@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { ObraDetailContent } from '@/components/obras/obra-detail-content'
 import { notFound } from 'next/navigation'
 
+export const dynamic = 'force-dynamic'
+
 export default async function ObraDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()

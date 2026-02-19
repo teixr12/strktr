@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { OrcamentosContent } from '@/components/orcamentos/orcamentos-content'
 
+export const dynamic = 'force-dynamic'
+
 export default async function OrcamentosPage() {
   const supabase = await createClient()
   const { data: orcamentos } = await supabase
