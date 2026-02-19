@@ -1,6 +1,6 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  serverExternalPackages: ['@supabase/ssr', '@supabase/supabase-js'],
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'ui-avatars.com' },

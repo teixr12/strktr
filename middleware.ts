@@ -1,6 +1,8 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+export const runtime = 'nodejs'
+
 export async function middleware(request: NextRequest) {
   // If env vars are missing, skip auth (don't crash the entire site)
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
