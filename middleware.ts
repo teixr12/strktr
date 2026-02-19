@@ -1,34 +1,64 @@
+import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export function middleware(request: NextRequest) {
-  // Check for Supabase auth cookie (sb-<project-ref>-auth-token)
-  // This is a lightweight check — actual auth verification happens in server components
-  const hasAuthCookie = request.cookies.getAll().some(
-    (cookie) =>
-      cookie.name.startsWith('sb-') && cookie.name.endsWith('-auth-token')
-  )
-
-  const { pathname } = request.nextUrl
-  const isAuthPage =
-    pathname.startsWith('/login') ||
-    pathname.startsWith('/register') ||
-    pathname.startsWith('/auth')
-
-  // No auth cookie + not on auth page → redirect to login
-  if (!hasAuthCookie && !isAuthPage) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
-    return NextResponse.redirect(url)
+export async function middleware(request: NextRequest) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseKey) {
+    return NextResponse.next()
   }
 
-  // Has auth cookie + on auth page → redirect to dashboard
-  if (hasAuthCookie && isAuthPage) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
-    return NextResponse.redirect(url)
+  let supabaseResponse = NextResponse.next({ request })
+
+  try {
+    const supabase = createServerClient(supabaseUrl, supabaseKey, {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          )
+          supabaseResponse = NextResponse.next({ request })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          )
+        },
+      },
+    })
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    // Unauthenticated → redirect to login (except auth pages)
+    if (
+      !user &&
+      !request.nextUrl.pathname.startsWith('/login') &&
+      !request.nextUrl.pathname.startsWith('/register') &&
+      !request.nextUrl.pathname.startsWith('/auth')
+    ) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/login'
+      return NextResponse.redirect(url)
+    }
+
+    // Authenticated on auth pages → redirect to dashboard
+    if (
+      user &&
+      (request.nextUrl.pathname.startsWith('/login') ||
+        request.nextUrl.pathname.startsWith('/register'))
+    ) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/dashboard'
+      return NextResponse.redirect(url)
+    }
+  } catch (e) {
+    console.error('Middleware auth error:', e)
   }
 
-  return NextResponse.next()
+  return supabaseResponse
 }
 
 export const config = {
