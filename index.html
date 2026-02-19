@@ -1,0 +1,2177 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>STRKTR — Gestão Premium de Obras</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Supabase JS v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+          colors: {
+            sand: { 50:'#fafaf9',100:'#f5f5f4',200:'#e7e5e4',300:'#d6d3d1',400:'#a8a29e',500:'#d4a373',600:'#bc8a5f',700:'#a47e53',800:'#8b6f47',900:'#735c3d' },
+            ocean: { 50:'#f0f9ff',100:'#e0f2fe',200:'#bae6fd',300:'#7dd3fc',400:'#38bdf8',500:'#0ea5e9',600:'#0284c7',700:'#0369a1',800:'#075985',900:'#0c4a6e' },
+          },
+          boxShadow: { apple:'0 2px 12px rgba(0,0,0,0.08)', 'apple-hover':'0 8px 30px rgba(0,0,0,0.12)' }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body { font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased; overflow-x:hidden; }
+    input,textarea,select { user-select:text; -webkit-user-select:text; }
+    .transition-apple { transition:all .3s cubic-bezier(.4,0,.2,1); }
+    .glass { background:rgba(255,255,255,.72); backdrop-filter:saturate(180%) blur(20px); border:1px solid rgba(255,255,255,.3); }
+    .dark .glass { background:rgba(30,30,30,.72); border:1px solid rgba(255,255,255,.08); }
+    .glass-card { background:rgba(255,255,255,.6); backdrop-filter:blur(20px); border:.5px solid rgba(0,0,0,.04); box-shadow:0 4px 24px rgba(0,0,0,.04); }
+    .dark .glass-card { background:rgba(40,40,40,.6); border:.5px solid rgba(255,255,255,.06); box-shadow:0 4px 24px rgba(0,0,0,.2); }
+    ::-webkit-scrollbar { width:6px; height:6px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:rgba(0,0,0,.15); border-radius:3px; }
+    .dark ::-webkit-scrollbar-thumb { background:rgba(255,255,255,.15); }
+    @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes scaleIn { from{opacity:0;transform:scale(.95)} to{opacity:1;transform:scale(1)} }
+    @keyframes spin { to{transform:rotate(360deg)} }
+    .animate-slide-up { animation:slideUp .6s cubic-bezier(.4,0,.2,1) forwards; }
+    .animate-scale-in { animation:scaleIn .4s cubic-bezier(.4,0,.2,1) forwards; }
+    .animate-spin-slow { animation:spin 1s linear infinite; }
+    .stagger-1{animation-delay:.1s}.stagger-2{animation-delay:.2s}.stagger-3{animation-delay:.3s}.stagger-4{animation-delay:.4s}
+    .progress-fill { transition:width 1.2s cubic-bezier(.4,0,.2,1); }
+    .btn-press:active { transform:scale(.96); }
+    @keyframes modalIn { from{opacity:0;transform:translateY(20px) scale(.98)} to{opacity:1;transform:translateY(0) scale(1)} }
+    .modal-animate { animation:modalIn .4s cubic-bezier(.4,0,.2,1) forwards; }
+    .modal-glass { background:rgba(255,255,255,.98); backdrop-filter:blur(20px); }
+    .dark .modal-glass { background:rgba(30,30,30,.98); }
+    .timeline-item::before { content:''; position:absolute; left:15px; top:40px; bottom:-20px; width:2px; background:linear-gradient(to bottom,#d4a373,transparent); }
+    .timeline-item:last-child::before { display:none; }
+    .nav-item.active { background:rgb(245 245 244); color:rgb(68 50 29); }
+    .dark .nav-item.active { background:rgba(212,163,115,.15); color:rgb(212 163 115); }
+    .toast { position:fixed; bottom:24px; right:24px; z-index:9999; padding:12px 20px; border-radius:12px; font-size:14px; font-weight:500; box-shadow:0 8px 30px rgba(0,0,0,.15); animation:slideUp .3s ease; }
+    .toast-success { background:#10b981; color:#fff; }
+    .toast-error { background:#ef4444; color:#fff; }
+    .toast-info { background:#3b82f6; color:#fff; }
+    .skeleton { background:linear-gradient(90deg,rgba(0,0,0,.06) 25%,rgba(0,0,0,.12) 50%,rgba(0,0,0,.06) 75%); background-size:200% 100%; animation:shimmer 1.5s infinite; border-radius:8px; }
+    .dark .skeleton { background:linear-gradient(90deg,rgba(255,255,255,.04) 25%,rgba(255,255,255,.08) 50%,rgba(255,255,255,.04) 75%); background-size:200% 100%; }
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    @media (hover:none) and (pointer:coarse) { button,a { min-height:44px; min-width:44px; } }
+  </style>
+</head>
+<body class="bg-gray-50 dark:bg-black text-gray-900 dark:text-gray-100 antialiased">
+
+<!-- =========================================================
+     SUPABASE CONFIG — Substitua com seus dados
+     ========================================================= -->
+<script>
+  // ⚠️  CONFIGURE AQUI antes de usar
+  const SUPABASE_URL = 'https://hlfwlcnqhupsvxiglzox.supabase.co'
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhsZndsY25xaHVwc3Z4aWdsem94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0NDgxNzgsImV4cCI6MjA4NzAyNDE3OH0.uq99KAh7kq_7qP1Uo8lo6ZsFQxzcUEwDz1NN0jQvBKo'
+
+  const { createClient } = supabase
+  const sb = createClient(SUPABASE_URL, SUPABASE_KEY)
+
+  // Estado global
+  const state = {
+    user: null,
+    profile: null,
+    obras: [],
+    leads: [],
+    transacoes: [],
+    equipe: [],
+    visitas: [],
+    orcamentos: [],
+    orcItems: [],
+    editOrcId: null,
+    loading: true,
+    dragLeadId: null,
+    currentTab: 'dashboard'
+  }
+
+  let financeChart = null
+
+  // ---- Utilitários ----
+  function fmt(n) { return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0}).format(n||0) }
+  function fmtN(n) { return new Intl.NumberFormat('pt-BR').format(n||0) }
+  function fmtDate(d) { if(!d) return '—'; return new Date(d+'T12:00:00').toLocaleDateString('pt-BR') }
+  function fmtDateTime(d) { if(!d) return '—'; return new Date(d).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) }
+  function ago(d) { if(!d) return ''; const diff=Date.now()-new Date(d); const days=Math.floor(diff/86400000); if(days===0) return 'hoje'; if(days===1) return 'ontem'; return `há ${days} dias`; }
+
+  function toast(msg, type='success') {
+    const t = document.createElement('div')
+    t.className = `toast toast-${type}`
+    t.textContent = msg
+    document.body.appendChild(t)
+    setTimeout(()=>t.remove(), 3500)
+  }
+
+  function showLoader(el) { if(el) el.innerHTML = `<div class="flex items-center justify-center py-12"><div class="w-8 h-8 border-2 border-sand-500 border-t-transparent rounded-full animate-spin-slow"></div></div>` }
+
+  // ---- Auth ----
+  async function init() {
+    const { data: { session } } = await sb.auth.getSession()
+    if (session) {
+      state.user = session.user
+      await loadProfile()
+      showApp()
+    } else {
+      showLogin()
+    }
+
+    sb.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN') {
+        state.user = session.user
+        await loadProfile()
+        showApp()
+      } else if (event === 'SIGNED_OUT') {
+        state.user = null
+        state.profile = null
+        showLogin()
+      }
+    })
+  }
+
+  async function doLogin() {
+    const email = document.getElementById('loginEmail').value.trim()
+    const pass = document.getElementById('loginPass').value
+    const btn = document.getElementById('loginBtn')
+    if (!email || !pass) return toast('Preencha email e senha', 'error')
+    btn.disabled = true
+    btn.innerHTML = `<div class="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin-slow mx-auto"></div>`
+    const { error } = await sb.auth.signInWithPassword({ email, password: pass })
+    if (error) {
+      toast(error.message === 'Invalid login credentials' ? 'Email ou senha incorretos' : error.message, 'error')
+      btn.disabled = false
+      btn.innerHTML = '<span>Acessar Sistema</span><i data-lucide="arrow-right" class="w-5 h-5 group-hover:translate-x-1 transition-transform"></i>'
+      lucide.createIcons()
+    }
+  }
+
+  async function doRegister() {
+    const nome = document.getElementById('regNome').value.trim()
+    const email = document.getElementById('regEmail').value.trim()
+    const pass = document.getElementById('regPass').value
+    if (!nome || !email || !pass) return toast('Preencha todos os campos', 'error')
+    if (pass.length < 6) return toast('Senha deve ter ao menos 6 caracteres', 'error')
+    const { error } = await sb.auth.signUp({ email, password: pass, options: { data: { nome } } })
+    if (error) return toast(error.message, 'error')
+    toast('Conta criada! Verifique seu email para confirmar.', 'info')
+    toggleRegister()
+  }
+
+  async function doLogout() {
+    await sb.auth.signOut()
+    toast('Até logo!', 'info')
+  }
+
+  async function loadProfile() {
+    const { data } = await sb.from('profiles').select('*').eq('id', state.user.id).single()
+    if (data) {
+      state.profile = data
+      const el = document.getElementById('sidebarUserName')
+      const em = document.getElementById('sidebarUserEmail')
+      if (el) el.textContent = data.nome || data.email
+      if (em) em.textContent = data.email
+      const av = document.getElementById('sidebarAvatar')
+      if (av) av.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(data.nome||'U')}&background=d4a373&color=fff`
+    }
+  }
+
+  function showLogin() {
+    document.getElementById('loginScreen').classList.remove('hidden')
+    document.getElementById('mainApp').classList.add('hidden')
+  }
+
+  function showApp() {
+    document.getElementById('loginScreen').classList.add('hidden')
+    const app = document.getElementById('mainApp')
+    app.classList.remove('hidden')
+    loadAll()
+  }
+
+  function toggleRegister() {
+    const login = document.getElementById('loginForm')
+    const reg = document.getElementById('registerForm')
+    login.classList.toggle('hidden')
+    reg.classList.toggle('hidden')
+  }
+
+  // ---- Data Loading ----
+  async function loadAll() {
+    await Promise.all([loadObras(), loadLeads(), loadTransacoes(), loadEquipe(), loadVisitas(), loadOrcamentos()])
+    renderDashboard()
+    updateNavBadges()
+  }
+
+  async function loadObras() {
+    const { data } = await sb.from('obras').select('*').order('created_at', { ascending: false })
+    state.obras = data || []
+  }
+
+  async function loadLeads() {
+    const { data } = await sb.from('leads').select('*').order('created_at', { ascending: false })
+    state.leads = data || []
+  }
+
+  async function loadTransacoes() {
+    const { data } = await sb.from('transacoes').select('*, obras(nome)').order('data', { ascending: false })
+    state.transacoes = data || []
+  }
+
+  async function loadEquipe() {
+    const { data } = await sb.from('equipe').select('*').order('nome')
+    state.equipe = data || []
+  }
+
+  async function loadVisitas() {
+    const { data } = await sb.from('visitas').select('*, obras(nome), leads(nome)').order('data_hora')
+    state.visitas = data || []
+  }
+
+  // ---- DASHBOARD ----
+  function renderDashboard() {
+    const obrasAtivas = state.obras.filter(o => o.status === 'Em Andamento').length
+    const totalContrato = state.obras.reduce((s,o) => s+(o.valor_contrato||0), 0)
+    const leadsQ = state.leads.filter(l => l.status !== 'Perdido').length
+    const receitas = state.transacoes.filter(t=>t.tipo==='Receita').reduce((s,t)=>s+(t.valor||0),0)
+    const despesas = state.transacoes.filter(t=>t.tipo==='Despesa').reduce((s,t)=>s+(t.valor||0),0)
+    const hotLeads = state.leads.filter(l=>l.temperatura==='Hot').length
+
+    setKPI('kpiObras', obrasAtivas, 'obras ativas')
+    setKPI('kpiReceita', fmt(receitas), 'receita total')
+    setKPI('kpiLeads', leadsQ, 'leads ativos')
+    setKPI('kpiSaldo', fmt(receitas-despesas), 'saldo líquido')
+
+    renderDashObras()
+    renderDashLeads()
+    renderDashTimeline()
+  }
+
+  function setKPI(id, val, label) {
+    const el = document.getElementById(id)
+    if (el) { el.querySelector('.kpi-val').textContent = val; el.querySelector('.kpi-label').textContent = label; }
+  }
+
+  function renderDashObras() {
+    const el = document.getElementById('dashObras')
+    if (!el) return
+    const obras = state.obras.slice(0, 3)
+    if (!obras.length) { el.innerHTML = emptyState('Nenhuma obra cadastrada', 'hard-hat'); return }
+    el.innerHTML = obras.map(o => obraCard(o, true)).join('')
+    lucide.createIcons()
+    animateProgressBars()
+  }
+
+  function renderDashLeads() {
+    const el = document.getElementById('dashLeads')
+    if (!el) return
+    const hot = state.leads.filter(l=>l.temperatura==='Hot').slice(0,4)
+    el.innerHTML = hot.length ? hot.map(l => leadMiniCard(l)).join('') : `<p class="text-sm text-gray-500 text-center py-4">Nenhum lead hot</p>`
+    lucide.createIcons()
+  }
+
+  function renderDashTimeline() {
+    const el = document.getElementById('dashTimeline')
+    if (!el) return
+    const prox = state.visitas.filter(v=>v.status==='Agendado').slice(0,5)
+    el.innerHTML = prox.length ? prox.map(v => `
+      <div class="timeline-item relative pl-10 pb-5">
+        <div class="absolute left-0 w-8 h-8 rounded-full bg-sand-100 dark:bg-sand-900/30 flex items-center justify-center">
+          <i data-lucide="calendar" class="w-4 h-4 text-sand-600 dark:text-sand-400"></i>
+        </div>
+        <div class="glass-card rounded-xl p-3">
+          <p class="font-semibold text-sm text-gray-900 dark:text-white">${esc(v.titulo)}</p>
+          <p class="text-xs text-gray-500 mt-0.5">${fmtDateTime(v.data_hora)} · ${v.obras?.nome||v.leads?.nome||v.local||''}</p>
+          <span class="inline-flex mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${tipoColor(v.tipo)}">${v.tipo}</span>
+        </div>
+      </div>`).join('') : `<p class="text-sm text-gray-500 text-center py-4">Nenhuma visita agendada</p>`
+    lucide.createIcons()
+  }
+
+  // ---- OBRAS ----
+  function renderObras() {
+    const el = document.getElementById('obrasGrid')
+    if (!el) return
+    if (!state.obras.length) { el.innerHTML = emptyState('Nenhuma obra cadastrada ainda', 'hard-hat'); return }
+    el.innerHTML = state.obras.map(o => obraCard(o, false)).join('')
+    lucide.createIcons()
+    animateProgressBars()
+  }
+
+  function obraCard(o, mini) {
+    const statusColor = { 'Em Andamento':'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', 'Concluída':'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', 'Pausada':'bg-gray-100 text-gray-600', 'Cancelada':'bg-red-100 text-red-700', 'Orçamento':'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' }
+    const iconColor = { sand:'from-sand-200 to-sand-300 dark:from-sand-800 dark:to-sand-900', ocean:'from-ocean-200 to-ocean-300 dark:from-ocean-800 dark:to-ocean-900', green:'from-green-200 to-green-300 dark:from-green-800 dark:to-green-900' }
+    const iColor = iconColor[o.cor||'sand'] || iconColor.sand
+    return `
+    <div class="group p-4 md:p-5 rounded-2xl bg-white/50 dark:bg-gray-800/50 border border-transparent hover:border-sand-300 dark:hover:border-sand-700 transition-all cursor-pointer hover:shadow-lg" onclick="openObraModal('${o.id}')">
+      <div class="flex items-start justify-between mb-3 gap-2">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-xl bg-gradient-to-br ${iColor} flex items-center justify-center flex-shrink-0">
+            <i data-lucide="${o.icone||'home'}" class="w-5 h-5 text-sand-700 dark:text-sand-300"></i>
+          </div>
+          <div class="min-w-0">
+            <h4 class="font-semibold text-sm md:text-base text-gray-900 dark:text-white truncate">${esc(o.nome)}</h4>
+            <p class="text-xs text-gray-500 dark:text-gray-400 truncate">${esc(o.cliente)} · ${esc(o.local)}</p>
+          </div>
+        </div>
+        <div class="text-right flex-shrink-0">
+          <div class="font-semibold text-sm text-gray-900 dark:text-white">${fmt(o.valor_contrato)}</div>
+          ${o.area_m2 ? `<div class="text-xs text-gray-400">${o.area_m2}m²</div>` : ''}
+        </div>
+      </div>
+      <div class="flex items-center justify-between mb-2">
+        <span class="px-2 py-0.5 text-xs font-bold rounded-full ${statusColor[o.status]||statusColor['Em Andamento']}">${o.status}</span>
+        <span class="text-xs text-gray-500">${o.etapa_atual||''}</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="flex-1">
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-gray-500">Progresso</span>
+            <span class="font-semibold text-sand-600 dark:text-sand-400">${o.progresso||0}%</span>
+          </div>
+          <div class="h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div class="h-full bg-gradient-to-r from-sand-400 to-sand-600 rounded-full progress-fill" style="width:${o.progresso||0}%"></div>
+          </div>
+        </div>
+      </div>
+      ${o.data_previsao && !mini ? `<div class="mt-2 text-xs text-gray-400">Previsão: ${fmtDate(o.data_previsao)}</div>` : ''}
+    </div>`
+  }
+
+  function leadMiniCard(l) {
+    const tempColor = { Hot:'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', Morno:'bg-amber-100 text-amber-700', Frio:'bg-blue-100 text-blue-700' }
+    return `
+    <div class="flex items-center justify-between p-3 rounded-xl bg-white/50 dark:bg-gray-800/50 hover:bg-sand-50 dark:hover:bg-sand-900/20 transition-all cursor-pointer" onclick="openLeadModal('${l.id}')">
+      <div class="flex items-center gap-3 min-w-0">
+        <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(l.nome)}&background=d4a373&color=fff" class="w-8 h-8 rounded-full flex-shrink-0">
+        <div class="min-w-0">
+          <p class="font-semibold text-sm text-gray-900 dark:text-white truncate">${esc(l.nome)}</p>
+          <p class="text-xs text-gray-500 truncate">${l.tipo_projeto||l.empresa||''}</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <span class="px-2 py-0.5 text-[10px] font-bold rounded-full ${tempColor[l.temperatura]||tempColor.Morno}">${l.temperatura}</span>
+        <span class="text-xs font-semibold text-gray-700 dark:text-gray-300">${l.valor_potencial ? fmt(l.valor_potencial) : ''}</span>
+      </div>
+    </div>`
+  }
+
+  // ---- OBRA MODAL ----
+  let currentObraId = null
+  async function openObraModal(id) {
+    currentObraId = id
+    const modal = document.getElementById('obraModal')
+    modal.classList.remove('hidden')
+    document.body.style.overflow = 'hidden'
+    switchObraTab('resumo')
+
+    const obra = state.obras.find(o => o.id === id)
+    if (!obra) return
+
+    document.getElementById('modalObraTitle').textContent = obra.nome
+    document.getElementById('modalObraCliente').textContent = `${obra.cliente} · ${obra.local}`
+    document.getElementById('modalProgressText').textContent = (obra.progresso||0)+'%'
+    document.getElementById('modalProgressBar').style.width = (obra.progresso||0)+'%'
+
+    // Load etapas
+    const { data: etapas } = await sb.from('obra_etapas').select('*').eq('obra_id', id).order('ordem')
+    renderObraEtapas(etapas||[], obra)
+
+    // Load financeiro da obra
+    const txObra = state.transacoes.filter(t => t.obra_id === id)
+    renderObraFinanceiro(txObra, obra)
+  }
+
+  function closeObraModal() {
+    document.getElementById('obraModal').classList.add('hidden')
+    document.body.style.overflow = ''
+    currentObraId = null
+  }
+
+  function renderObraEtapas(etapas, obra) {
+    const el = document.getElementById('obra-tab-etapas')
+    if (!el) return
+    const statusInfo = { Concluída:{c:'text-emerald-600',i:'check-circle'}, 'Em Andamento':{c:'text-amber-600',i:'loader'}, Pendente:{c:'text-gray-400',i:'circle'}, Bloqueada:{c:'text-red-500',i:'x-circle'} }
+    el.innerHTML = `
+      <div class="flex justify-end mb-3">
+        <button onclick="openNewEtapaModal()" class="flex items-center gap-2 px-3 py-1.5 bg-sand-500 hover:bg-sand-600 text-white text-xs font-medium rounded-full transition-all btn-press">
+          <i data-lucide="plus" class="w-3.5 h-3.5"></i> Nova Etapa
+        </button>
+      </div>
+      ${etapas.length ? etapas.map(e => {
+        const s = statusInfo[e.status] || statusInfo.Pendente
+        return `
+        <div class="flex items-center gap-3 p-3 rounded-xl bg-white/50 dark:bg-gray-800/50 mb-2 group">
+          <div class="${s.c} flex-shrink-0"><i data-lucide="${s.i}" class="w-5 h-5"></i></div>
+          <div class="flex-1 min-w-0">
+            <p class="font-medium text-sm text-gray-900 dark:text-white">${esc(e.nome)}</p>
+            ${e.responsavel ? `<p class="text-xs text-gray-500">${esc(e.responsavel)}</p>` : ''}
+          </div>
+          <div class="flex items-center gap-1">
+            <select onchange="updateEtapaStatus('${e.id}', this.value)" class="text-xs border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1 bg-white dark:bg-gray-800 cursor-pointer">
+              ${['Pendente','Em Andamento','Concluída','Bloqueada'].map(s2 => `<option ${e.status===s2?'selected':''} value="${s2}">${s2}</option>`).join('')}
+            </select>
+            <button onclick="deleteEtapa('${e.id}')" class="opacity-0 group-hover:opacity-100 p-1 text-red-400 hover:text-red-600 transition-all"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+          </div>
+        </div>`
+      }).join('') : `<p class="text-sm text-gray-500 text-center py-6">Nenhuma etapa cadastrada</p>`}
+    `
+    lucide.createIcons()
+  }
+
+  function renderObraFinanceiro(txs, obra) {
+    const el = document.getElementById('obra-tab-financeiro')
+    if (!el) return
+    const rec = txs.filter(t=>t.tipo==='Receita').reduce((s,t)=>s+t.valor,0)
+    const dep = txs.filter(t=>t.tipo==='Despesa').reduce((s,t)=>s+t.valor,0)
+    el.innerHTML = `
+      <div class="grid grid-cols-3 gap-3 mb-4">
+        <div class="glass-card rounded-xl p-3 text-center">
+          <p class="text-xs text-gray-500 mb-1">Contrato</p>
+          <p class="font-bold text-sm text-gray-900 dark:text-white">${fmt(obra.valor_contrato)}</p>
+        </div>
+        <div class="glass-card rounded-xl p-3 text-center">
+          <p class="text-xs text-gray-500 mb-1">Recebido</p>
+          <p class="font-bold text-sm text-emerald-600">${fmt(rec)}</p>
+        </div>
+        <div class="glass-card rounded-xl p-3 text-center">
+          <p class="text-xs text-gray-500 mb-1">Gasto</p>
+          <p class="font-bold text-sm text-red-500">${fmt(dep)}</p>
+        </div>
+      </div>
+      ${txs.length ? txs.map(t => `
+        <div class="flex items-center justify-between p-2.5 rounded-xl bg-white/50 dark:bg-gray-800/50 mb-1.5">
+          <div class="flex items-center gap-2.5">
+            <div class="w-6 h-6 rounded-full flex items-center justify-center ${t.tipo==='Receita'?'bg-emerald-100':'bg-red-100'}">
+              <i data-lucide="${t.tipo==='Receita'?'trending-up':'trending-down'}" class="w-3.5 h-3.5 ${t.tipo==='Receita'?'text-emerald-600':'text-red-500'}"></i>
+            </div>
+            <div>
+              <p class="text-xs font-medium text-gray-800 dark:text-gray-200">${esc(t.descricao)}</p>
+              <p class="text-[10px] text-gray-400">${fmtDate(t.data)} · ${t.categoria}</p>
+            </div>
+          </div>
+          <span class="font-semibold text-sm ${t.tipo==='Receita'?'text-emerald-600':'text-red-500'}">${t.tipo==='Receita'?'+':'-'}${fmt(t.valor)}</span>
+        </div>
+      `).join('') : `<p class="text-sm text-gray-500 text-center py-4">Nenhuma transação</p>`}
+    `
+    lucide.createIcons()
+  }
+
+  function switchObraTab(tab) {
+    document.querySelectorAll('[data-obra-tab]').forEach(btn => {
+      btn.classList.remove('text-sand-600','dark:text-sand-400','border-b-2','border-sand-500')
+      btn.classList.add('text-gray-500')
+    })
+    const active = document.querySelector(`[data-obra-tab="${tab}"]`)
+    if (active) { active.classList.remove('text-gray-500'); active.classList.add('text-sand-600','dark:text-sand-400','border-b-2','border-sand-500') }
+    document.querySelectorAll('.obra-tab-content').forEach(c => c.classList.add('hidden'))
+    const t = document.getElementById(`obra-tab-${tab}`)
+    if (t) t.classList.remove('hidden')
+  }
+
+  // ---- LEADS ----
+  function renderLeads() {
+    const board = document.getElementById('kanbanBoard')
+    if (!board) return
+    const COLS = [
+      { id:'Novo Lead', label:'Novo Lead', dot:'#9ca3af', bg:'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300' },
+      { id:'Qualificado', label:'Qualificado', dot:'#f59e0b', bg:'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
+      { id:'Proposta', label:'Proposta', dot:'#3b82f6', bg:'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
+      { id:'Negociação', label:'Negociação', dot:'#8b5cf6', bg:'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' },
+      { id:'Fechado', label:'Fechado ✓', dot:'#10b981', bg:'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' },
+    ]
+    const tempEmoji = { Hot:'🔥', Morno:'🌤', Frio:'❄️' }
+    board.innerHTML = COLS.map(col => {
+      const leads = state.leads.filter(l => l.status === col.id)
+      const totalVal = leads.reduce((s, l) => s + (l.valor_potencial||0), 0)
+      return `<div class="flex-shrink-0 w-64 md:w-72">
+        <div class="flex items-center justify-between mb-3 px-1">
+          <div class="flex items-center gap-2">
+            <div class="w-2 h-2 rounded-full" style="background:${col.dot}"></div>
+            <span class="font-semibold text-sm text-gray-900 dark:text-white">${col.label}</span>
+            <span class="text-xs font-bold px-2 py-0.5 rounded-full ${col.bg}">${leads.length}</span>
+          </div>
+          ${totalVal > 0 ? `<span class="text-xs font-semibold text-sand-600">${fmt(totalVal)}</span>` : ''}
+        </div>
+        <div class="glass-card rounded-2xl p-3 min-h-[180px] space-y-2 kanban-drop-zone" 
+             data-col="${col.id}"
+             ondragover="event.preventDefault();this.classList.add('ring-2','ring-sand-400')"
+             ondragleave="this.classList.remove('ring-2','ring-sand-400')"
+             ondrop="kanbanDrop(event,'${col.id}')">
+          ${leads.map(l => `<div class="bg-white dark:bg-gray-800 rounded-xl p-3 shadow-sm border border-gray-100 dark:border-gray-700 cursor-pointer hover:shadow-md transition-all"
+               draggable="true" data-lead-id="${l.id}"
+               ondragstart="state.dragLeadId='${l.id}';this.style.opacity='.5'"
+               ondragend="this.style.opacity='1'"
+               onclick="openLeadModal('${l.id}')">
+            <div class="flex items-start justify-between mb-1">
+              <h4 class="font-semibold text-sm text-gray-900 dark:text-white truncate">${esc(l.nome)}</h4>
+              <span class="text-sm ml-1 flex-shrink-0">${tempEmoji[l.temperatura]||''}</span>
+            </div>
+            ${l.tipo_obra ? `<p class="text-xs text-gray-500 mb-2 truncate">${esc(l.tipo_obra)}</p>` : ''}
+            <div class="flex items-center justify-between mt-2">
+              ${l.valor_potencial ? `<span class="text-xs font-semibold text-sand-600">${fmt(l.valor_potencial)}</span>` : '<span></span>'}
+              ${l.telefone ? `<a href="https://wa.me/55${l.telefone.replace(/\D/g,'')}" target="_blank" onclick="event.stopPropagation()" class="p-1 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 rounded-lg transition-colors"><i data-lucide="message-circle" class="w-3.5 h-3.5 text-emerald-600"></i></a>` : ''}
+            </div>
+          </div>`).join('')}
+          ${leads.length === 0 ? '<div class="text-center py-8 text-xs text-gray-400 dark:text-gray-600">Arraste leads aqui</div>' : ''}
+        </div>
+      </div>`
+    }).join('')
+    lucide.createIcons()
+  }
+
+  async function kanbanDrop(event, newStatus) {
+    event.preventDefault()
+    event.currentTarget.classList.remove('ring-2','ring-sand-400')
+    const leadId = state.dragLeadId
+    if (!leadId) return
+    state.dragLeadId = null
+    await supabase.from('leads').update({ status: newStatus }).eq('id', leadId).eq('user_id', state.user.id)
+    await loadLeads()
+    toast(`Lead movido para ${newStatus}`, 'success')
+  }
+
+
+  function renderFinanceiro() {
+    const el = document.getElementById('financeiroContent')
+    if (!el) return
+    const receitas = state.transacoes.filter(t=>t.tipo==='Receita').reduce((s,t)=>s+t.valor,0)
+    const despesas = state.transacoes.filter(t=>t.tipo==='Despesa').reduce((s,t)=>s+t.valor,0)
+    const saldo = receitas - despesas
+    document.getElementById('finReceitas').textContent = fmt(receitas)
+    document.getElementById('finDespesas').textContent = fmt(despesas)
+    document.getElementById('finSaldo').textContent = fmt(saldo)
+    document.getElementById('finSaldo').className = `text-2xl font-bold ${saldo>=0?'text-emerald-600':'text-red-500'}`
+
+    const txEl = document.getElementById('transacoesLista')
+    if (!txEl) return
+    txEl.innerHTML = state.transacoes.slice(0,50).map(t => `
+      <div class="flex items-center justify-between p-3 rounded-xl bg-white/50 dark:bg-gray-800/50 hover:bg-gray-100/50 dark:hover:bg-gray-700/50 transition-all group">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="w-8 h-8 rounded-full flex items-center justify-center ${t.tipo==='Receita'?'bg-emerald-100 dark:bg-emerald-900/30':'bg-red-100 dark:bg-red-900/30'} flex-shrink-0">
+            <i data-lucide="${t.tipo==='Receita'?'arrow-down-left':'arrow-up-right'}" class="w-4 h-4 ${t.tipo==='Receita'?'text-emerald-600':'text-red-500'}"></i>
+          </div>
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-gray-900 dark:text-white truncate">${esc(t.descricao)}</p>
+            <p class="text-xs text-gray-400">${fmtDate(t.data)} · ${t.categoria} ${t.obras?.nome ? '· '+esc(t.obras.nome) : ''}</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <span class="font-semibold text-sm ${t.tipo==='Receita'?'text-emerald-600':'text-red-500'}">${t.tipo==='Receita'?'+':'-'}${fmt(t.valor)}</span>
+          <button onclick="deleteTx('${t.id}')" class="opacity-0 group-hover:opacity-100 p-1 text-red-400 hover:text-red-600 transition-all"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+        </div>
+      </div>
+    `).join('')
+    lucide.createIcons()
+    initFinanceChart()
+  }
+
+  function initFinanceChart() {
+    const canvas = document.getElementById('financeChart')
+    if (!canvas) return
+    if (financeChart) { financeChart.destroy(); financeChart = null }
+    const isDark = document.documentElement.classList.contains('dark')
+    const tc = isDark ? '#9ca3af' : '#6b7280'
+
+    // Agrupa por mês
+    const meses = {}
+    state.transacoes.forEach(t => {
+      const m = t.data?.substring(0,7)
+      if (!m) return
+      if (!meses[m]) meses[m] = { r:0, d:0 }
+      if (t.tipo==='Receita') meses[m].r += t.valor
+      else meses[m].d += t.valor
+    })
+    const labels = Object.keys(meses).sort().slice(-6)
+    const recs = labels.map(m => Math.round((meses[m]?.r||0)/1000))
+    const deps = labels.map(m => Math.round((meses[m]?.d||0)/1000))
+    const fmtMes = m => { const [y,mo]=m.split('-'); return ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(mo)-1]+'/'+y.slice(2) }
+
+    financeChart = new Chart(canvas, {
+      type:'bar',
+      data: {
+        labels: labels.map(fmtMes),
+        datasets: [
+          { label:'Receitas', data:recs, backgroundColor:'rgba(52,211,153,.7)', borderRadius:6, barPercentage:.6 },
+          { label:'Despesas', data:deps, backgroundColor:'rgba(251,113,133,.7)', borderRadius:6, barPercentage:.6 }
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        plugins: { legend:{ labels:{color:tc,usePointStyle:true,font:{size:11}} }, tooltip:{ callbacks:{ label(ctx){ return ctx.dataset.label+': R$'+ctx.parsed.y+'k' } } } },
+        scales: { x:{grid:{display:false},ticks:{color:tc}}, y:{grid:{color:isDark?'rgba(255,255,255,.05)':'rgba(0,0,0,.05)',borderDash:[5,5]},ticks:{color:tc,callback:v=>'R$'+v+'k'}} }
+      }
+    })
+  }
+
+  // ---- EQUIPE ----
+  function renderEquipe() {
+    const el = document.getElementById('equipeGrid')
+    if (!el) return
+    if (!state.equipe.length) { el.innerHTML = emptyState('Nenhum membro da equipe', 'users'); return }
+    const stColor = { Ativo:'bg-emerald-100 text-emerald-700', Inativo:'bg-gray-100 text-gray-500', Férias:'bg-blue-100 text-blue-700' }
+    el.innerHTML = state.equipe.map(m => `
+      <div class="glass-card rounded-2xl p-4 hover:shadow-lg transition-all">
+        <div class="flex items-center gap-3 mb-3">
+          <img src="${m.avatar_url||`https://ui-avatars.com/api/?name=${encodeURIComponent(m.nome)}&background=d4a373&color=fff`}" class="w-12 h-12 rounded-full border-2 border-white dark:border-gray-700 shadow-sm">
+          <div class="flex-1 min-w-0">
+            <p class="font-semibold text-sm text-gray-900 dark:text-white truncate">${esc(m.nome)}</p>
+            <p class="text-xs text-gray-500 truncate">${esc(m.cargo)}</p>
+          </div>
+          <span class="px-2 py-0.5 text-[10px] font-bold rounded-full ${stColor[m.status]||stColor.Ativo}">${m.status}</span>
+        </div>
+        ${m.especialidade ? `<p class="text-xs text-gray-500 mb-2"><span class="font-medium">Especialidade:</span> ${esc(m.especialidade)}</p>` : ''}
+        ${m.telefone ? `<div class="flex items-center gap-1.5 text-xs text-gray-500 mb-1"><i data-lucide="phone" class="w-3 h-3"></i>${esc(m.telefone)}</div>` : ''}
+        <div class="flex items-center justify-between mt-3">
+          <div class="flex items-center gap-1">
+            ${'★'.repeat(Math.round(m.avaliacao||5))}
+            <span class="text-xs text-gray-400 ml-1">${m.avaliacao||5}</span>
+          </div>
+          ${m.valor_hora ? `<span class="text-xs font-semibold text-sand-600">${fmt(m.valor_hora)}/h</span>` : ''}
+        </div>
+      </div>
+    `).join('')
+    lucide.createIcons()
+  }
+
+  // ---- CALENDÁRIO ----
+  function renderCalendario() {
+    const el = document.getElementById('calendarioLista')
+    if (!el) return
+    const agendadas = state.visitas.filter(v => v.status !== 'Cancelado')
+    if (!agendadas.length) { el.innerHTML = emptyState('Nenhuma visita agendada', 'calendar-days'); return }
+    const tipoColor2 = { Visita:'bg-sand-100 text-sand-700', Reunião:'bg-ocean-100 text-ocean-700', Vistoria:'bg-purple-100 text-purple-700', Entrega:'bg-emerald-100 text-emerald-700', Outro:'bg-gray-100 text-gray-600' }
+    const stColor2 = { Agendado:'bg-amber-100 text-amber-700', Realizado:'bg-emerald-100 text-emerald-700', Cancelado:'bg-red-100 text-red-500', Reagendado:'bg-blue-100 text-blue-700' }
+
+    // Agrupar por data
+    const groups = {}
+    agendadas.forEach(v => {
+      const d = v.data_hora?.substring(0,10)
+      if (!groups[d]) groups[d] = []
+      groups[d].push(v)
+    })
+
+    el.innerHTML = Object.keys(groups).sort().map(d => `
+      <div class="mb-4">
+        <div class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">${fmtDate(d)}</div>
+        ${groups[d].map(v => `
+          <div class="flex items-start gap-3 p-3 glass-card rounded-xl mb-2 hover:shadow-md transition-all">
+            <div class="text-center flex-shrink-0 w-10">
+              <div class="text-xs font-bold text-sand-600">${new Date(v.data_hora).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
+              <div class="text-[10px] text-gray-400">${v.duracao_min||60}min</div>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="font-semibold text-sm text-gray-900 dark:text-white">${esc(v.titulo)}</p>
+              <p class="text-xs text-gray-500 mt-0.5">${v.obras?.nome||v.leads?.nome||v.local||''}</p>
+              <div class="flex gap-1.5 mt-1.5">
+                <span class="px-2 py-0.5 text-[10px] font-bold rounded-full ${tipoColor2[v.tipo]||tipoColor2.Outro}">${v.tipo}</span>
+                <span class="px-2 py-0.5 text-[10px] font-bold rounded-full ${stColor2[v.status]||stColor2.Agendado}">${v.status}</span>
+              </div>
+            </div>
+            <div class="flex gap-1">
+              <button onclick="deleteVisita('${v.id}')" class="p-1.5 text-gray-400 hover:text-red-500 transition-colors"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `).join('')
+    lucide.createIcons()
+  }
+
+  // ---- CRUD: Obra ----
+  async function saveObra() {
+    const isEdit = !!document.getElementById('obraFormId').value
+    const data = {
+      user_id: state.user.id,
+      nome: document.getElementById('obraFormNome').value.trim(),
+      cliente: document.getElementById('obraFormCliente').value.trim(),
+      local: document.getElementById('obraFormLocal').value.trim(),
+      tipo: document.getElementById('obraFormTipo').value,
+      valor_contrato: parseFloat(document.getElementById('obraFormValor').value)||0,
+      area_m2: parseFloat(document.getElementById('obraFormArea').value)||null,
+      progresso: parseInt(document.getElementById('obraFormProgresso').value)||0,
+      status: document.getElementById('obraFormStatus').value,
+      etapa_atual: document.getElementById('obraFormEtapa').value.trim(),
+      data_inicio: document.getElementById('obraFormInicio').value||null,
+      data_previsao: document.getElementById('obraFormPrevisao').value||null,
+      descricao: document.getElementById('obraFormDesc').value.trim(),
+    }
+    if (!data.nome || !data.cliente || !data.local) return toast('Preencha nome, cliente e local', 'error')
+
+    let error
+    if (isEdit) {
+      const r = await sb.from('obras').update(data).eq('id', document.getElementById('obraFormId').value)
+      error = r.error
+    } else {
+      const r = await sb.from('obras').insert(data)
+      error = r.error
+    }
+    if (error) return toast(error.message, 'error')
+    toast(isEdit ? 'Obra atualizada!' : 'Obra criada!', 'success')
+    closeModal('obraFormModal')
+    await loadObras()
+    renderObras()
+    renderDashboard()
+    updateNavBadges()
+  }
+
+  async function deleteObra(id) {
+    if (!confirm('Excluir esta obra? Esta ação não pode ser desfeita.')) return
+    const { error } = await sb.from('obras').delete().eq('id', id)
+    if (error) return toast(error.message, 'error')
+    toast('Obra excluída', 'info')
+    closeObraModal()
+    await loadObras()
+    renderObras()
+    renderDashboard()
+    updateNavBadges()
+  }
+
+  function openNewObraForm() {
+    document.getElementById('obraFormId').value = ''
+    document.getElementById('obraFormTitle').textContent = 'Nova Obra'
+    ;['Nome','Cliente','Local','Tipo','Valor','Area','Progresso','Status','Etapa','Inicio','Previsao','Desc'].forEach(f => {
+      const el = document.getElementById('obraForm'+f)
+      if (el) el.value = f==='Status'?'Em Andamento':f==='Tipo'?'Residencial':f==='Progresso'?'0':''
+    })
+    openModal('obraFormModal')
+  }
+
+  function openEditObraForm() {
+    if (!currentObraId) return
+    const o = state.obras.find(ob => ob.id === currentObraId)
+    if (!o) return
+    document.getElementById('obraFormId').value = o.id
+    document.getElementById('obraFormTitle').textContent = 'Editar Obra'
+    document.getElementById('obraFormNome').value = o.nome||''
+    document.getElementById('obraFormCliente').value = o.cliente||''
+    document.getElementById('obraFormLocal').value = o.local||''
+    document.getElementById('obraFormTipo').value = o.tipo||'Residencial'
+    document.getElementById('obraFormValor').value = o.valor_contrato||''
+    document.getElementById('obraFormArea').value = o.area_m2||''
+    document.getElementById('obraFormProgresso').value = o.progresso||0
+    document.getElementById('obraFormStatus').value = o.status||'Em Andamento'
+    document.getElementById('obraFormEtapa').value = o.etapa_atual||''
+    document.getElementById('obraFormInicio').value = o.data_inicio||''
+    document.getElementById('obraFormPrevisao').value = o.data_previsao||''
+    document.getElementById('obraFormDesc').value = o.descricao||''
+    closeObraModal()
+    openModal('obraFormModal')
+  }
+
+  // ---- CRUD: Etapas ----
+  async function updateEtapaStatus(id, status) {
+    const { error } = await sb.from('obra_etapas').update({status}).eq('id', id)
+    if (error) toast(error.message, 'error')
+    else toast('Etapa atualizada!', 'success')
+  }
+
+  async function deleteEtapa(id) {
+    if (!confirm('Excluir esta etapa?')) return
+    await sb.from('obra_etapas').delete().eq('id', id)
+    const { data: etapas } = await sb.from('obra_etapas').select('*').eq('obra_id', currentObraId).order('ordem')
+    const obra = state.obras.find(o => o.id === currentObraId)
+    renderObraEtapas(etapas||[], obra)
+    toast('Etapa excluída', 'info')
+  }
+
+  function openNewEtapaModal() { openModal('etapaFormModal') }
+
+  async function saveEtapa() {
+    const nome = document.getElementById('etapaFormNome').value.trim()
+    const resp = document.getElementById('etapaFormResp').value.trim()
+    const status = document.getElementById('etapaFormStatus').value
+    if (!nome) return toast('Preencha o nome da etapa', 'error')
+    const { error } = await sb.from('obra_etapas').insert({ obra_id: currentObraId, user_id: state.user.id, nome, responsavel: resp, status })
+    if (error) return toast(error.message, 'error')
+    toast('Etapa adicionada!', 'success')
+    closeModal('etapaFormModal')
+    document.getElementById('etapaFormNome').value = ''
+    document.getElementById('etapaFormResp').value = ''
+    const { data: etapas } = await sb.from('obra_etapas').select('*').eq('obra_id', currentObraId).order('ordem')
+    const obra = state.obras.find(o => o.id === currentObraId)
+    renderObraEtapas(etapas||[], obra)
+  }
+
+  // ---- CRUD: Lead ----
+  let currentLeadId = null
+  async function openLeadModal(id) {
+    currentLeadId = id
+    const lead = state.leads.find(l => l.id === id)
+    if (!lead) return
+    const tempColor = { Hot:'text-red-600', Morno:'text-amber-600', Frio:'text-blue-600' }
+    document.getElementById('leadModalTitle').textContent = lead.nome
+    document.getElementById('leadModalSub').textContent = `${lead.status} · ${lead.temperatura}`
+    document.getElementById('leadModalBody').innerHTML = `
+      <div class="grid grid-cols-2 gap-3">
+        ${lead.email ? `<div class="col-span-2 flex items-center gap-2 text-sm"><i data-lucide="mail" class="w-4 h-4 text-gray-400 flex-shrink-0"></i><a href="mailto:${esc(lead.email)}" class="text-ocean-600 hover:underline truncate">${esc(lead.email)}</a></div>` : ''}
+        ${lead.telefone ? `<div class="col-span-2 flex items-center gap-2 text-sm"><i data-lucide="phone" class="w-4 h-4 text-gray-400 flex-shrink-0"></i><a href="tel:${esc(lead.telefone)}" class="text-ocean-600 hover:underline">${esc(lead.telefone)}</a></div>` : ''}
+        ${lead.empresa ? `<div class="col-span-2 flex items-center gap-2 text-sm"><i data-lucide="building-2" class="w-4 h-4 text-gray-400"></i><span>${esc(lead.empresa)}</span></div>` : ''}
+        ${lead.tipo_projeto ? `<div class="glass-card rounded-xl p-3"><p class="text-xs text-gray-500">Projeto</p><p class="font-semibold text-sm mt-0.5">${esc(lead.tipo_projeto)}</p></div>` : ''}
+        ${lead.local ? `<div class="glass-card rounded-xl p-3"><p class="text-xs text-gray-500">Local</p><p class="font-semibold text-sm mt-0.5">${esc(lead.local)}</p></div>` : ''}
+        ${lead.valor_potencial ? `<div class="glass-card rounded-xl p-3"><p class="text-xs text-gray-500">Valor Potencial</p><p class="font-semibold text-sm text-emerald-600 mt-0.5">${fmt(lead.valor_potencial)}</p></div>` : ''}
+        <div class="glass-card rounded-xl p-3"><p class="text-xs text-gray-500">Origem</p><p class="font-semibold text-sm mt-0.5">${lead.origem||'—'}</p></div>
+      </div>
+      ${lead.notas ? `<div class="mt-3 glass-card rounded-xl p-3"><p class="text-xs text-gray-500 mb-1">Notas</p><p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">${esc(lead.notas)}</p></div>` : ''}
+      <div class="mt-4 flex gap-2">
+        <select onchange="updateLeadStatus('${lead.id}', 'status', this.value)" class="flex-1 text-sm border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 bg-white dark:bg-gray-800">
+          ${['Novo','Qualificado','Proposta','Negociação','Fechado','Perdido'].map(s=>`<option ${lead.status===s?'selected':''} value="${s}">${s}</option>`).join('')}
+        </select>
+        <select onchange="updateLeadStatus('${lead.id}', 'temperatura', this.value)" class="flex-1 text-sm border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 bg-white dark:bg-gray-800">
+          ${['Hot','Morno','Frio'].map(t=>`<option ${lead.temperatura===t?'selected':''} value="${t}">${t}</option>`).join('')}
+        </select>
+      </div>
+      <div class="mt-2 flex gap-2">
+        ${lead.telefone ? `<a href="https://wa.me/55${lead.telefone.replace(/\D/g,'')}" target="_blank" class="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-xl transition-all"><i data-lucide="message-circle" class="w-4 h-4"></i>WhatsApp</a>` : ''}
+        <button onclick="deleteLead('${lead.id}')" class="flex items-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium rounded-xl transition-all dark:bg-red-900/20 dark:hover:bg-red-900/30"><i data-lucide="trash-2" class="w-4 h-4"></i>Excluir</button>
+      </div>
+    `
+    document.getElementById('leadModal').classList.remove('hidden')
+    document.body.style.overflow = 'hidden'
+    lucide.createIcons()
+  }
+
+  function closeLeadModal() {
+    document.getElementById('leadModal').classList.add('hidden')
+    document.body.style.overflow = ''
+    currentLeadId = null
+  }
+
+  async function updateLeadStatus(id, field, value) {
+    const { error } = await sb.from('leads').update({ [field]: value, updated_at: new Date().toISOString() }).eq('id', id)
+    if (error) return toast(error.message, 'error')
+    const lead = state.leads.find(l => l.id === id)
+    if (lead) lead[field] = value
+    toast('Lead atualizado!', 'success')
+    renderLeads()
+    updateNavBadges()
+  }
+
+  async function deleteLead(id) {
+    if (!confirm('Excluir este lead?')) return
+    const { error } = await sb.from('leads').delete().eq('id', id)
+    if (error) return toast(error.message, 'error')
+    toast('Lead excluído', 'info')
+    closeLeadModal()
+    await loadLeads()
+    renderLeads()
+    updateNavBadges()
+  }
+
+  async function saveLead() {
+    const data = {
+      user_id: state.user.id,
+      nome: document.getElementById('leadFormNome').value.trim(),
+      email: document.getElementById('leadFormEmail').value.trim()||null,
+      telefone: document.getElementById('leadFormTelefone').value.trim()||null,
+      empresa: document.getElementById('leadFormEmpresa').value.trim()||null,
+      origem: document.getElementById('leadFormOrigem').value,
+      temperatura: document.getElementById('leadFormTemp').value,
+      valor_potencial: parseFloat(document.getElementById('leadFormValor').value)||null,
+      tipo_projeto: document.getElementById('leadFormTipoProjeto').value.trim()||null,
+      local: document.getElementById('leadFormLocal').value.trim()||null,
+      notas: document.getElementById('leadFormNotas').value.trim()||null,
+      status: 'Novo'
+    }
+    if (!data.nome) return toast('Preencha o nome do lead', 'error')
+    const { error } = await sb.from('leads').insert(data)
+    if (error) return toast(error.message, 'error')
+    toast('Lead cadastrado!', 'success')
+    closeModal('leadFormModal')
+    ;['Nome','Email','Telefone','Empresa','Valor','TipoProjeto','Local','Notas'].forEach(f => { const el = document.getElementById('leadForm'+f); if(el) el.value='' })
+    await loadLeads()
+    renderLeads()
+    updateNavBadges()
+  }
+
+  // ---- CRUD: Transação ----
+  async function saveTx() {
+    const data = {
+      user_id: state.user.id,
+      tipo: document.getElementById('txFormTipo').value,
+      categoria: document.getElementById('txFormCategoria').value.trim(),
+      descricao: document.getElementById('txFormDescricao').value.trim(),
+      valor: parseFloat(document.getElementById('txFormValor').value)||0,
+      data: document.getElementById('txFormData').value || new Date().toISOString().substring(0,10),
+      obra_id: document.getElementById('txFormObra').value || null,
+      status: 'Confirmado'
+    }
+    if (!data.descricao || !data.valor || !data.categoria) return toast('Preencha todos os campos obrigatórios', 'error')
+    const { error } = await sb.from('transacoes').insert(data)
+    if (error) return toast(error.message, 'error')
+    toast('Transação salva!', 'success')
+    closeModal('txFormModal')
+    await loadTransacoes()
+    renderFinanceiro()
+    renderDashboard()
+  }
+
+  async function deleteTx(id) {
+    if (!confirm('Excluir esta transação?')) return
+    await sb.from('transacoes').delete().eq('id', id)
+    await loadTransacoes()
+    renderFinanceiro()
+    renderDashboard()
+    toast('Transação excluída', 'info')
+  }
+
+  // ---- CRUD: Membro equipe ----
+  async function saveMembro() {
+    const data = {
+      user_id: state.user.id,
+      nome: document.getElementById('membroFormNome').value.trim(),
+      cargo: document.getElementById('membroFormCargo').value.trim(),
+      telefone: document.getElementById('membroFormTel').value.trim()||null,
+      email: document.getElementById('membroFormEmail').value.trim()||null,
+      especialidade: document.getElementById('membroFormEsp').value.trim()||null,
+      status: 'Ativo'
+    }
+    if (!data.nome || !data.cargo) return toast('Preencha nome e cargo', 'error')
+    const { error } = await sb.from('equipe').insert(data)
+    if (error) return toast(error.message, 'error')
+    toast('Membro adicionado!', 'success')
+    closeModal('membroFormModal')
+    await loadEquipe()
+    renderEquipe()
+  }
+
+  // ---- CRUD: Visita ----
+  async function saveVisita() {
+    const data = {
+      user_id: state.user.id,
+      titulo: document.getElementById('visitaFormTitulo').value.trim(),
+      tipo: document.getElementById('visitaFormTipo').value,
+      data_hora: document.getElementById('visitaFormDataHora').value,
+      duracao_min: parseInt(document.getElementById('visitaFormDuracao').value)||60,
+      local: document.getElementById('visitaFormLocal').value.trim()||null,
+      obra_id: document.getElementById('visitaFormObra').value||null,
+      status: 'Agendado'
+    }
+    if (!data.titulo || !data.data_hora) return toast('Preencha título e data/hora', 'error')
+    const { error } = await sb.from('visitas').insert(data)
+    if (error) return toast(error.message, 'error')
+    toast('Visita agendada!', 'success')
+    closeModal('visitaFormModal')
+    await loadVisitas()
+    renderCalendario()
+    renderDashboard()
+  }
+
+  async function deleteVisita(id) {
+    if (!confirm('Cancelar esta visita?')) return
+    await sb.from('visitas').delete().eq('id', id)
+    await loadVisitas()
+    renderCalendario()
+    toast('Visita cancelada', 'info')
+  }
+
+  // ---- Profile ----
+  async function saveProfile() {
+    const data = {
+      nome: document.getElementById('profileNome').value.trim(),
+      telefone: document.getElementById('profileTel').value.trim()||null,
+      empresa: document.getElementById('profileEmpresa').value.trim()||null,
+      cargo: document.getElementById('profileCargo').value.trim()||null
+    }
+    const { error } = await sb.from('profiles').update(data).eq('id', state.user.id)
+    if (error) return toast(error.message, 'error')
+    Object.assign(state.profile, data)
+    toast('Perfil salvo!', 'success')
+    closeModal('profileModal')
+    loadProfile()
+  }
+
+  function openProfileModal() {
+    if (state.profile) {
+      document.getElementById('profileNome').value = state.profile.nome||''
+      document.getElementById('profileTel').value = state.profile.telefone||''
+      document.getElementById('profileEmpresa').value = state.profile.empresa||''
+      document.getElementById('profileCargo').value = state.profile.cargo||''
+    }
+    openModal('profileModal')
+  }
+
+  // ---- Nav & Tab ----
+  function switchTab(tab) {
+    state.currentTab = tab
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'))
+    const btn = document.querySelector(`[data-tab="${tab}"]`)
+    if (btn) btn.classList.add('active')
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'))
+    const tabEl = document.getElementById('tab-'+tab)
+    if (tabEl) tabEl.classList.remove('hidden')
+
+    const titles = { dashboard:'Visão Geral', obras:'Obras', leads:'Leads VIP', orcamentos:'Orçamentos', financeiro:'Financeiro', equipe:'Equipe', calendario:'Agenda' }
+    document.getElementById('pageTitle').textContent = titles[tab]||tab
+
+    // Lazy render
+    if (tab==='obras') renderObras()
+    else if (tab==='leads') renderLeads()
+    else if (tab==='financeiro') renderFinanceiro()
+    else if (tab==='equipe') renderEquipe()
+    else if (tab==='calendario') { renderCalendario(); populateObraSelects() }
+    else renderDashboard()
+
+    if (window.innerWidth < 768) closeMobileMenu()
+  }
+
+  function populateObraSelects() {
+    const selects = ['txFormObra','visitaFormObra']
+    selects.forEach(id => {
+      const el = document.getElementById(id)
+      if (!el) return
+      el.innerHTML = '<option value="">Nenhuma obra</option>' + state.obras.map(o=>`<option value="${o.id}">${esc(o.nome)}</option>`).join('')
+    })
+  }
+
+  function updateNavBadges() {
+    const obrasCount = state.obras.filter(o=>o.status==='Em Andamento').length
+    const hotCount = state.leads.filter(l=>l.temperatura==='Hot').length
+    const el1 = document.getElementById('badgeObras')
+    const el2 = document.getElementById('badgeLeads')
+    if (el1) el1.textContent = obrasCount
+    if (el2) el2.textContent = hotCount ? hotCount+' Hot' : ''
+  }
+
+  function toggleMobileMenu() {
+    const sidebar = document.getElementById('sidebar')
+    const overlay = document.getElementById('mobileOverlay')
+    const isOpen = !sidebar.classList.contains('-translate-x-full')
+    if (isOpen) closeMobileMenu()
+    else { sidebar.classList.remove('-translate-x-full'); overlay.classList.remove('hidden'); document.body.style.overflow='hidden' }
+  }
+
+  function closeMobileMenu() {
+    document.getElementById('sidebar').classList.add('-translate-x-full')
+    document.getElementById('mobileOverlay').classList.add('hidden')
+    document.body.style.overflow=''
+  }
+
+  function toggleTheme() {
+    const html = document.documentElement
+    html.classList.toggle('dark')
+    localStorage.setItem('theme', html.classList.contains('dark') ? 'dark' : 'light')
+    if (financeChart) { financeChart.destroy(); financeChart=null; setTimeout(initFinanceChart,100) }
+  }
+
+  // ---- Modal helpers ----
+  function openModal(id) { document.getElementById(id).classList.remove('hidden'); document.body.style.overflow='hidden' }
+  function closeModal(id) { document.getElementById(id).classList.add('hidden'); document.body.style.overflow='' }
+
+  // ---- Misc ----
+  function esc(s) { if(!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+  function emptyState(msg, icon) { return `<div class="flex flex-col items-center justify-center py-12 gap-3 text-center"><div class="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center"><i data-lucide="${icon}" class="w-7 h-7 text-gray-400"></i></div><p class="text-sm text-gray-500">${msg}</p></div>` }
+  function tipoColor(t) { const m={Visita:'bg-sand-100 text-sand-700',Reunião:'bg-ocean-100 text-ocean-700',Vistoria:'bg-purple-100 text-purple-700',Entrega:'bg-emerald-100 text-emerald-700',Outro:'bg-gray-100 text-gray-600'}; return m[t]||m.Outro }
+  function animateProgressBars() {
+    setTimeout(()=>{
+      document.querySelectorAll('.progress-fill').forEach(b=>{ const w=b.style.width; b.style.width='0'; setTimeout(()=>b.style.width=w,50) })
+    },100)
+  }
+
+  // ---- Init ----
+  if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    document.documentElement.classList.add('dark')
+  }
+
+  window.addEventListener('load', () => {
+    init()
+    lucide.createIcons()
+  })
+
+  // ===== ORCAMENTOS =====
+  async function loadOrcamentos() {
+    const { data } = await supabase
+      .from('orcamentos')
+      .select('*, orcamento_itens(*)')
+      .eq('user_id', state.user.id)
+      .order('created_at', { ascending: false })
+    state.orcamentos = data || []
+    renderOrcamentos()
+    updateOrcBadge()
+  }
+
+  function updateOrcBadge() {
+    const badge = document.getElementById('badgeOrc')
+    if (!badge) return
+    const pendentes = state.orcamentos.filter(o => o.status === 'Enviado').length
+    if (pendentes > 0) {
+      badge.textContent = pendentes
+      badge.classList.remove('hidden')
+    } else {
+      badge.classList.add('hidden')
+    }
+  }
+
+  function renderOrcamentos() {
+    renderOrcStats()
+    filterOrcamentos()
+  }
+
+  function renderOrcStats() {
+    const el = document.getElementById('orcStats')
+    if (!el) return
+    const total = state.orcamentos.length
+    const enviados = state.orcamentos.filter(o => o.status === 'Enviado').length
+    const aprovados = state.orcamentos.filter(o => o.status === 'Aprovado').length
+    const valorAprovado = state.orcamentos.filter(o => o.status === 'Aprovado')
+      .reduce((s, o) => {
+        const itens = o.orcamento_itens || []
+        return s + itens.reduce((si, i) => si + (i.quantidade * i.valor_unitario), 0)
+      }, 0)
+    el.innerHTML = `
+      <div class="glass-card rounded-2xl p-4">
+        <div class="text-2xl font-bold text-gray-900 dark:text-white">${total}</div>
+        <div class="text-xs text-gray-500 mt-1">Total</div>
+      </div>
+      <div class="glass-card rounded-2xl p-4">
+        <div class="text-2xl font-bold text-blue-600">${enviados}</div>
+        <div class="text-xs text-gray-500 mt-1">Enviados</div>
+      </div>
+      <div class="glass-card rounded-2xl p-4">
+        <div class="text-2xl font-bold text-emerald-600">${aprovados}</div>
+        <div class="text-xs text-gray-500 mt-1">Aprovados</div>
+      </div>
+      <div class="glass-card rounded-2xl p-4">
+        <div class="text-xl font-bold text-sand-600">${fmt(valorAprovado)}</div>
+        <div class="text-xs text-gray-500 mt-1">Receita aprovada</div>
+      </div>
+    `
+  }
+
+  function filterOrcamentos() {
+    const search = (document.getElementById('orcSearch')?.value || '').toLowerCase()
+    const statusFilter = document.getElementById('orcStatusFilter')?.value || ''
+    let list = state.orcamentos
+    if (search) list = list.filter(o => o.titulo.toLowerCase().includes(search))
+    if (statusFilter) list = list.filter(o => o.status === statusFilter)
+    renderOrcList(list)
+  }
+
+  function renderOrcList(list) {
+    const el = document.getElementById('orcList')
+    if (!el) return
+    if (!list.length) {
+      el.innerHTML = `<div class="p-12 text-center text-gray-400 dark:text-gray-600">
+        <i data-lucide="file-text" class="w-12 h-12 mx-auto mb-3 opacity-30"></i>
+        <p class="text-sm">Nenhum orçamento encontrado</p>
+        <p class="text-xs mt-1 text-gray-400">Crie seu primeiro orçamento!</p>
+      </div>`
+      lucide.createIcons(); return
+    }
+    const stColors = { Rascunho:'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300', Enviado:'bg-blue-100 text-blue-700', Aprovado:'bg-emerald-100 text-emerald-700', Recusado:'bg-red-100 text-red-500' }
+    el.innerHTML = list.map(o => {
+      const itens = o.orcamento_itens || []
+      const total = itens.reduce((s, i) => s + (i.quantidade * i.valor_unitario), 0)
+      const lead = state.leads.find(l => l.id === o.lead_id)
+      return `<div class="p-4 md:p-5 flex items-center justify-between gap-3 hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors cursor-pointer" onclick="viewOrcamento('${o.id}')">
+        <div class="flex items-center gap-3 md:gap-4 min-w-0">
+          <div class="w-10 h-10 rounded-xl bg-sand-100 dark:bg-sand-900/30 flex items-center justify-center flex-shrink-0">
+            <i data-lucide="file-text" class="w-5 h-5 text-sand-600"></i>
+          </div>
+          <div class="min-w-0">
+            <p class="font-semibold text-sm text-gray-900 dark:text-white truncate">${esc(o.titulo)}</p>
+            <div class="flex items-center gap-2 mt-0.5 flex-wrap">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${stColors[o.status]||'bg-gray-100 text-gray-600'}">${o.status}</span>
+              ${lead ? `<span class="text-xs text-gray-500">${esc(lead.nome)}</span>` : ''}
+              <span class="text-xs text-gray-400">${itens.length} iten${itens.length !== 1 ? 's' : ''}</span>
+            </div>
+          </div>
+        </div>
+        <div class="text-right flex-shrink-0">
+          <div class="font-semibold text-sm text-gray-900 dark:text-white">${fmt(total)}</div>
+          <div class="text-xs text-gray-400">${fmtDateTime(o.created_at)}</div>
+        </div>
+      </div>`
+    }).join('')
+    lucide.createIcons()
+  }
+
+  function openNewOrcamento() {
+    state.editOrcId = null
+    state.orcItems = []
+    document.getElementById('orcModalTitle').textContent = 'Novo Orçamento'
+    document.getElementById('orcTitulo').value = ''
+    document.getElementById('orcStatus').value = 'Rascunho'
+    document.getElementById('orcValidade').value = ''
+    document.getElementById('orcObs').value = ''
+    // populate lead/obra selects
+    const leadSel = document.getElementById('orcLeadSelect')
+    if (leadSel) leadSel.innerHTML = '<option value="">Nenhum lead</option>' + state.leads.map(l => `<option value="${l.id}">${esc(l.nome)}</option>`).join('')
+    const obraSel = document.getElementById('orcObraSelect')
+    if (obraSel) obraSel.innerHTML = '<option value="">Nenhuma obra</option>' + state.obras.map(o => `<option value="${o.id}">${esc(o.nome)}</option>`).join('')
+    renderOrcModalItems()
+    openModal('orcModal')
+  }
+
+  function addOrcItem() {
+    state.orcItems.push({ tempId: Date.now(), descricao: '', unidade: 'm²', quantidade: 1, valor_unitario: 0 })
+    renderOrcModalItems()
+  }
+
+  function removeOrcItem(tempId) {
+    state.orcItems = state.orcItems.filter(i => i.tempId != tempId)
+    renderOrcModalItems()
+  }
+
+  function updateOrcItem(tempId, field, value) {
+    const item = state.orcItems.find(i => i.tempId == tempId)
+    if (!item) return
+    if (field === 'quantidade' || field === 'valor_unitario') {
+      item[field] = parseFloat(value) || 0
+    } else {
+      item[field] = value
+    }
+    renderOrcTotal()
+  }
+
+  function renderOrcTotal() {
+    const total = state.orcItems.reduce((s, i) => s + (i.quantidade * i.valor_unitario), 0)
+    const el = document.getElementById('orcModalTotal')
+    if (el) el.textContent = fmt(total)
+  }
+
+  function renderOrcModalItems() {
+    const tbody = document.getElementById('orcItemsTbody')
+    if (!tbody) return
+    tbody.innerHTML = state.orcItems.map(item => `
+      <tr class="border-t border-gray-100 dark:border-gray-700">
+        <td class="p-2">
+          <input type="text" value="${esc(item.descricao)}" placeholder="Descrição..."
+                 class="w-full px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-sand-400"
+                 onchange="updateOrcItem(${item.tempId},'descricao',this.value)">
+        </td>
+        <td class="p-2 w-20">
+          <input type="text" value="${esc(item.unidade)}"
+                 class="w-full px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-sand-400 text-center"
+                 onchange="updateOrcItem(${item.tempId},'unidade',this.value)">
+        </td>
+        <td class="p-2 w-24">
+          <input type="number" value="${item.quantidade}" min="0" step="0.01"
+                 class="w-full px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-sand-400 text-right"
+                 oninput="updateOrcItem(${item.tempId},'quantidade',this.value);renderOrcTotal()">
+        </td>
+        <td class="p-2 w-28">
+          <input type="number" value="${item.valor_unitario}" min="0" step="0.01"
+                 class="w-full px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-sand-400 text-right"
+                 oninput="updateOrcItem(${item.tempId},'valor_unitario',this.value);renderOrcTotal()">
+        </td>
+        <td class="p-2 text-right text-sm font-medium text-gray-700 dark:text-gray-300 w-28 whitespace-nowrap">
+          ${fmt(item.quantidade * item.valor_unitario)}
+        </td>
+        <td class="p-2 w-10 text-center">
+          <button onclick="removeOrcItem(${item.tempId})" class="p-1 hover:bg-red-100 dark:hover:bg-red-900/20 rounded-lg transition-colors">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5 text-gray-400 hover:text-red-500"></i>
+          </button>
+        </td>
+      </tr>
+    `).join('')
+    renderOrcTotal()
+    lucide.createIcons()
+  }
+
+  async function saveOrcamento() {
+    const titulo = document.getElementById('orcTitulo').value.trim()
+    if (!titulo) { toast('Título é obrigatório', 'error'); return }
+    const totalVal = state.orcItems.reduce((s, i) => s + (i.quantidade * i.valor_unitario), 0)
+    const payload = {
+      user_id: state.user.id,
+      titulo,
+      lead_id: document.getElementById('orcLeadSelect')?.value || null,
+      obra_id: document.getElementById('orcObraSelect')?.value || null,
+      status: document.getElementById('orcStatus').value,
+      validade: document.getElementById('orcValidade').value || null,
+      observacoes: document.getElementById('orcObs').value.trim(),
+      valor_total: totalVal
+    }
+    if (!payload.lead_id) delete payload.lead_id
+    if (!payload.obra_id) delete payload.obra_id
+    if (!payload.validade) delete payload.validade
+    
+    let orcId = state.editOrcId
+    let error
+    if (orcId) {
+      ;({ error } = await supabase.from('orcamentos').update(payload).eq('id', orcId))
+      if (!error) await supabase.from('orcamento_itens').delete().eq('orcamento_id', orcId)
+    } else {
+      const { data, error: e } = await supabase.from('orcamentos').insert(payload).select().single()
+      error = e; if (data) orcId = data.id
+    }
+    if (error) { toast('Erro: ' + error.message, 'error'); return }
+    if (orcId && state.orcItems.length > 0) {
+      const items = state.orcItems.map((i, idx) => ({
+        orcamento_id: orcId,
+        descricao: i.descricao || 'Item',
+        unidade: i.unidade || 'm²',
+        quantidade: i.quantidade,
+        valor_unitario: i.valor_unitario,
+        ordem: idx
+      }))
+      await supabase.from('orcamento_itens').insert(items)
+    }
+    closeModal('orcModal')
+    await loadOrcamentos()
+    toast('Orçamento salvo!', 'success')
+  }
+
+  async function viewOrcamento(id) {
+    const o = state.orcamentos.find(x => x.id === id)
+    if (!o) return
+    state.editOrcId = id
+    const itens = o.orcamento_itens || []
+    const total = itens.reduce((s, i) => s + (i.quantidade * i.valor_unitario), 0)
+    const lead = state.leads.find(l => l.id === o.lead_id)
+    const obra = state.obras.find(ob => ob.id === o.obra_id)
+    const stColors = { Rascunho:'bg-gray-100 text-gray-600', Enviado:'bg-blue-100 text-blue-700', Aprovado:'bg-emerald-100 text-emerald-700', Recusado:'bg-red-100 text-red-500' }
+    document.getElementById('orcViewTitle').textContent = o.titulo
+    document.getElementById('orcViewBody').innerHTML = `
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${stColors[o.status]||'bg-gray-100 text-gray-600'}">${o.status}</span>
+        ${lead ? `<span class="text-sm text-gray-600 dark:text-gray-400"><span class="text-gray-400">Cliente:</span> ${esc(lead.nome)}</span>` : ''}
+        ${obra ? `<span class="text-sm text-gray-600 dark:text-gray-400"><span class="text-gray-400">Obra:</span> ${esc(obra.nome)}</span>` : ''}
+        ${o.validade ? `<span class="text-sm text-gray-500">Válido até ${fmtDate(o.validade)}</span>` : ''}
+      </div>
+      ${o.observacoes ? `<p class="text-sm text-gray-500 italic p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl">"${esc(o.observacoes)}"</p>` : ''}
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm min-w-[500px]">
+          <thead class="bg-gray-50 dark:bg-gray-900/50 text-xs text-gray-500 font-semibold uppercase">
+            <tr>
+              <th class="text-left px-4 py-3">Descrição</th>
+              <th class="text-center px-3 py-3 w-16">Un.</th>
+              <th class="text-right px-3 py-3 w-20">Qtd</th>
+              <th class="text-right px-3 py-3 w-28">Vl. Unit.</th>
+              <th class="text-right px-4 py-3 w-28">Total</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+            ${itens.map((i, idx) => `<tr class="${idx%2?'bg-gray-50/50 dark:bg-gray-900/20':''}">
+              <td class="px-4 py-3">${esc(i.descricao)}</td>
+              <td class="px-3 py-3 text-center text-gray-500">${i.unidade}</td>
+              <td class="px-3 py-3 text-right">${i.quantidade}</td>
+              <td class="px-3 py-3 text-right">${fmt(i.valor_unitario)}</td>
+              <td class="px-4 py-3 text-right font-semibold">${fmt(i.quantidade * i.valor_unitario)}</td>
+            </tr>`).join('')}
+          </tbody>
+          <tfoot class="border-t-2 border-gray-200 dark:border-gray-700 bg-sand-50 dark:bg-sand-900/20">
+            <tr>
+              <td colspan="4" class="px-4 py-4 text-right font-bold text-base">Total do Orçamento:</td>
+              <td class="px-4 py-4 text-right font-bold text-xl text-sand-600">${fmt(total)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    `
+    openModal('orcViewModal')
+    lucide.createIcons()
+  }
+
+  function editCurrentOrcamento() {
+    const o = state.orcamentos.find(x => x.id === state.editOrcId)
+    if (!o) return
+    closeModal('orcViewModal')
+    state.orcItems = (o.orcamento_itens || []).map((i, idx) => ({ tempId: Date.now()+idx, descricao: i.descricao, unidade: i.unidade, quantidade: i.quantidade, valor_unitario: i.valor_unitario }))
+    document.getElementById('orcModalTitle').textContent = 'Editar Orçamento'
+    document.getElementById('orcTitulo').value = o.titulo || ''
+    document.getElementById('orcStatus').value = o.status || 'Rascunho'
+    document.getElementById('orcValidade').value = o.validade || ''
+    document.getElementById('orcObs').value = o.observacoes || ''
+    const leadSel = document.getElementById('orcLeadSelect')
+    if (leadSel) { leadSel.innerHTML = '<option value="">Nenhum lead</option>' + state.leads.map(l => `<option value="${l.id}" ${l.id === o.lead_id ? 'selected' : ''}>${esc(l.nome)}</option>`).join('') }
+    const obraSel = document.getElementById('orcObraSelect')
+    if (obraSel) { obraSel.innerHTML = '<option value="">Nenhuma obra</option>' + state.obras.map(ob => `<option value="${ob.id}" ${ob.id === o.obra_id ? 'selected' : ''}>${esc(ob.nome)}</option>`).join('') }
+    renderOrcModalItems()
+    openModal('orcModal')
+  }
+
+  async function deleteCurrentOrcamento() {
+    if (!confirm('Excluir este orçamento permanentemente?')) return
+    await supabase.from('orcamento_itens').delete().eq('orcamento_id', state.editOrcId)
+    await supabase.from('orcamentos').delete().eq('id', state.editOrcId)
+    closeModal('orcViewModal')
+    await loadOrcamentos()
+    toast('Orçamento excluído', 'info')
+  }
+
+  function printOrcamento() {
+    const o = state.orcamentos.find(x => x.id === state.editOrcId)
+    if (!o) return
+    const itens = o.orcamento_itens || []
+    const total = itens.reduce((s, i) => s + (i.quantidade * i.valor_unitario), 0)
+    const lead = state.leads.find(l => l.id === o.lead_id)
+    const statusColor = { Rascunho:'#6b7280', Enviado:'#2563eb', Aprovado:'#059669', Recusado:'#dc2626' }
+    const printWin = window.open('', '_blank', 'width=900,height=700')
+    printWin.document.write(`<!DOCTYPE html><html><head><title>Orçamento - ${o.titulo}</title>
+    <style>body{font-family:system-ui,sans-serif;max-width:800px;margin:0 auto;padding:2rem;color:#111}
+    table{width:100%;border-collapse:collapse}th,td{padding:.75rem 1rem;text-align:left}
+    thead tr{background:#f9fafb}tbody tr:nth-child(even){background:#fafafa}
+    tfoot tr{background:#fff7ed;border-top:2px solid #e5e7eb}
+    .badge{padding:.25rem .75rem;border-radius:9999px;font-size:.75rem;font-weight:600;background:${statusColor[o.status]}20;color:${statusColor[o.status]}}
+    @media print{button{display:none!important}}
+    </style></head><body>
+    <button onclick="window.print()" style="margin-bottom:1rem;padding:.5rem 1rem;background:#d4a373;color:#fff;border:none;border-radius:.5rem;cursor:pointer;">🖨️ Imprimir</button>
+    <div style="display:flex;justify-content:space-between;align-items:start;border-bottom:2px solid #e5e7eb;padding-bottom:1.5rem;margin-bottom:2rem">
+      <div><h1 style="font-size:2rem;font-weight:700;color:#d4a373;margin:0">STRKTR</h1><p style="color:#6b7280;margin:.25rem 0 0">Gestão Premium de Obras</p></div>
+      <div style="text-align:right"><p style="font-size:.75rem;color:#9ca3af;margin:0">Gerado em ${new Date().toLocaleDateString('pt-BR')}</p><span class="badge">${o.status}</span></div>
+    </div>
+    <h2 style="font-size:1.5rem;font-weight:600;margin-bottom:.5rem">${o.titulo}</h2>
+    ${lead ? `<p style="color:#6b7280;margin-bottom:1rem">Cliente: <strong>${lead.nome}</strong>${lead.telefone ? ' • ' + lead.telefone : ''}</p>` : ''}
+    ${o.observacoes ? `<p style="color:#6b7280;font-style:italic;padding:1rem;background:#f9fafb;border-radius:.5rem;margin-bottom:1.5rem">${o.observacoes}</p>` : ''}
+    <table>
+      <thead><tr><th>Descrição</th><th style="text-align:center;width:60px">Un.</th><th style="text-align:right;width:80px">Qtd</th><th style="text-align:right;width:120px">Vl. Unit.</th><th style="text-align:right;width:120px">Total</th></tr></thead>
+      <tbody>${itens.map((i,idx) => `<tr><td>${i.descricao}</td><td style="text-align:center;color:#6b7280">${i.unidade}</td><td style="text-align:right">${i.quantidade}</td><td style="text-align:right">${new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(i.valor_unitario)}</td><td style="text-align:right;font-weight:600">${new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(i.quantidade*i.valor_unitario)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td colspan="4" style="text-align:right;font-weight:700;font-size:1rem">Total:</td><td style="text-align:right;font-weight:700;font-size:1.25rem;color:#d4a373">${new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(total)}</td></tr></tfoot>
+    </table>
+    ${o.validade ? `<p style="text-align:right;color:#6b7280;font-size:.875rem;margin-top:1rem">Válido até: ${fmtDate(o.validade)}</p>` : ''}
+    <div style="margin-top:3rem;padding-top:1.5rem;border-top:1px solid #e5e7eb;text-align:center;color:#9ca3af;font-size:.75rem">
+      STRKTR — Gestão Premium de Obras • DBE11 LTDA • CNPJ: 53.903.617/0001-83
+    </div>
+    </body></html>`)
+    printWin.document.close()
+  }
+</script>
+
+<!-- ========================================
+     LOGIN SCREEN
+     ======================================== -->
+<div id="loginScreen" class="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-sand-100 via-white to-ocean-50 dark:from-gray-900 dark:via-gray-950 dark:to-slate-950 transition-opacity duration-500 p-4">
+  <div class="w-full max-w-md">
+    <!-- Login Form -->
+    <div id="loginForm" class="glass rounded-3xl p-8 md:p-10 shadow-2xl animate-scale-in">
+      <div class="text-center mb-8">
+        <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-sand-400 to-sand-600 flex items-center justify-center shadow-xl">
+          <i data-lucide="waves" class="w-8 h-8 text-white"></i>
+        </div>
+        <h1 class="text-2xl font-semibold tracking-tight mb-1 bg-gradient-to-r from-sand-700 to-sand-500 bg-clip-text text-transparent dark:from-sand-400 dark:to-sand-200">STRKTR</h1>
+        <p class="text-gray-500 dark:text-gray-400 text-xs font-medium">Sistema de Gestão Premium</p>
+      </div>
+      <div class="space-y-3">
+        <div class="relative">
+          <input type="email" id="loginEmail" placeholder="Email" class="w-full px-4 py-3.5 bg-white/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 transition-all dark:text-white">
+          <i data-lucide="mail" class="w-4 h-4 absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+        </div>
+        <div class="relative">
+          <input type="password" id="loginPass" placeholder="Senha" onkeydown="if(event.key==='Enter')doLogin()" class="w-full px-4 py-3.5 bg-white/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 transition-all dark:text-white">
+          <i data-lucide="lock" class="w-4 h-4 absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+        </div>
+        <button id="loginBtn" onclick="doLogin()" class="w-full mt-2 py-3.5 bg-gradient-to-r from-sand-500 to-sand-700 hover:from-sand-600 hover:to-sand-800 text-white font-medium rounded-2xl shadow-lg shadow-sand-500/25 transition-all btn-press flex items-center justify-center gap-2 group">
+          <span>Acessar Sistema</span>
+          <i data-lucide="arrow-right" class="w-4 h-4 group-hover:translate-x-1 transition-transform"></i>
+        </button>
+      </div>
+      <div class="mt-5 text-center">
+        <button onclick="toggleRegister()" class="text-sm text-gray-500 hover:text-sand-600 transition-colors">Criar conta →</button>
+      </div>
+    </div>
+
+    <!-- Register Form -->
+    <div id="registerForm" class="hidden glass rounded-3xl p-8 md:p-10 shadow-2xl animate-scale-in">
+      <div class="text-center mb-6">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Criar Conta</h2>
+        <p class="text-gray-500 text-xs mt-1">Preencha os dados para acessar</p>
+      </div>
+      <div class="space-y-3">
+        <input type="text" id="regNome" placeholder="Seu nome" class="w-full px-4 py-3.5 bg-white/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+        <input type="email" id="regEmail" placeholder="Email" class="w-full px-4 py-3.5 bg-white/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+        <input type="password" id="regPass" placeholder="Senha (mín. 6 caracteres)" onkeydown="if(event.key==='Enter')doRegister()" class="w-full px-4 py-3.5 bg-white/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+        <button onclick="doRegister()" class="w-full py-3.5 bg-gradient-to-r from-sand-500 to-sand-700 text-white font-medium rounded-2xl btn-press transition-all">Criar Conta</button>
+      </div>
+      <div class="mt-4 text-center">
+        <button onclick="toggleRegister()" class="text-sm text-gray-500 hover:text-sand-600 transition-colors">← Voltar ao login</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================
+     MAIN APP
+     ======================================== -->
+<div id="mainApp" class="hidden h-screen flex flex-col md:flex-row">
+
+  <!-- Mobile Overlay -->
+  <div id="mobileOverlay" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden backdrop-blur-sm" onclick="closeMobileMenu()"></div>
+
+  <!-- Sidebar -->
+  <aside id="sidebar" class="fixed md:relative inset-y-0 left-0 w-72 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-r border-gray-200/50 dark:border-gray-800/50 flex flex-col z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-300">
+    <div class="p-5 border-b border-gray-200/50 dark:border-gray-800/50 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-sand-400 to-sand-600 flex items-center justify-center shadow-lg">
+          <i data-lucide="waves" class="w-5 h-5 text-white"></i>
+        </div>
+        <div>
+          <h1 class="font-semibold text-base tracking-tight text-gray-900 dark:text-white">STRKTR</h1>
+          <p class="text-[10px] text-sand-600 dark:text-sand-400 font-medium">Premium</p>
+        </div>
+      </div>
+      <button onclick="closeMobileMenu()" class="md:hidden p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+
+    <nav class="flex-1 overflow-y-auto p-3 space-y-1">
+      <button onclick="switchTab('dashboard')" data-tab="dashboard" class="nav-item active w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-apple text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+        <i data-lucide="layout-grid" class="w-5 h-5"></i><span>Visão Geral</span>
+      </button>
+      <button onclick="switchTab('obras')" data-tab="obras" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-apple">
+        <i data-lucide="hard-hat" class="w-5 h-5"></i><span>Obras</span>
+        <span id="badgeObras" class="ml-auto bg-sand-100 text-sand-700 text-xs font-bold px-2 py-0.5 rounded-full dark:bg-sand-900/40 dark:text-sand-300">0</span>
+      </button>
+      <button onclick="switchTab('leads')" data-tab="leads" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-apple">
+        <i data-lucide="crown" class="w-5 h-5"></i><span>Leads VIP</span>
+        <span id="badgeLeads" class="ml-auto bg-red-100 text-red-700 text-xs font-bold px-2 py-0.5 rounded-full animate-pulse dark:bg-red-900/30 dark:text-red-400"></span>
+      </button>
+      <button onclick="switchTab('orcamentos')" data-tab="orcamentos" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-apple">
+        <i data-lucide="file-text" class="w-5 h-5"></i><span>Orçamentos</span>
+        <span id="badgeOrc" class="ml-auto bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full dark:bg-blue-900/40 dark:text-blue-300 hidden"></span>
+      </button>
+      <button onclick="switchTab('financeiro')" data-tab="financeiro" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-apple">
+        <i data-lucide="wallet" class="w-5 h-5"></i><span>Financeiro</span>
+      </button>
+      <button onclick="switchTab('equipe')" data-tab="equipe" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-apple">
+        <i data-lucide="users" class="w-5 h-5"></i><span>Equipe</span>
+      </button>
+      <button onclick="switchTab('calendario')" data-tab="calendario" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-apple">
+        <i data-lucide="calendar-days" class="w-5 h-5"></i><span>Agenda</span>
+      </button>
+    </nav>
+
+    <div class="p-4 border-t border-gray-200/50 dark:border-gray-800/50">
+      <div class="glass-card p-3 rounded-2xl flex items-center gap-3">
+        <img id="sidebarAvatar" src="https://ui-avatars.com/api/?name=U&background=d4a373&color=fff" class="w-9 h-9 rounded-full border-2 border-white dark:border-gray-700 shadow-sm">
+        <div class="flex-1 min-w-0">
+          <p id="sidebarUserName" class="text-sm font-semibold text-gray-900 dark:text-white truncate">—</p>
+          <p id="sidebarUserEmail" class="text-xs text-gray-400 truncate"></p>
+        </div>
+        <div class="flex gap-1">
+          <button onclick="openProfileModal()" class="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors text-gray-400"><i data-lucide="settings" class="w-4 h-4"></i></button>
+          <button onclick="doLogout()" class="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors text-gray-400"><i data-lucide="log-out" class="w-4 h-4"></i></button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Content Area -->
+  <main class="flex-1 flex flex-col min-w-0 bg-gray-50/50 dark:bg-black relative overflow-hidden">
+
+    <!-- Header -->
+    <header class="h-14 md:h-16 bg-white/50 dark:bg-gray-900/50 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-800/50 flex items-center justify-between px-4 md:px-6 sticky top-0 z-30 flex-shrink-0">
+      <div class="flex items-center gap-3">
+        <button onclick="toggleMobileMenu()" class="md:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors">
+          <i data-lucide="menu" class="w-5 h-5"></i>
+        </button>
+        <h2 id="pageTitle" class="text-lg md:text-xl font-semibold text-gray-900 dark:text-white tracking-tight">Visão Geral</h2>
+        <span class="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-semibold rounded-full border border-emerald-200 dark:border-emerald-800">
+          <div class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div> Online
+        </span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="toggleTheme()" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-500">
+          <i data-lucide="sun" class="w-5 h-5 hidden dark:block"></i>
+          <i data-lucide="moon" class="w-5 h-5 block dark:hidden"></i>
+        </button>
+        <button onclick="openNewObraForm()" class="hidden sm:flex items-center gap-1.5 px-3 py-2 bg-sand-500 hover:bg-sand-600 text-white text-xs font-medium rounded-full shadow-lg shadow-sand-500/25 transition-all btn-press">
+          <i data-lucide="plus" class="w-3.5 h-3.5"></i><span>Nova Obra</span>
+        </button>
+        <button onclick="openModal('leadFormModal')" class="flex items-center gap-1.5 px-3 py-2 bg-ocean-500 hover:bg-ocean-600 text-white text-xs font-medium rounded-full shadow-lg shadow-ocean-500/25 transition-all btn-press">
+          <i data-lucide="plus" class="w-3.5 h-3.5"></i><span class="hidden sm:inline">Novo Lead</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Tabs -->
+    <div class="flex-1 overflow-y-auto">
+
+      <!-- DASHBOARD -->
+      <div id="tab-dashboard" class="tab-content p-4 md:p-6 space-y-6">
+        <!-- KPIs -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+          <div id="kpiObras" class="glass-card rounded-2xl p-4 md:p-5">
+            <div class="flex items-center justify-between mb-3">
+              <div class="p-2 bg-sand-100 dark:bg-sand-900/20 rounded-xl"><i data-lucide="hard-hat" class="w-5 h-5 text-sand-600 dark:text-sand-400"></i></div>
+            </div>
+            <p class="kpi-val text-2xl md:text-3xl font-semibold text-gray-900 dark:text-white mb-0.5">—</p>
+            <p class="kpi-label text-xs text-gray-500">Carregando...</p>
+          </div>
+          <div id="kpiReceita" class="glass-card rounded-2xl p-4 md:p-5">
+            <div class="flex items-center justify-between mb-3">
+              <div class="p-2 bg-emerald-100 dark:bg-emerald-900/20 rounded-xl"><i data-lucide="banknote" class="w-5 h-5 text-emerald-600"></i></div>
+            </div>
+            <p class="kpi-val text-xl md:text-2xl font-semibold text-gray-900 dark:text-white mb-0.5">—</p>
+            <p class="kpi-label text-xs text-gray-500">Carregando...</p>
+          </div>
+          <div id="kpiLeads" class="glass-card rounded-2xl p-4 md:p-5">
+            <div class="flex items-center justify-between mb-3">
+              <div class="p-2 bg-ocean-100 dark:bg-ocean-900/20 rounded-xl"><i data-lucide="crown" class="w-5 h-5 text-ocean-600"></i></div>
+            </div>
+            <p class="kpi-val text-2xl md:text-3xl font-semibold text-gray-900 dark:text-white mb-0.5">—</p>
+            <p class="kpi-label text-xs text-gray-500">Carregando...</p>
+          </div>
+          <div id="kpiSaldo" class="glass-card rounded-2xl p-4 md:p-5 col-span-2 lg:col-span-1">
+            <div class="flex items-center justify-between mb-3">
+              <div class="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-xl"><i data-lucide="trending-up" class="w-5 h-5 text-purple-600"></i></div>
+            </div>
+            <p class="kpi-val text-xl md:text-2xl font-semibold text-gray-900 dark:text-white mb-0.5">—</p>
+            <p class="kpi-label text-xs text-gray-500">Carregando...</p>
+          </div>
+        </div>
+
+        <!-- Main Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+          <!-- Obras -->
+          <div class="lg:col-span-2 glass-card rounded-3xl p-4 md:p-6">
+            <div class="flex items-center justify-between mb-4 md:mb-5">
+              <div>
+                <h3 class="text-base font-semibold text-gray-900 dark:text-white">Obras em Destaque</h3>
+                <p class="text-xs text-gray-500">Projetos em andamento</p>
+              </div>
+              <button onclick="switchTab('obras')" class="text-xs font-medium text-sand-600 dark:text-sand-400 hover:text-sand-700 flex items-center gap-1">Ver todas <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></button>
+            </div>
+            <div id="dashObras" class="space-y-3">
+              <div class="skeleton h-20 w-full"></div>
+              <div class="skeleton h-20 w-full"></div>
+            </div>
+          </div>
+
+          <!-- Pipeline + Timeline -->
+          <div class="space-y-4 md:space-y-5">
+            <!-- Hot Leads -->
+            <div class="glass-card rounded-3xl p-4 md:p-5">
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="text-base font-semibold text-gray-900 dark:text-white">Leads Hot 🔥</h3>
+                <button onclick="switchTab('leads')" class="text-xs text-sand-600 dark:text-sand-400">Ver todos</button>
+              </div>
+              <div id="dashLeads" class="space-y-1.5">
+                <div class="skeleton h-12 w-full"></div>
+                <div class="skeleton h-12 w-full"></div>
+              </div>
+            </div>
+
+            <!-- Próximas Visitas -->
+            <div class="glass-card rounded-3xl p-4 md:p-5">
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="text-base font-semibold text-gray-900 dark:text-white">Próximas Visitas</h3>
+                <button onclick="switchTab('calendario')" class="text-xs text-sand-600 dark:text-sand-400">Ver agenda</button>
+              </div>
+              <div id="dashTimeline" class="space-y-2">
+                <div class="skeleton h-16 w-full"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- OBRAS -->
+      <div id="tab-obras" class="tab-content hidden p-4 md:p-6">
+        <div class="flex items-center justify-between mb-5">
+          <h3 class="text-base font-semibold text-gray-900 dark:text-white">Todas as Obras</h3>
+          <button onclick="openNewObraForm()" class="flex items-center gap-2 px-4 py-2 bg-sand-500 hover:bg-sand-600 text-white text-sm font-medium rounded-full btn-press transition-all shadow-md">
+            <i data-lucide="plus" class="w-4 h-4"></i> Nova Obra
+          </button>
+        </div>
+        <div id="obrasGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
+          <div class="skeleton h-32 rounded-2xl"></div>
+          <div class="skeleton h-32 rounded-2xl"></div>
+        </div>
+      </div>
+
+      <!-- LEADS -->
+      <div id="tab-leads" class="tab-content hidden p-4 md:p-6">
+        <div class="flex items-center justify-between mb-5">
+          <h3 class="text-base font-semibold text-gray-900 dark:text-white">Leads VIP</h3>
+          <button onclick="openModal('leadFormModal')" class="flex items-center gap-2 px-4 py-2 bg-ocean-500 hover:bg-ocean-600 text-white text-sm font-medium rounded-full btn-press transition-all shadow-md">
+            <i data-lucide="plus" class="w-4 h-4"></i> Novo Lead
+          </button>
+        </div>
+        <div class="overflow-x-auto pb-4 -mx-4 md:-mx-6 px-4 md:px-6">
+          <div id="kanbanBoard" class="flex gap-3 min-w-max">
+            <div class="w-64 skeleton h-64 rounded-2xl flex-shrink-0"></div>
+            <div class="w-64 skeleton h-64 rounded-2xl flex-shrink-0"></div>
+            <div class="w-64 skeleton h-64 rounded-2xl flex-shrink-0"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ORCAMENTOS -->
+      <div id="tab-orcamentos" class="tab-content hidden p-4 md:p-6 space-y-5">
+        <div class="flex items-center justify-between mb-1">
+          <h3 class="text-base font-semibold text-gray-900 dark:text-white">Orçamentos</h3>
+          <button onclick="openNewOrcamento()" class="flex items-center gap-2 px-4 py-2 bg-sand-500 hover:bg-sand-600 text-white text-sm font-medium rounded-full btn-press transition-all shadow-md">
+            <i data-lucide="plus" class="w-4 h-4"></i> Novo Orçamento
+          </button>
+        </div>
+        <!-- Stats -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3" id="orcStats">
+          <div class="skeleton h-20 rounded-2xl"></div>
+          <div class="skeleton h-20 rounded-2xl"></div>
+          <div class="skeleton h-20 rounded-2xl"></div>
+          <div class="skeleton h-20 rounded-2xl"></div>
+        </div>
+        <!-- Filters -->
+        <div class="glass-card rounded-2xl p-3 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <input id="orcSearch" type="text" placeholder="Buscar orçamento..." oninput="filterOrcamentos()" 
+                 class="w-full sm:flex-1 px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-300 dark:focus:ring-sand-700">
+          <select id="orcStatusFilter" onchange="filterOrcamentos()" 
+                  class="w-full sm:w-auto px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none">
+            <option value="">Todos os status</option>
+            <option value="Rascunho">Rascunho</option>
+            <option value="Enviado">Enviado</option>
+            <option value="Aprovado">Aprovado</option>
+            <option value="Recusado">Recusado</option>
+          </select>
+        </div>
+        <!-- List -->
+        <div class="glass-card rounded-2xl overflow-hidden">
+          <div id="orcList" class="divide-y divide-gray-200 dark:divide-gray-800">
+            <div class="skeleton h-16 m-4 rounded-xl"></div>
+            <div class="skeleton h-16 m-4 rounded-xl"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FINANCEIRO -->
+      <div id="tab-financeiro" class="tab-content hidden p-4 md:p-6 space-y-5">
+        <!-- KPIs -->
+        <div class="grid grid-cols-3 gap-3">
+          <div class="glass-card rounded-2xl p-4 text-center">
+            <p class="text-xs text-gray-500 mb-1">Receitas</p>
+            <p id="finReceitas" class="text-lg md:text-2xl font-bold text-emerald-600">—</p>
+          </div>
+          <div class="glass-card rounded-2xl p-4 text-center">
+            <p class="text-xs text-gray-500 mb-1">Despesas</p>
+            <p id="finDespesas" class="text-lg md:text-2xl font-bold text-red-500">—</p>
+          </div>
+          <div class="glass-card rounded-2xl p-4 text-center">
+            <p class="text-xs text-gray-500 mb-1">Saldo</p>
+            <p id="finSaldo" class="text-lg md:text-2xl font-bold text-gray-900 dark:text-white">—</p>
+          </div>
+        </div>
+        <!-- Chart -->
+        <div class="glass-card rounded-3xl p-4 md:p-5">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-base font-semibold text-gray-900 dark:text-white">Fluxo por Mês</h3>
+          </div>
+          <div class="relative h-52 md:h-64"><canvas id="financeChart"></canvas></div>
+        </div>
+        <!-- Transações -->
+        <div class="glass-card rounded-3xl p-4 md:p-5">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-base font-semibold text-gray-900 dark:text-white">Lançamentos</h3>
+            <button onclick="populateObraSelects();openModal('txFormModal')" class="flex items-center gap-1.5 px-3 py-1.5 bg-sand-500 hover:bg-sand-600 text-white text-xs font-medium rounded-full btn-press transition-all">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i> Novo
+            </button>
+          </div>
+          <div id="transacoesLista" class="space-y-1.5 max-h-80 overflow-y-auto">
+            <div class="skeleton h-12 w-full rounded-xl"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- EQUIPE -->
+      <div id="tab-equipe" class="tab-content hidden p-4 md:p-6">
+        <div class="flex items-center justify-between mb-5">
+          <h3 class="text-base font-semibold text-gray-900 dark:text-white">Equipe Técnica</h3>
+          <button onclick="openModal('membroFormModal')" class="flex items-center gap-2 px-4 py-2 bg-sand-500 hover:bg-sand-600 text-white text-sm font-medium rounded-full btn-press transition-all shadow-md">
+            <i data-lucide="user-plus" class="w-4 h-4"></i> Adicionar
+          </button>
+        </div>
+        <div id="equipeGrid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
+          <div class="skeleton h-32 rounded-2xl"></div>
+          <div class="skeleton h-32 rounded-2xl"></div>
+        </div>
+      </div>
+
+      <!-- CALENDÁRIO -->
+      <div id="tab-calendario" class="tab-content hidden p-4 md:p-6">
+        <div class="flex items-center justify-between mb-5">
+          <h3 class="text-base font-semibold text-gray-900 dark:text-white">Agenda de Visitas</h3>
+          <button onclick="populateObraSelects();openModal('visitaFormModal')" class="flex items-center gap-2 px-4 py-2 bg-sand-500 hover:bg-sand-600 text-white text-sm font-medium rounded-full btn-press transition-all shadow-md">
+            <i data-lucide="calendar-plus" class="w-4 h-4"></i> Agendar
+          </button>
+        </div>
+        <div id="calendarioLista" class="max-w-2xl">
+          <div class="skeleton h-20 rounded-2xl mb-2"></div>
+        </div>
+      </div>
+
+    </div><!-- /overflow -->
+  </main>
+</div><!-- /mainApp -->
+
+<!-- ========================================
+     MODALS
+     ======================================== -->
+
+<!-- Obra Detail Modal -->
+<div id="obraModal" class="hidden fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm">
+  <div class="modal-glass modal-animate w-full md:max-w-2xl rounded-t-3xl md:rounded-3xl shadow-2xl max-h-[90vh] flex flex-col dark:bg-gray-900">
+    <div class="p-5 border-b border-gray-200/50 dark:border-gray-800 flex items-start justify-between flex-shrink-0">
+      <div>
+        <h3 id="modalObraTitle" class="text-lg font-semibold text-gray-900 dark:text-white">—</h3>
+        <p id="modalObraCliente" class="text-sm text-gray-500 mt-0.5">—</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="openEditObraForm()" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors text-gray-400"><i data-lucide="edit-2" class="w-4 h-4"></i></button>
+        <button onclick="if(currentObraId)deleteObra(currentObraId)" class="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors text-red-400"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+        <button onclick="closeObraModal()" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors text-gray-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+    </div>
+
+    <div class="px-5 pt-4 flex-shrink-0">
+      <div class="flex justify-between text-sm mb-1.5">
+        <span class="text-gray-500 text-xs">Progresso</span>
+        <span id="modalProgressText" class="font-semibold text-sand-600 dark:text-sand-400 text-xs">0%</span>
+      </div>
+      <div class="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+        <div id="modalProgressBar" class="h-full bg-gradient-to-r from-sand-400 to-sand-600 rounded-full transition-all duration-1000" style="width:0%"></div>
+      </div>
+      <div class="flex gap-4 mt-4 border-b border-gray-200/50 dark:border-gray-800">
+        <button data-obra-tab="resumo" onclick="switchObraTab('resumo')" class="pb-3 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors">Resumo</button>
+        <button data-obra-tab="etapas" onclick="switchObraTab('etapas')" class="pb-3 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors">Etapas</button>
+        <button data-obra-tab="financeiro" onclick="switchObraTab('financeiro')" class="pb-3 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors">Financeiro</button>
+      </div>
+    </div>
+
+    <div class="flex-1 overflow-y-auto p-5">
+      <!-- Resumo -->
+      <div id="obra-tab-resumo" class="obra-tab-content">
+        <p class="text-sm text-gray-500 text-center py-8">Selecione uma obra para ver detalhes</p>
+      </div>
+      <!-- Etapas -->
+      <div id="obra-tab-etapas" class="obra-tab-content hidden"></div>
+      <!-- Financeiro -->
+      <div id="obra-tab-financeiro" class="obra-tab-content hidden"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Obra Form Modal -->
+<div id="obraFormModal" class="hidden fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm">
+  <div class="modal-glass modal-animate w-full md:max-w-lg rounded-t-3xl md:rounded-3xl shadow-2xl max-h-[90vh] overflow-y-auto dark:bg-gray-900">
+    <div class="p-5 border-b border-gray-200/50 dark:border-gray-800 flex items-center justify-between sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur">
+      <h3 id="obraFormTitle" class="text-lg font-semibold text-gray-900 dark:text-white">Nova Obra</h3>
+      <button onclick="closeModal('obraFormModal')" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors text-gray-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <input type="hidden" id="obraFormId">
+    <div class="p-5 space-y-3">
+      <input id="obraFormNome" placeholder="Nome da obra *" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+      <div class="grid grid-cols-2 gap-3">
+        <input id="obraFormCliente" placeholder="Cliente *" class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+        <input id="obraFormLocal" placeholder="Local *" class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <select id="obraFormTipo" class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+          <option>Residencial</option><option>Comercial</option><option>Industrial</option><option>Rural</option><option>Reforma</option>
+        </select>
+        <select id="obraFormStatus" class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+          <option>Em Andamento</option><option>Orçamento</option><option>Pausada</option><option>Concluída</option><option>Cancelada</option>
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div class="relative">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">R$</span>
+          <input type="number" id="obraFormValor" placeholder="Valor contrato" class="w-full pl-8 pr-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+        </div>
+        <div class="relative">
+          <input type="number" id="obraFormArea" placeholder="Área m²" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <input id="obraFormEtapa" placeholder="Etapa atual (ex: Fundação)" class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">Progresso: <span id="progressoVal">0</span>%</label>
+          <input type="range" id="obraFormProgresso" min="0" max="100" value="0" oninput="document.getElementById('progressoVal').textContent=this.value" class="w-full accent-sand-500">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="text-xs text-gray-500 mb-1 block">Data Início</label><input type="date" id="obraFormInicio" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white"></div>
+        <div><label class="text-xs text-gray-500 mb-1 block">Previsão Conclusão</label><input type="date" id="obraFormPrevisao" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white"></div>
+      </div>
+      <textarea id="obraFormDesc" placeholder="Descrição / observações" rows="3" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 resize-none dark:text-white"></textarea>
+      <button onclick="saveObra()" class="w-full py-3.5 bg-gradient-to-r from-sand-500 to-sand-700 hover:from-sand-600 hover:to-sand-800 text-white font-medium rounded-2xl btn-press transition-all shadow-lg shadow-sand-500/25">Salvar Obra</button>
+    </div>
+  </div>
+</div>
+
+<!-- Etapa Form Modal -->
+<div id="etapaFormModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+  <div class="modal-glass modal-animate w-full max-w-sm rounded-3xl shadow-2xl dark:bg-gray-900 p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Nova Etapa</h3>
+      <button onclick="closeModal('etapaFormModal')" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl text-gray-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <div class="space-y-3">
+      <input id="etapaFormNome" placeholder="Nome da etapa *" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+      <input id="etapaFormResp" placeholder="Responsável" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+      <select id="etapaFormStatus" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+        <option>Pendente</option><option>Em Andamento</option><option>Concluída</option><option>Bloqueada</option>
+      </select>
+      <button onclick="saveEtapa()" class="w-full py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all">Adicionar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Lead Detail Modal -->
+<div id="leadModal" class="hidden fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm">
+  <div class="modal-glass modal-animate w-full md:max-w-md rounded-t-3xl md:rounded-3xl shadow-2xl max-h-[85vh] overflow-y-auto dark:bg-gray-900">
+    <div class="p-5 border-b border-gray-200/50 dark:border-gray-800 flex items-center justify-between sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur">
+      <div>
+        <h3 id="leadModalTitle" class="text-lg font-semibold text-gray-900 dark:text-white">—</h3>
+        <p id="leadModalSub" class="text-xs text-gray-500 mt-0.5">—</p>
+      </div>
+      <button onclick="closeLeadModal()" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl text-gray-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <div id="leadModalBody" class="p-5 space-y-3"></div>
+  </div>
+</div>
+
+<!-- Lead Form Modal -->
+<div id="leadFormModal" class="hidden fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm">
+  <div class="modal-glass modal-animate w-full md:max-w-md rounded-t-3xl md:rounded-3xl shadow-2xl max-h-[90vh] overflow-y-auto dark:bg-gray-900">
+    <div class="p-5 border-b border-gray-200/50 dark:border-gray-800 flex items-center justify-between sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Novo Lead</h3>
+      <button onclick="closeModal('leadFormModal')" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl text-gray-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <div class="p-5 space-y-3">
+      <input id="leadFormNome" placeholder="Nome *" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ocean-500/50 dark:text-white">
+      <div class="grid grid-cols-2 gap-3">
+        <input id="leadFormEmail" type="email" placeholder="Email" class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ocean-500/50 dark:text-white">
+        <input id="leadFormTelefone" type="tel" placeholder="Telefone" class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ocean-500/50 dark:text-white">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <input id="leadFormEmpresa" placeholder="Empresa" class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ocean-500/50 dark:text-white">
+        <input id="leadFormTipoProjeto" placeholder="Tipo de projeto" class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ocean-500/50 dark:text-white">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <select id="leadFormOrigem" class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ocean-500/50 dark:text-white">
+          <option>Indicação</option><option>Instagram</option><option>Google</option><option>WhatsApp</option><option>Evento</option><option>Site</option><option>Outro</option>
+        </select>
+        <select id="leadFormTemp" class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ocean-500/50 dark:text-white">
+          <option>Hot</option><option selected>Morno</option><option>Frio</option>
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div class="relative">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">R$</span>
+          <input type="number" id="leadFormValor" placeholder="Valor potencial" class="w-full pl-8 pr-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ocean-500/50 dark:text-white">
+        </div>
+        <input id="leadFormLocal" placeholder="Localização" class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ocean-500/50 dark:text-white">
+      </div>
+      <textarea id="leadFormNotas" placeholder="Notas / observações" rows="2" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ocean-500/50 resize-none dark:text-white"></textarea>
+      <button onclick="saveLead()" class="w-full py-3.5 bg-gradient-to-r from-ocean-500 to-ocean-700 hover:from-ocean-600 hover:to-ocean-800 text-white font-medium rounded-2xl btn-press transition-all shadow-lg">Cadastrar Lead</button>
+    </div>
+  </div>
+</div>
+
+<!-- Transação Form Modal -->
+<div id="txFormModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+  <div class="modal-glass modal-animate w-full max-w-sm rounded-3xl shadow-2xl dark:bg-gray-900 p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Nova Transação</h3>
+      <button onclick="closeModal('txFormModal')" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl text-gray-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <div class="space-y-3">
+      <div class="grid grid-cols-2 gap-2">
+        <button onclick="document.getElementById('txFormTipo').value='Receita';this.classList.add('bg-emerald-500','text-white');this.nextElementSibling.classList.remove('bg-red-500','text-white')" class="py-2.5 text-sm font-medium rounded-xl border border-gray-200 dark:border-gray-700 transition-all">Receita</button>
+        <button onclick="document.getElementById('txFormTipo').value='Despesa';this.classList.add('bg-red-500','text-white');this.previousElementSibling.classList.remove('bg-emerald-500','text-white')" class="py-2.5 text-sm font-medium rounded-xl border border-gray-200 dark:border-gray-700 transition-all">Despesa</button>
+        <select id="txFormTipo" class="hidden"><option>Receita</option><option>Despesa</option></select>
+      </div>
+      <input id="txFormDescricao" placeholder="Descrição *" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+      <input id="txFormCategoria" placeholder="Categoria * (ex: Material, Mão de Obra)" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+      <div class="grid grid-cols-2 gap-3">
+        <div class="relative">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">R$</span>
+          <input type="number" id="txFormValor" placeholder="Valor *" class="w-full pl-8 pr-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+        </div>
+        <input type="date" id="txFormData" class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+      </div>
+      <select id="txFormObra" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+        <option value="">Nenhuma obra vinculada</option>
+      </select>
+      <button onclick="saveTx()" class="w-full py-3.5 bg-gradient-to-r from-sand-500 to-sand-700 text-white font-medium rounded-2xl btn-press transition-all">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Membro Form Modal -->
+<div id="membroFormModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+  <div class="modal-glass modal-animate w-full max-w-sm rounded-3xl shadow-2xl dark:bg-gray-900 p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Adicionar Membro</h3>
+      <button onclick="closeModal('membroFormModal')" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl text-gray-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <div class="space-y-3">
+      <input id="membroFormNome" placeholder="Nome *" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+      <input id="membroFormCargo" placeholder="Cargo *" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+      <input id="membroFormEsp" placeholder="Especialidade" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+      <div class="grid grid-cols-2 gap-3">
+        <input id="membroFormTel" type="tel" placeholder="Telefone" class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+        <input id="membroFormEmail" type="email" placeholder="Email" class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+      </div>
+      <button onclick="saveMembro()" class="w-full py-3.5 bg-gradient-to-r from-sand-500 to-sand-700 text-white font-medium rounded-2xl btn-press transition-all">Adicionar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Visita Form Modal -->
+<div id="visitaFormModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+  <div class="modal-glass modal-animate w-full max-w-sm rounded-3xl shadow-2xl dark:bg-gray-900 p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Agendar Visita</h3>
+      <button onclick="closeModal('visitaFormModal')" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl text-gray-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <div class="space-y-3">
+      <input id="visitaFormTitulo" placeholder="Título *" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+      <div class="grid grid-cols-2 gap-3">
+        <select id="visitaFormTipo" class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+          <option>Visita</option><option>Reunião</option><option>Vistoria</option><option>Entrega</option><option>Outro</option>
+        </select>
+        <select id="visitaFormDuracao" class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+          <option value="30">30 min</option><option value="60" selected>1h</option><option value="90">1h30</option><option value="120">2h</option><option value="180">3h</option>
+        </select>
+      </div>
+      <div><label class="text-xs text-gray-500 mb-1 block">Data e Hora *</label>
+        <input type="datetime-local" id="visitaFormDataHora" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+      </div>
+      <input id="visitaFormLocal" placeholder="Local" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+      <select id="visitaFormObra" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+        <option value="">Nenhuma obra vinculada</option>
+      </select>
+      <button onclick="saveVisita()" class="w-full py-3.5 bg-gradient-to-r from-sand-500 to-sand-700 text-white font-medium rounded-2xl btn-press transition-all">Agendar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Profile Modal -->
+<div id="profileModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+  <div class="modal-glass modal-animate w-full max-w-sm rounded-3xl shadow-2xl dark:bg-gray-900 p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Meu Perfil</h3>
+      <button onclick="closeModal('profileModal')" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl text-gray-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <div class="space-y-3">
+      <input id="profileNome" placeholder="Nome" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+      <input id="profileTel" placeholder="Telefone" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+      <input id="profileEmpresa" placeholder="Empresa" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+      <input id="profileCargo" placeholder="Cargo" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 dark:text-white">
+      <button onclick="saveProfile()" class="w-full py-3.5 bg-gradient-to-r from-sand-500 to-sand-700 text-white font-medium rounded-2xl btn-press transition-all">Salvar</button>
+      <button onclick="doLogout();closeModal('profileModal')" class="w-full py-3 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-2xl transition-all font-medium">Sair da conta</button>
+    </div>
+  </div>
+</div>
+
+<!-- Orcamento Form Modal -->
+<div id="orcModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+  <div class="modal-glass modal-animate w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
+    <div class="p-5 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between flex-shrink-0">
+      <h3 id="orcModalTitle" class="text-lg font-semibold text-gray-900 dark:text-white">Novo Orçamento</h3>
+      <button onclick="closeModal('orcModal')" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+    <div class="p-5 space-y-4 overflow-y-auto flex-1">
+      <div>
+        <label class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Título do Orçamento *</label>
+        <input id="orcTitulo" type="text" placeholder="Ex: Reforma Residencial - Carlos Eduardo" 
+               class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-300 dark:text-white">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Cliente / Lead</label>
+          <select id="orcLeadSelect" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-sm focus:outline-none dark:text-white">
+            <option value="">Nenhum lead</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Obra vinculada</label>
+          <select id="orcObraSelect" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-sm focus:outline-none dark:text-white">
+            <option value="">Nenhuma obra</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Status</label>
+          <select id="orcStatus" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-sm focus:outline-none dark:text-white">
+            <option>Rascunho</option>
+            <option>Enviado</option>
+            <option>Aprovado</option>
+            <option>Recusado</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Válido até</label>
+          <input id="orcValidade" type="date" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-sm focus:outline-none dark:text-white">
+        </div>
+      </div>
+      <div>
+        <label class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Observações</label>
+        <textarea id="orcObs" rows="2" placeholder="Condições, prazos, notas..." 
+                  class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-sm focus:outline-none resize-none dark:text-white"></textarea>
+      </div>
+      <!-- Items -->
+      <div>
+        <div class="flex items-center justify-between mb-3">
+          <h4 class="font-semibold text-sm text-gray-900 dark:text-white">Itens do Orçamento</h4>
+          <button onclick="addOrcItem()" class="flex items-center gap-1.5 text-xs font-medium text-sand-600 hover:text-sand-700 btn-press">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i> Adicionar Item
+          </button>
+        </div>
+        <div class="rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden overflow-x-auto">
+          <table class="w-full min-w-[500px] text-sm">
+            <thead class="bg-gray-50 dark:bg-gray-900/50">
+              <tr>
+                <th class="text-left px-3 py-2.5 text-xs text-gray-500 font-semibold">Descrição</th>
+                <th class="px-2 py-2.5 text-xs text-gray-500 font-semibold text-center w-20">Un.</th>
+                <th class="px-2 py-2.5 text-xs text-gray-500 font-semibold text-right w-24">Qtd</th>
+                <th class="px-2 py-2.5 text-xs text-gray-500 font-semibold text-right w-28">Vl. Unit.</th>
+                <th class="px-2 py-2.5 text-xs text-gray-500 font-semibold text-right w-28">Total</th>
+                <th class="w-10"></th>
+              </tr>
+            </thead>
+            <tbody id="orcItemsTbody"></tbody>
+            <tfoot class="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+              <tr>
+                <td colspan="4" class="px-3 py-3 text-right font-bold text-sm">Total:</td>
+                <td class="px-3 py-3 text-right font-bold text-base text-sand-600" id="orcModalTotal">R$ 0</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="p-5 border-t border-gray-200 dark:border-gray-800 flex gap-3 justify-end flex-shrink-0">
+      <button onclick="closeModal('orcModal')" class="px-5 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">Cancelar</button>
+      <button onclick="saveOrcamento()" class="px-5 py-2.5 text-sm font-medium bg-sand-500 hover:bg-sand-600 text-white rounded-2xl btn-press transition-all shadow-lg shadow-sand-500/25">Salvar Orçamento</button>
+    </div>
+  </div>
+</div>
+
+<!-- Orcamento View Modal -->
+<div id="orcViewModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+  <div class="modal-glass modal-animate w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
+    <div class="p-5 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between flex-shrink-0">
+      <h3 id="orcViewTitle" class="text-lg font-semibold text-gray-900 dark:text-white">Orçamento</h3>
+      <button onclick="closeModal('orcViewModal')" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+    <div id="orcViewBody" class="p-5 space-y-4 overflow-y-auto flex-1"></div>
+    <div class="p-5 border-t border-gray-200 dark:border-gray-800 flex gap-3 justify-between flex-shrink-0">
+      <button onclick="deleteCurrentOrcamento()" class="px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-2xl transition-all">Excluir</button>
+      <div class="flex gap-2">
+        <button onclick="printOrcamento()" class="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">
+          <i data-lucide="printer" class="w-4 h-4"></i> Imprimir
+        </button>
+        <button onclick="editCurrentOrcamento()" class="px-5 py-2.5 text-sm font-medium bg-sand-500 hover:bg-sand-600 text-white rounded-2xl btn-press transition-all">Editar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
