@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Header } from '@/components/layout/header'
+import { Footer } from '@/components/layout/footer'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -15,7 +16,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       />
       <main className="flex-1 flex flex-col min-w-0 bg-gray-50/50 dark:bg-black relative overflow-hidden">
         <Header onMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)} />
-        <div className="flex-1 overflow-y-auto">{children}</div>
+        <div className="flex-1 overflow-y-auto">
+          {children}
+          <Footer />
+        </div>
       </main>
     </div>
   )

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from '@/hooks/use-toast'
 import { fmtDate } from '@/lib/utils'
@@ -52,7 +53,7 @@ export function PerfilContent({ profile }: Props) {
     <div className="p-4 md:p-6 max-w-2xl mx-auto space-y-6">
       {/* Header */}
       <div className="glass-card rounded-3xl p-6 flex items-center gap-5">
-        <img src={avatarUrl} alt="Avatar" className="w-20 h-20 rounded-2xl border-2 border-white dark:border-gray-700 shadow-lg" />
+        <Image src={avatarUrl} alt="Avatar" width={80} height={80} className="w-20 h-20 rounded-2xl border-2 border-white dark:border-gray-700 shadow-lg" />
         <div>
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{form.nome || 'Usuário'}</h2>
           <p className="text-sm text-gray-500">{profile?.email || ''}</p>

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from '@/hooks/use-toast'
 import { fmt, fmtDate } from '@/lib/utils'
-import { Plus, X, Trash2, TrendingUp, TrendingDown, Wallet, Hash } from 'lucide-react'
+import { Plus, X, Trash2, TrendingUp, TrendingDown, Wallet, Hash, Pencil } from 'lucide-react'
 import type { Transacao, Obra } from '@/types/database'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js'
 import { Bar } from 'react-chartjs-2'
@@ -17,6 +17,7 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
   const supabase = createClient()
   const [transacoes, setTransacoes] = useState(initialTransacoes)
   const [showForm, setShowForm] = useState(false)
+  const [editingTx, setEditingTx] = useState<Transacao | null>(null)
   const [filtroTipo, setFiltroTipo] = useState<'Todos' | 'Receita' | 'Despesa'>('Todos')
   const [busca, setBusca] = useState('')
   const [obras, setObras] = useState<Pick<Obra, 'id' | 'nome'>[]>([])
@@ -86,6 +87,21 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
     },
   }
 
+  function openEditTx(tx: Transacao) {
+    setEditingTx(tx)
+    setForm({
+      descricao: tx.descricao, tipo: tx.tipo, categoria: tx.categoria,
+      valor: String(tx.valor), data: tx.data, obra_id: tx.obra_id || '',
+    })
+    setShowForm(true)
+  }
+
+  function closeForm() {
+    setShowForm(false)
+    setEditingTx(null)
+    setForm({ descricao: '', tipo: 'Receita', categoria: '', valor: '', data: new Date().toISOString().slice(0, 10), obra_id: '' })
+  }
+
   async function saveTx() {
     if (!form.descricao.trim()) { toast('Descrição é obrigatória', 'error'); return }
     if (!form.valor || parseFloat(form.valor) <= 0) { toast('Valor inválido', 'error'); return }
@@ -101,12 +117,19 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
       data: form.data,
       obra_id: form.obra_id || null,
     }
-    const { data, error } = await supabase.from('transacoes').insert(payload).select('*, obras(nome)').single()
-    if (error) { toast(error.message, 'error'); return }
-    setTransacoes((prev) => [data, ...prev])
-    toast('Transação criada!', 'success')
-    setShowForm(false)
-    setForm({ descricao: '', tipo: 'Receita', categoria: '', valor: '', data: new Date().toISOString().slice(0, 10), obra_id: '' })
+
+    if (editingTx) {
+      const { data, error } = await supabase.from('transacoes').update(payload).eq('id', editingTx.id).select('*, obras(nome)').single()
+      if (error) { toast(error.message, 'error'); return }
+      setTransacoes((prev) => prev.map((t) => t.id === editingTx.id ? data : t))
+      toast('Transação atualizada!', 'success')
+    } else {
+      const { data, error } = await supabase.from('transacoes').insert(payload).select('*, obras(nome)').single()
+      if (error) { toast(error.message, 'error'); return }
+      setTransacoes((prev) => [data, ...prev])
+      toast('Transação criada!', 'success')
+    }
+    closeForm()
   }
 
   async function deleteTx(id: string) {
@@ -124,7 +147,7 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Financeiro</h2>
           <p className="text-xs text-gray-500">{transacoes.length} transações</p>
         </div>
-        <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-4 py-2 bg-sand-500 hover:bg-sand-600 text-white text-sm font-medium rounded-full transition-all btn-press">
+        <button onClick={() => { closeForm(); setShowForm(true) }} className="flex items-center gap-2 px-4 py-2 bg-sand-500 hover:bg-sand-600 text-white text-sm font-medium rounded-full transition-all btn-press">
           <Plus className="w-4 h-4" /> Nova Transação
         </button>
       </div>
@@ -193,6 +216,9 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
                 <span className={`font-semibold text-sm ${t.tipo === 'Receita' ? 'text-emerald-600' : 'text-red-500'}`}>
                   {t.tipo === 'Receita' ? '+' : '-'}{fmt(t.valor)}
                 </span>
+                <button onClick={() => openEditTx(t)} className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-sand-600 transition-all">
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
                 <button onClick={() => deleteTx(t.id)} className="opacity-0 group-hover:opacity-100 p-1 text-red-400 hover:text-red-600 transition-all">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -207,8 +233,8 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="modal-glass modal-animate w-full max-w-md rounded-3xl shadow-2xl dark:bg-gray-900 p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Nova Transação</h3>
-              <button onClick={() => setShowForm(false)} className="p-1 text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{editingTx ? 'Editar Transação' : 'Nova Transação'}</h3>
+              <button onClick={closeForm} className="p-1 text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
             <div className="space-y-3">
               <input value={form.descricao} onChange={(e) => setForm((f) => ({ ...f, descricao: e.target.value }))} placeholder="Descrição *" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white" />
@@ -229,7 +255,7 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
               </select>
               <div className="flex gap-2 pt-2">
                 <button onClick={() => setShowForm(false)} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">Cancelar</button>
-                <button onClick={saveTx} className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all text-sm">Criar</button>
+                <button onClick={saveTx} className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all text-sm">{editingTx ? 'Salvar' : 'Criar'}</button>
               </div>
             </div>
           </div>

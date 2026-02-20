@@ -1,14 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { toast } from '@/hooks/use-toast'
 import { fmt, fmtDate } from '@/lib/utils'
 import { OBRA_STATUS_COLORS, OBRA_ICON_COLORS } from '@/lib/constants'
-import { Plus, HardHat, Home, Building, TreePine } from 'lucide-react'
+import { Plus, HardHat, Home, Building, TreePine, Search } from 'lucide-react'
 import { ObraFormModal } from './obra-form-modal'
-import type { Obra } from '@/types/database'
+import type { Obra, ObraStatus } from '@/types/database'
 
 const obraIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   home: Home,
@@ -16,9 +15,13 @@ const obraIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   'tree-pine': TreePine,
 }
 
+const STATUS_OPTIONS: ('Todas' | ObraStatus)[] = ['Todas', 'Em Andamento', 'Orçamento', 'Pausada', 'Concluída', 'Cancelada']
+
 export function ObrasContent({ initialObras }: { initialObras: Obra[] }) {
   const [obras, setObras] = useState(initialObras)
   const [showForm, setShowForm] = useState(false)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'Todas' | ObraStatus>('Todas')
   const supabase = createClient()
 
   async function refresh() {
@@ -26,9 +29,20 @@ export function ObrasContent({ initialObras }: { initialObras: Obra[] }) {
     if (data) setObras(data)
   }
 
+  const filtered = useMemo(() => {
+    return obras.filter((o) => {
+      if (statusFilter !== 'Todas' && o.status !== statusFilter) return false
+      if (search) {
+        const q = search.toLowerCase()
+        if (!o.nome.toLowerCase().includes(q) && !o.cliente.toLowerCase().includes(q) && !o.local.toLowerCase().includes(q)) return false
+      }
+      return true
+    })
+  }, [obras, search, statusFilter])
+
   return (
     <div className="p-4 md:p-6">
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between mb-4">
         <h3 className="text-base font-semibold text-gray-900 dark:text-white">Todas as Obras</h3>
         <button
           onClick={() => setShowForm(true)}
@@ -38,16 +52,42 @@ export function ObrasContent({ initialObras }: { initialObras: Obra[] }) {
         </button>
       </div>
 
-      {obras.length === 0 ? (
+      {/* Search & Filters */}
+      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por nome, cliente ou local..."
+            className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white"
+          />
+        </div>
+        <div className="flex gap-1 flex-wrap">
+          {STATUS_OPTIONS.map((s) => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`px-3 py-2 text-xs font-medium rounded-xl transition-all whitespace-nowrap ${
+                statusFilter === s ? 'bg-sand-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200'
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
           <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
             <HardHat className="w-7 h-7 text-gray-400" />
           </div>
-          <p className="text-sm text-gray-500">Nenhuma obra cadastrada ainda</p>
+          <p className="text-sm text-gray-500">{obras.length === 0 ? 'Nenhuma obra cadastrada ainda' : 'Nenhuma obra encontrada'}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
-          {obras.map((o) => {
+          {filtered.map((o) => {
             const Icon = obraIcons[o.icone] || Home
             const iColor = OBRA_ICON_COLORS[o.cor || 'sand'] || OBRA_ICON_COLORS.sand
             return (

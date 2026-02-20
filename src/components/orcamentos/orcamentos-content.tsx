@@ -5,8 +5,8 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from '@/hooks/use-toast'
 import { fmt, fmtDate } from '@/lib/utils'
 import { ORC_STATUS_COLORS } from '@/lib/constants'
-import { Plus, X, Trash2, Edit2, Printer, Eye, FileText, Search } from 'lucide-react'
-import type { Orcamento, OrcamentoItem, OrcamentoStatus, Lead, Obra } from '@/types/database'
+import { Plus, X, Trash2, Edit2, Printer, FileText, Search } from 'lucide-react'
+import type { Orcamento, OrcamentoStatus, Lead, Obra } from '@/types/database'
 
 interface Props { initialOrcamentos: Orcamento[] }
 

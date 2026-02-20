@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from '@/hooks/use-toast'
 import { fmt, fmtDate } from '@/lib/utils'
 import { KANBAN_COLUMNS, TEMPERATURA_EMOJI, TEMPERATURA_COLORS } from '@/lib/constants'
-import { Plus, X, Phone, MessageCircle, Trash2, Edit2, GripVertical } from 'lucide-react'
+import { Plus, X, MessageCircle, Trash2, Edit2, GripVertical, Search } from 'lucide-react'
 import type { Lead, LeadStatus, LeadTemperatura } from '@/types/database'
 
 interface Props { initialLeads: Lead[] }
@@ -20,6 +20,18 @@ export function LeadsContent({ initialLeads }: Props) {
   const [detailLead, setDetailLead] = useState<Lead | null>(null)
   const dragRef = useRef<string | null>(null)
   const [dragOverCol, setDragOverCol] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const filteredLeads = useMemo(() => {
+    if (!searchQuery) return leads
+    const q = searchQuery.toLowerCase()
+    return leads.filter((l) =>
+      l.nome.toLowerCase().includes(q) ||
+      (l.email && l.email.toLowerCase().includes(q)) ||
+      (l.telefone && l.telefone.includes(q)) ||
+      (l.tipo_projeto && l.tipo_projeto.toLowerCase().includes(q))
+    )
+  }, [leads, searchQuery])
 
   const [form, setForm] = useState({
     nome: '', email: '', telefone: '', tipo_projeto: 'Residencial',
@@ -116,10 +128,21 @@ export function LeadsContent({ initialLeads }: Props) {
         </button>
       </div>
 
+      {/* Search */}
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <input
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Buscar leads por nome, email, telefone..."
+          className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white"
+        />
+      </div>
+
       {/* Kanban Board */}
       <div className="flex gap-3 overflow-x-auto pb-4 snap-x snap-mandatory">
         {KANBAN_COLUMNS.map((col) => {
-          const colLeads = leads.filter((l) => l.status === col.id)
+          const colLeads = filteredLeads.filter((l) => l.status === col.id)
           const total = colLeads.reduce((s, l) => s + (l.valor_potencial || 0), 0)
           return (
             <div

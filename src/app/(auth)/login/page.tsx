@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowRight, Mail, Lock, Waves } from 'lucide-react'
+import { ArrowRight, Mail, Lock } from 'lucide-react'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -47,7 +47,9 @@ export default function LoginPage() {
     <div className="glass rounded-3xl p-8 md:p-10 shadow-2xl animate-scale-in">
       <div className="text-center mb-8">
         <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-sand-400 to-sand-600 flex items-center justify-center shadow-xl">
-          <Waves className="w-8 h-8 text-white" />
+          <svg viewBox="0 0 24 24" className="w-8 h-8" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M7 4C7 4 8 4 12 4C16 4 17 7 17 9C17 11 15 12 12 12C9 12 7 13 7 15C7 17 8 20 12 20C16 20 17 20 17 20" />
+          </svg>
         </div>
         <h1 className="text-2xl font-semibold tracking-tight mb-1 bg-gradient-to-r from-sand-700 to-sand-500 bg-clip-text text-transparent dark:from-sand-400 dark:to-sand-200">
           STRKTR
@@ -102,12 +104,18 @@ export default function LoginPage() {
         </button>
       </form>
 
-      <div className="mt-5 text-center">
+      <div className="mt-5 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
         <Link
           href="/register"
-          className="text-sm text-gray-500 hover:text-sand-600 transition-colors"
+          className="hover:text-sand-600 dark:hover:text-sand-400 transition-colors"
         >
           Criar conta &rarr;
+        </Link>
+        <Link
+          href="/forgot-password"
+          className="hover:text-sand-600 dark:hover:text-sand-400 transition-colors"
+        >
+          Esqueceu a senha?
         </Link>
       </div>
     </div>

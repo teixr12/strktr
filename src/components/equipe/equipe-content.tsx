@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from '@/hooks/use-toast'
 import { fmt } from '@/lib/utils'
@@ -119,9 +120,11 @@ export function EquipeContent({ initialMembros }: Props) {
             <div key={m.id} className="glass-card rounded-2xl p-4 group hover:shadow-lg transition-all">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <img
+                  <Image
                     src={m.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.nome)}&background=d4a373&color=fff`}
                     alt={m.nome}
+                    width={44}
+                    height={44}
                     className="w-11 h-11 rounded-xl"
                   />
                   <div>

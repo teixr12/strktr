@@ -3,6 +3,7 @@
 import type { Obra, Lead, Transacao, Visita } from '@/types/database'
 import { fmt, fmtDate, fmtDateTime } from '@/lib/utils'
 import { OBRA_STATUS_COLORS, OBRA_ICON_COLORS, TEMPERATURA_COLORS, TIPO_VISITA_COLORS } from '@/lib/constants'
+import { KANBAN_COLUMNS } from '@/lib/constants'
 import {
   HardHat,
   Banknote,
@@ -13,8 +14,10 @@ import {
   Home,
   Building,
   TreePine,
+  Activity,
 } from 'lucide-react'
 import Link from 'next/link'
+import Image from 'next/image'
 
 const obraIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   home: Home,
@@ -123,6 +126,86 @@ export function DashboardContent({ obras, leads, transacoes, visitas }: Dashboar
           </div>
         </div>
       </div>
+
+      {/* Pipeline + Atividade Recente */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+        {/* Mini Pipeline */}
+        <div className="glass-card rounded-3xl p-4 md:p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">Pipeline de Leads</h3>
+            <Link href="/leads" className="text-xs text-sand-600 dark:text-sand-400">Ver kanban</Link>
+          </div>
+          <div className="space-y-2">
+            {KANBAN_COLUMNS.filter((c) => c.id !== 'Perdido').map((col) => {
+              const count = leads.filter((l) => l.status === col.id).length
+              const total = leads.filter((l) => l.status !== 'Perdido').length || 1
+              const pct = Math.round((count / total) * 100)
+              return (
+                <div key={col.id} className="flex items-center gap-3">
+                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: col.dot }} />
+                  <span className="text-xs text-gray-600 dark:text-gray-400 w-24 truncate">{col.label}</span>
+                  <div className="flex-1 h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: col.dot }} />
+                  </div>
+                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 w-6 text-right">{count}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Atividade Recente */}
+        <div className="glass-card rounded-3xl p-4 md:p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">Atividade Recente</h3>
+            <Activity className="w-4 h-4 text-gray-400" />
+          </div>
+          <div className="space-y-2">
+            {(() => {
+              const activities = [
+                ...transacoes.slice(0, 5).map((t) => ({
+                  id: t.id,
+                  icon: t.tipo === 'Receita' ? '💰' : '💸',
+                  text: `${t.tipo === 'Receita' ? 'Receita' : 'Despesa'}: ${t.descricao}`,
+                  sub: `${fmt(t.valor)} · ${t.categoria}`,
+                  date: t.data,
+                })),
+                ...visitas.filter((v) => v.status === 'Realizado').slice(0, 3).map((v) => ({
+                  id: v.id,
+                  icon: '📍',
+                  text: `Visita: ${v.titulo}`,
+                  sub: v.obras?.nome || v.local || '',
+                  date: v.data_hora.slice(0, 10),
+                })),
+                ...leads.slice(0, 3).map((l) => ({
+                  id: l.id,
+                  icon: '👤',
+                  text: `Lead: ${l.nome}`,
+                  sub: l.tipo_projeto || l.empresa || '',
+                  date: l.created_at.slice(0, 10),
+                })),
+              ]
+                .sort((a, b) => b.date.localeCompare(a.date))
+                .slice(0, 8)
+
+              if (activities.length === 0) {
+                return <p className="text-sm text-gray-500 text-center py-4">Sem atividade recente</p>
+              }
+
+              return activities.map((a) => (
+                <div key={a.id} className="flex items-start gap-3 p-2 rounded-xl hover:bg-white/50 dark:hover:bg-gray-800/50 transition-all">
+                  <span className="text-base mt-0.5">{a.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-800 dark:text-gray-200 truncate">{a.text}</p>
+                    <p className="text-xs text-gray-400 truncate">{a.sub}</p>
+                  </div>
+                  <span className="text-[10px] text-gray-400 flex-shrink-0">{fmtDate(a.date)}</span>
+                </div>
+              ))
+            })()}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -209,9 +292,11 @@ function LeadMiniCard({ lead: l }: { lead: Lead }) {
       className="flex items-center justify-between p-3 rounded-xl bg-white/50 dark:bg-gray-800/50 hover:bg-sand-50 dark:hover:bg-sand-900/20 transition-all"
     >
       <div className="flex items-center gap-3 min-w-0">
-        <img
+        <Image
           src={`https://ui-avatars.com/api/?name=${encodeURIComponent(l.nome)}&background=d4a373&color=fff`}
           alt={l.nome}
+          width={32}
+          height={32}
           className="w-8 h-8 rounded-full flex-shrink-0"
         />
         <div className="min-w-0">

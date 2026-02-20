@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
@@ -13,7 +14,6 @@ import {
   Wallet,
   Users,
   CalendarDays,
-  Waves,
   Settings,
   LogOut,
   X,
@@ -91,7 +91,9 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
         <div className="p-5 border-b border-gray-200/50 dark:border-gray-800/50 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-sand-400 to-sand-600 flex items-center justify-center shadow-lg">
-              <Waves className="w-5 h-5 text-white" />
+              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M7 4C7 4 8 4 12 4C16 4 17 7 17 9C17 11 15 12 12 12C9 12 7 13 7 15C7 17 8 20 12 20C16 20 17 20 17 20" />
+              </svg>
             </div>
             <div>
               <h1 className="font-semibold text-base tracking-tight text-gray-900 dark:text-white">
@@ -134,11 +136,13 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
         {/* User */}
         <div className="p-4 border-t border-gray-200/50 dark:border-gray-800/50">
           <div className="glass-card p-3 rounded-2xl flex items-center gap-3">
-            <img
+            <Image
               src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
                 profile?.nome || 'U'
               )}&background=d4a373&color=fff`}
               alt="Avatar"
+              width={36}
+              height={36}
               className="w-9 h-9 rounded-full border-2 border-white dark:border-gray-700 shadow-sm"
             />
             <div className="flex-1 min-w-0">

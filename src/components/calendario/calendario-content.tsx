@@ -3,9 +3,9 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from '@/hooks/use-toast'
-import { fmtDate, fmtDateTime } from '@/lib/utils'
+import { fmtDateTime } from '@/lib/utils'
 import { TIPO_VISITA_COLORS, VISITA_STATUS_COLORS } from '@/lib/constants'
-import { Plus, X, Trash2, CalendarDays, Clock, MapPin } from 'lucide-react'
+import { Plus, X, Trash2, CalendarDays, Clock, MapPin, Pencil } from 'lucide-react'
 import type { Visita, VisitaTipo, VisitaStatus, Lead, Obra } from '@/types/database'
 
 interface Props { initialVisitas: Visita[] }
@@ -14,6 +14,7 @@ export function CalendarioContent({ initialVisitas }: Props) {
   const supabase = createClient()
   const [visitas, setVisitas] = useState(initialVisitas)
   const [showForm, setShowForm] = useState(false)
+  const [editingVisita, setEditingVisita] = useState<Visita | null>(null)
   const [obras, setObras] = useState<Pick<Obra, 'id' | 'nome'>[]>([])
   const [leads, setLeads] = useState<Pick<Lead, 'id' | 'nome'>[]>([])
 
@@ -60,6 +61,20 @@ export function CalendarioContent({ initialVisitas }: Props) {
 
   function resetForm() {
     setForm({ titulo: '', tipo: 'Visita', data_hora: '', duracao_min: '60', local: '', obra_id: '', lead_id: '', status: 'Agendado', notas: '' })
+    setEditingVisita(null)
+  }
+
+  function openEditVisita(v: Visita) {
+    setEditingVisita(v)
+    const localDt = new Date(v.data_hora)
+    const dtStr = `${localDt.getFullYear()}-${String(localDt.getMonth() + 1).padStart(2, '0')}-${String(localDt.getDate()).padStart(2, '0')}T${String(localDt.getHours()).padStart(2, '0')}:${String(localDt.getMinutes()).padStart(2, '0')}`
+    setForm({
+      titulo: v.titulo, tipo: v.tipo, data_hora: dtStr,
+      duracao_min: String(v.duracao_min), local: v.local || '',
+      obra_id: v.obra_id || '', lead_id: v.lead_id || '',
+      status: v.status, notas: v.notas || '',
+    })
+    setShowForm(true)
   }
 
   async function saveVisita() {
@@ -76,10 +91,18 @@ export function CalendarioContent({ initialVisitas }: Props) {
       obra_id: form.obra_id || null, lead_id: form.lead_id || null,
       status: form.status, notas: form.notas || null,
     }
-    const { data, error } = await supabase.from('visitas').insert(payload).select('*, obras(nome), leads(nome)').single()
-    if (error) { toast(error.message, 'error'); return }
-    setVisitas((prev) => [...prev, data])
-    toast('Visita agendada!', 'success')
+
+    if (editingVisita) {
+      const { data, error } = await supabase.from('visitas').update(payload).eq('id', editingVisita.id).select('*, obras(nome), leads(nome)').single()
+      if (error) { toast(error.message, 'error'); return }
+      setVisitas((prev) => prev.map((vi) => vi.id === editingVisita.id ? data : vi))
+      toast('Visita atualizada!', 'success')
+    } else {
+      const { data, error } = await supabase.from('visitas').insert(payload).select('*, obras(nome), leads(nome)').single()
+      if (error) { toast(error.message, 'error'); return }
+      setVisitas((prev) => [...prev, data])
+      toast('Visita agendada!', 'success')
+    }
     setShowForm(false)
     resetForm()
   }
@@ -108,9 +131,14 @@ export function CalendarioContent({ initialVisitas }: Props) {
                   </div>
                   <h4 className="font-semibold text-sm text-gray-900 dark:text-white">{v.titulo}</h4>
                 </div>
-                <button onClick={() => deleteVisita(v.id)} className="opacity-0 group-hover:opacity-100 p-1 text-red-400 hover:text-red-600 transition-all">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                <div className="flex gap-1">
+                  <button onClick={() => openEditVisita(v)} className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-sand-600 transition-all">
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button onClick={() => deleteVisita(v.id)} className="opacity-0 group-hover:opacity-100 p-1 text-red-400 hover:text-red-600 transition-all">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
@@ -159,8 +187,8 @@ export function CalendarioContent({ initialVisitas }: Props) {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="modal-glass modal-animate w-full max-w-md rounded-3xl shadow-2xl dark:bg-gray-900 p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Nova Visita</h3>
-              <button onClick={() => setShowForm(false)} className="p-1 text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{editingVisita ? 'Editar Visita' : 'Nova Visita'}</h3>
+              <button onClick={() => { setShowForm(false); resetForm() }} className="p-1 text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
 
             <div className="space-y-3">
@@ -203,8 +231,8 @@ export function CalendarioContent({ initialVisitas }: Props) {
               <textarea value={form.notas} onChange={(e) => setForm((f) => ({ ...f, notas: e.target.value }))} placeholder="Notas" rows={3} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white resize-none" />
 
               <div className="flex gap-2 pt-2">
-                <button onClick={() => setShowForm(false)} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">Cancelar</button>
-                <button onClick={saveVisita} className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all text-sm">Agendar</button>
+                <button onClick={() => { setShowForm(false); resetForm() }} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">Cancelar</button>
+                <button onClick={saveVisita} className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all text-sm">{editingVisita ? 'Salvar' : 'Agendar'}</button>
               </div>
             </div>
           </div>
