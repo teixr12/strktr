@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from '@/hooks/use-toast'
 import { fmtDate } from '@/lib/utils'
-import { Save, Lock, User } from 'lucide-react'
+import { Save, Lock, User, Eye, EyeOff } from 'lucide-react'
 import type { Profile } from '@/types/database'
 
 interface Props { profile: Profile | null }
@@ -21,6 +21,8 @@ export function PerfilContent({ profile }: Props) {
   })
   const [pwForm, setPwForm] = useState({ nova: '', confirmar: '' })
   const [changingPw, setChangingPw] = useState(false)
+  const [showNewPw, setShowNewPw] = useState(false)
+  const [showConfirmPw, setShowConfirmPw] = useState(false)
 
   async function saveProfile() {
     if (!form.nome.trim()) { toast('Nome é obrigatório', 'error'); return }
@@ -115,11 +117,21 @@ export function PerfilContent({ profile }: Props) {
         <div className="space-y-3">
           <div>
             <label className="text-xs text-gray-500 mb-1 block">Nova Senha</label>
-            <input type="password" value={pwForm.nova} onChange={(e) => setPwForm((f) => ({ ...f, nova: e.target.value }))} placeholder="Mínimo 6 caracteres" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white" />
+            <div className="relative">
+              <input type={showNewPw ? 'text' : 'password'} value={pwForm.nova} onChange={(e) => setPwForm((f) => ({ ...f, nova: e.target.value }))} placeholder="Mínimo 6 caracteres" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white pr-10" />
+              <button type="button" onClick={() => setShowNewPw(!showNewPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                {showNewPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
           <div>
             <label className="text-xs text-gray-500 mb-1 block">Confirmar Senha</label>
-            <input type="password" value={pwForm.confirmar} onChange={(e) => setPwForm((f) => ({ ...f, confirmar: e.target.value }))} placeholder="Repita a senha" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white" />
+            <div className="relative">
+              <input type={showConfirmPw ? 'text' : 'password'} value={pwForm.confirmar} onChange={(e) => setPwForm((f) => ({ ...f, confirmar: e.target.value }))} placeholder="Repita a senha" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white pr-10" />
+              <button type="button" onClick={() => setShowConfirmPw(!showConfirmPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                {showConfirmPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
           <button onClick={changePassword} disabled={changingPw} className="w-full flex items-center justify-center gap-2 py-3 bg-gray-800 dark:bg-gray-700 hover:bg-gray-900 dark:hover:bg-gray-600 disabled:opacity-50 text-white font-medium rounded-2xl btn-press transition-all text-sm">
             <Lock className="w-4 h-4" /> {changingPw ? 'Alterando...' : 'Alterar Senha'}

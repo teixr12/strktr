@@ -11,6 +11,9 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'STRKTR — Gestão Premium de Obras',
   description: 'Sistema de gestão premium para construtoras e obras',
+  icons: {
+    icon: '/strktr-favicon.png',
+  },
 }
 
 export default function RootLayout({

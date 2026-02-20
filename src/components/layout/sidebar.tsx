@@ -90,19 +90,20 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
         {/* Logo */}
         <div className="p-5 border-b border-gray-200/50 dark:border-gray-800/50 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-sand-400 to-sand-600 flex items-center justify-center shadow-lg">
-              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M7 4C7 4 8 4 12 4C16 4 17 7 17 9C17 11 15 12 12 12C9 12 7 13 7 15C7 17 8 20 12 20C16 20 17 20 17 20" />
-              </svg>
-            </div>
-            <div>
-              <h1 className="font-semibold text-base tracking-tight text-gray-900 dark:text-white">
-                STRKTR
-              </h1>
-              <p className="text-[10px] text-sand-600 dark:text-sand-400 font-medium">
-                Premium
-              </p>
-            </div>
+            <Image
+              src="/strktr-logo-black.png"
+              alt="STRKTR"
+              width={120}
+              height={22}
+              className="dark:hidden"
+            />
+            <Image
+              src="/strktr-logo-white.png"
+              alt="STRKTR"
+              width={120}
+              height={22}
+              className="hidden dark:block"
+            />
           </div>
           <button
             onClick={onClose}

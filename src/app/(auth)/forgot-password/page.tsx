@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowLeft, Mail } from 'lucide-react'
 
 export default function ForgotPasswordPage() {
@@ -37,18 +38,27 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="glass rounded-3xl p-8 md:p-10 shadow-2xl animate-scale-in">
+    <div className="animate-scale-in">
       <div className="text-center mb-8">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-sand-400 to-sand-600 flex items-center justify-center shadow-xl">
-          <svg viewBox="0 0 24 24" className="w-8 h-8" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M7 4C7 4 8 4 12 4C16 4 17 7 17 9C17 11 15 12 12 12C9 12 7 13 7 15C7 17 8 20 12 20C16 20 17 20 17 20" />
-          </svg>
-        </div>
-        <h1 className="text-2xl font-semibold tracking-tight mb-1 bg-gradient-to-r from-sand-700 to-sand-500 bg-clip-text text-transparent dark:from-sand-400 dark:to-sand-200">
+        <Image
+          src="/strktr-logo-black.png"
+          alt="STRKTR"
+          width={140}
+          height={25}
+          className="mx-auto mb-4 dark:hidden"
+        />
+        <Image
+          src="/strktr-logo-white.png"
+          alt="STRKTR"
+          width={140}
+          height={25}
+          className="mx-auto mb-4 hidden dark:block"
+        />
+        <h1 className="text-2xl font-semibold tracking-tight mb-1 text-gray-900 dark:text-white">
           Recuperar Senha
         </h1>
-        <p className="text-gray-500 dark:text-gray-400 text-xs font-medium">
-          Enviaremos um link de redefinição para seu email
+        <p className="text-gray-500 dark:text-gray-400 text-sm">
+          Enviaremos um link de redefinicao para seu email
         </p>
       </div>
 
@@ -84,7 +94,7 @@ export default function ForgotPasswordPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Seu email cadastrado"
-              className="w-full px-4 py-3.5 bg-white/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 transition-all dark:text-white"
+              className="w-full px-4 py-3.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-500/50 transition-all dark:text-white pr-10"
             />
             <Mail className="w-4 h-4 absolute right-4 top-1/2 -translate-y-1/2 text-gray-400" />
           </div>
@@ -97,7 +107,7 @@ export default function ForgotPasswordPage() {
             {loading ? (
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin-slow" />
             ) : (
-              <span>Enviar Link de Recuperação</span>
+              <span>Enviar Link de Recuperacao</span>
             )}
           </button>
 
