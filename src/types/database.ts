@@ -161,3 +161,104 @@ export interface OrcamentoItem {
   ordem: number
   created_at: string
 }
+
+// --- Fase 3: Diário de Obra, Checklists, Anexos ---
+
+export type DiarioTipo = 'status_change' | 'etapa_change' | 'transacao' | 'checklist' | 'nota' | 'foto' | 'compra'
+
+export interface DiarioObra {
+  id: string
+  obra_id: string
+  user_id: string
+  tipo: DiarioTipo
+  titulo: string
+  descricao: string | null
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+export type ChecklistTipo = 'pre_obra' | 'pos_obra' | 'custom'
+
+export interface ObraChecklist {
+  id: string
+  obra_id: string
+  user_id: string
+  tipo: ChecklistTipo
+  nome: string
+  ordem: number
+  created_at: string
+  checklist_items?: ChecklistItem[]
+}
+
+export interface ChecklistItem {
+  id: string
+  checklist_id: string
+  descricao: string
+  concluido: boolean
+  concluido_por: string | null
+  concluido_em: string | null
+  ordem: number
+  created_at: string
+}
+
+export interface TransacaoAnexo {
+  id: string
+  transacao_id: string
+  user_id: string
+  url: string
+  nome_arquivo: string
+  tipo_arquivo: string
+  tamanho_bytes: number | null
+  created_at: string
+}
+
+// --- Fase 4: Projetos e Compras ---
+
+export type ProjetoStatus = 'Planejamento' | 'Em Aprovação' | 'Aprovado' | 'Em Execução' | 'Concluído' | 'Arquivado'
+
+export interface Projeto {
+  id: string
+  user_id: string
+  nome: string
+  descricao: string | null
+  cliente: string | null
+  local: string | null
+  tipo: string
+  status: ProjetoStatus
+  valor_estimado: number
+  area_m2: number | null
+  lead_id: string | null
+  obra_id: string | null
+  data_inicio_prev: string | null
+  data_fim_prev: string | null
+  notas: string | null
+  created_at: string
+  updated_at: string
+  leads?: { nome: string } | null
+  obras?: { nome: string } | null
+}
+
+export type CompraStatus = 'Solicitado' | 'Aprovado' | 'Pedido' | 'Entregue' | 'Cancelado'
+export type CompraUrgencia = 'Baixa' | 'Normal' | 'Alta' | 'Urgente'
+
+export interface Compra {
+  id: string
+  user_id: string
+  obra_id: string | null
+  descricao: string
+  categoria: string
+  fornecedor: string | null
+  valor_estimado: number
+  valor_real: number | null
+  status: CompraStatus
+  urgencia: CompraUrgencia
+  data_solicitacao: string
+  data_aprovacao: string | null
+  data_pedido: string | null
+  data_entrega: string | null
+  transacao_id: string | null
+  notas: string | null
+  created_at: string
+  updated_at: string
+  obras?: { nome: string } | null
+}

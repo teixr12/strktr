@@ -14,6 +14,8 @@ import {
   Wallet,
   Users,
   CalendarDays,
+  FolderKanban,
+  ShoppingCart,
   Settings,
   LogOut,
   X,
@@ -28,14 +30,18 @@ const icons = {
   Wallet,
   Users,
   CalendarDays,
+  FolderKanban,
+  ShoppingCart,
 } as const
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Visão Geral', icon: 'LayoutGrid' as const, href: '/dashboard' },
   { id: 'obras', label: 'Obras', icon: 'HardHat' as const, href: '/obras' },
+  { id: 'projetos', label: 'Projetos', icon: 'FolderKanban' as const, href: '/projetos' },
   { id: 'leads', label: 'Leads VIP', icon: 'Crown' as const, href: '/leads' },
   { id: 'orcamentos', label: 'Orçamentos', icon: 'FileText' as const, href: '/orcamentos' },
   { id: 'financeiro', label: 'Financeiro', icon: 'Wallet' as const, href: '/financeiro' },
+  { id: 'compras', label: 'Compras', icon: 'ShoppingCart' as const, href: '/compras' },
   { id: 'equipe', label: 'Equipe', icon: 'Users' as const, href: '/equipe' },
   { id: 'calendario', label: 'Agenda', icon: 'CalendarDays' as const, href: '/calendario' },
 ]

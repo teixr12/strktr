@@ -8,9 +8,11 @@ import { Menu, Sun, Moon, Plus, Bell } from 'lucide-react'
 const PAGE_TITLES: Record<string, string> = {
   '/dashboard': 'Visão Geral',
   '/obras': 'Obras',
+  '/projetos': 'Projetos',
   '/leads': 'Leads VIP',
   '/orcamentos': 'Orçamentos',
   '/financeiro': 'Financeiro',
+  '/compras': 'Compras',
   '/equipe': 'Equipe',
   '/calendario': 'Agenda',
   '/perfil': 'Meu Perfil',

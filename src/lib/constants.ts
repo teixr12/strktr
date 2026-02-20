@@ -61,12 +61,38 @@ export const ORC_STATUS_COLORS: Record<string, string> = {
   Recusado: 'bg-red-100 text-red-500',
 }
 
+export const PROJETO_STATUS_COLORS: Record<string, string> = {
+  Planejamento: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
+  'Em Aprovação': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  Aprovado: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  'Em Execução': 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  'Concluído': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+  Arquivado: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500',
+}
+
+export const COMPRA_STATUS_COLORS: Record<string, string> = {
+  Solicitado: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  Aprovado: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  Pedido: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  Entregue: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+  Cancelado: 'bg-red-100 text-red-500 dark:bg-red-900/30 dark:text-red-400',
+}
+
+export const COMPRA_URGENCIA_COLORS: Record<string, string> = {
+  Baixa: 'bg-gray-100 text-gray-500',
+  Normal: 'bg-blue-100 text-blue-600',
+  Alta: 'bg-amber-100 text-amber-700',
+  Urgente: 'bg-red-100 text-red-600',
+}
+
 export const NAV_ITEMS = [
   { id: 'dashboard', label: 'Visão Geral', icon: 'LayoutGrid', href: '/dashboard' },
   { id: 'obras', label: 'Obras', icon: 'HardHat', href: '/obras', badge: 'obras' },
+  { id: 'projetos', label: 'Projetos', icon: 'FolderKanban', href: '/projetos' },
   { id: 'leads', label: 'Leads VIP', icon: 'Crown', href: '/leads', badge: 'leads' },
   { id: 'orcamentos', label: 'Orçamentos', icon: 'FileText', href: '/orcamentos', badge: 'orc' },
   { id: 'financeiro', label: 'Financeiro', icon: 'Wallet', href: '/financeiro' },
+  { id: 'compras', label: 'Compras', icon: 'ShoppingCart', href: '/compras' },
   { id: 'equipe', label: 'Equipe', icon: 'Users', href: '/equipe' },
   { id: 'calendario', label: 'Agenda', icon: 'CalendarDays', href: '/calendario' },
 ] as const

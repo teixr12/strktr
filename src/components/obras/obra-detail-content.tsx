@@ -8,7 +8,10 @@ import { fmt, fmtDate } from '@/lib/utils'
 import { OBRA_STATUS_COLORS } from '@/lib/constants'
 import { ArrowLeft, Edit2, Trash2, Plus, CheckCircle, Loader, Circle, XCircle } from 'lucide-react'
 import { ObraFormModal } from './obra-form-modal'
-import type { Obra, ObraEtapa, Transacao } from '@/types/database'
+import { DiarioObraTab } from './diario-obra'
+import { ObraChecklistsTab } from './obra-checklists'
+import { logDiario } from '@/lib/diario'
+import type { Obra, ObraEtapa, Transacao, DiarioObra as DiarioEntry, ObraChecklist } from '@/types/database'
 
 const etapaStatusInfo: Record<string, { c: string; Icon: React.ComponentType<{ className?: string }> }> = {
   Concluída: { c: 'text-emerald-600', Icon: CheckCircle },
@@ -21,12 +24,14 @@ interface Props {
   obra: Obra
   initialEtapas: ObraEtapa[]
   initialTransacoes: Transacao[]
+  initialDiario?: DiarioEntry[]
+  initialChecklists?: ObraChecklist[]
 }
 
-export function ObraDetailContent({ obra, initialEtapas, initialTransacoes }: Props) {
+export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, initialDiario = [], initialChecklists = [] }: Props) {
   const router = useRouter()
   const supabase = createClient()
-  const [tab, setTab] = useState<'resumo' | 'etapas' | 'financeiro'>('resumo')
+  const [tab, setTab] = useState<'resumo' | 'etapas' | 'financeiro' | 'diario' | 'checklists'>('resumo')
   const [etapas, setEtapas] = useState(initialEtapas)
   const [showEditForm, setShowEditForm] = useState(false)
   const [showEtapaForm, setShowEtapaForm] = useState(false)
@@ -43,8 +48,15 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes }: Pr
 
   async function updateEtapaStatus(id: string, status: string) {
     const { error } = await supabase.from('obra_etapas').update({ status }).eq('id', id)
-    if (error) toast(error.message, 'error')
-    else { toast('Etapa atualizada!', 'success'); refreshEtapas() }
+    if (error) { toast(error.message, 'error'); return }
+    toast('Etapa atualizada!', 'success')
+    refreshEtapas()
+    // Log to diario
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const etapa = etapas.find((e) => e.id === id)
+      logDiario(supabase, obra.id, user.id, 'etapa_change', `Etapa "${etapa?.nome}" → ${status}`)
+    }
   }
 
   async function deleteEtapa(id: string) {
@@ -84,6 +96,8 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes }: Pr
     { id: 'resumo' as const, label: 'Resumo' },
     { id: 'etapas' as const, label: 'Etapas' },
     { id: 'financeiro' as const, label: 'Financeiro' },
+    { id: 'diario' as const, label: 'Diario' },
+    { id: 'checklists' as const, label: 'Checklists' },
   ]
 
   return (
@@ -241,6 +255,16 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes }: Pr
             ))
           )}
         </div>
+      )}
+
+      {/* Diario */}
+      {tab === 'diario' && (
+        <DiarioObraTab obraId={obra.id} initialEntries={initialDiario} />
+      )}
+
+      {/* Checklists */}
+      {tab === 'checklists' && (
+        <ObraChecklistsTab obraId={obra.id} initialChecklists={initialChecklists} />
       )}
 
       {showEditForm && (
