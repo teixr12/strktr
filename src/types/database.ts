@@ -262,3 +262,30 @@ export interface Compra {
   updated_at: string
   obras?: { nome: string } | null
 }
+
+// --- Fase 5: Organizações e Roles ---
+
+export type UserRole = 'admin' | 'manager' | 'user'
+export type OrgPlano = 'free' | 'pro' | 'enterprise'
+export type OrgMembroStatus = 'ativo' | 'inativo' | 'pendente'
+
+export interface Organizacao {
+  id: string
+  nome: string
+  cnpj: string | null
+  plano: OrgPlano
+  created_at: string
+  updated_at: string
+}
+
+export interface OrgMembro {
+  id: string
+  org_id: string
+  user_id: string
+  role: UserRole
+  convidado_por: string | null
+  status: OrgMembroStatus
+  created_at: string
+  organizacoes?: { nome: string; plano: OrgPlano } | null
+  profiles?: { nome: string; email: string | null } | null
+}

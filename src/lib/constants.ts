@@ -85,6 +85,12 @@ export const COMPRA_URGENCIA_COLORS: Record<string, string> = {
   Urgente: 'bg-red-100 text-red-600',
 }
 
+export const ROLE_COLORS: Record<string, string> = {
+  admin: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  manager: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  user: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+}
+
 export const NAV_ITEMS = [
   { id: 'dashboard', label: 'Visão Geral', icon: 'LayoutGrid', href: '/dashboard' },
   { id: 'obras', label: 'Obras', icon: 'HardHat', href: '/obras', badge: 'obras' },
@@ -95,4 +101,5 @@ export const NAV_ITEMS = [
   { id: 'compras', label: 'Compras', icon: 'ShoppingCart', href: '/compras' },
   { id: 'equipe', label: 'Equipe', icon: 'Users', href: '/equipe' },
   { id: 'calendario', label: 'Agenda', icon: 'CalendarDays', href: '/calendario' },
+  { id: 'configuracoes', label: 'Configurações', icon: 'Building2', href: '/configuracoes' },
 ] as const

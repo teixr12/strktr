@@ -16,6 +16,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/equipe': 'Equipe',
   '/calendario': 'Agenda',
   '/perfil': 'Meu Perfil',
+  '/configuracoes': 'Configurações',
 }
 
 interface HeaderProps {
