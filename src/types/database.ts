@@ -197,6 +197,7 @@ export interface ChecklistItem {
   concluido: boolean
   concluido_por: string | null
   concluido_em: string | null
+  data_limite: string | null
   ordem: number
   created_at: string
 }
