@@ -20,6 +20,7 @@ import {
   LogOut,
   X,
   Building2,
+  BookOpen,
 } from 'lucide-react'
 import type { Profile } from '@/types/database'
 
@@ -34,6 +35,7 @@ const icons = {
   FolderKanban,
   ShoppingCart,
   Building2,
+  BookOpen,
 } as const
 
 const NAV_ITEMS = [
@@ -46,6 +48,7 @@ const NAV_ITEMS = [
   { id: 'compras', label: 'Compras', icon: 'ShoppingCart' as const, href: '/compras' },
   { id: 'equipe', label: 'Equipe', icon: 'Users' as const, href: '/equipe' },
   { id: 'calendario', label: 'Agenda', icon: 'CalendarDays' as const, href: '/calendario' },
+  { id: 'knowledgebase', label: 'Base de Conhecimento', icon: 'BookOpen' as const, href: '/knowledgebase' },
   { id: 'configuracoes', label: 'Configurações', icon: 'Building2' as const, href: '/configuracoes' },
 ]
 

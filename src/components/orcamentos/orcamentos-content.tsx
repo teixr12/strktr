@@ -6,6 +6,7 @@ import { toast } from '@/hooks/use-toast'
 import { fmt, fmtDate } from '@/lib/utils'
 import { ORC_STATUS_COLORS } from '@/lib/constants'
 import { Plus, X, Trash2, Edit2, Printer, FileText, Search } from 'lucide-react'
+import { AiBudgetButton } from './ai-budget-button'
 import type { Orcamento, OrcamentoStatus, Lead, Obra } from '@/types/database'
 
 interface Props { initialOrcamentos: Orcamento[] }
@@ -353,7 +354,10 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
               <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-semibold text-gray-900 dark:text-white">Itens</span>
-                  <button onClick={addItem} className="text-xs text-sand-600 hover:text-sand-700 font-medium">+ Adicionar Item</button>
+                  <div className="flex items-center gap-2">
+                    <AiBudgetButton onItemsGenerated={(generated) => setItems(generated)} />
+                    <button onClick={addItem} className="text-xs text-sand-600 hover:text-sand-700 font-medium">+ Adicionar Item</button>
+                  </div>
                 </div>
 
                 <div className="space-y-2">

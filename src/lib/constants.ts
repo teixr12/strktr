@@ -91,6 +91,14 @@ export const ROLE_COLORS: Record<string, string> = {
   user: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
 }
 
+export const KB_CATEGORIA_COLORS: Record<string, string> = {
+  material: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  mao_de_obra: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  equipamento: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  sop: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+  referencia: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+}
+
 export const NAV_ITEMS = [
   { id: 'dashboard', label: 'Visão Geral', icon: 'LayoutGrid', href: '/dashboard' },
   { id: 'obras', label: 'Obras', icon: 'HardHat', href: '/obras', badge: 'obras' },
@@ -101,5 +109,6 @@ export const NAV_ITEMS = [
   { id: 'compras', label: 'Compras', icon: 'ShoppingCart', href: '/compras' },
   { id: 'equipe', label: 'Equipe', icon: 'Users', href: '/equipe' },
   { id: 'calendario', label: 'Agenda', icon: 'CalendarDays', href: '/calendario' },
+  { id: 'knowledgebase', label: 'Base de Conhecimento', icon: 'BookOpen', href: '/knowledgebase' },
   { id: 'configuracoes', label: 'Configurações', icon: 'Building2', href: '/configuracoes' },
 ] as const
