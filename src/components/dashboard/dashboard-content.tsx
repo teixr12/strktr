@@ -1,6 +1,7 @@
 'use client'
 
-import type { Obra, Lead, Transacao, Visita } from '@/types/database'
+import { useMemo } from 'react'
+import type { Obra, Lead, Transacao, Visita, Orcamento, Compra, Projeto } from '@/types/database'
 import { fmt, fmtDate, fmtDateTime } from '@/lib/utils'
 import { OBRA_STATUS_COLORS, OBRA_ICON_COLORS, TEMPERATURA_COLORS, TIPO_VISITA_COLORS } from '@/lib/constants'
 import { KANBAN_COLUMNS } from '@/lib/constants'
@@ -18,6 +19,10 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend } from 'chart.js'
+import { Bar, Doughnut } from 'react-chartjs-2'
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend)
 
 const obraIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   home: Home,
@@ -30,6 +35,9 @@ interface DashboardContentProps {
   leads: Lead[]
   transacoes: Transacao[]
   visitas: Visita[]
+  orcamentos: Orcamento[]
+  compras: Compra[]
+  projetos: Projeto[]
 }
 
 export function DashboardContent({ obras, leads, transacoes, visitas }: DashboardContentProps) {
@@ -46,6 +54,104 @@ export function DashboardContent({ obras, leads, transacoes, visitas }: Dashboar
   const proxVisitas = visitas.filter((v) => v.status === 'Agendado').slice(0, 5)
   const topObras = obras.slice(0, 3)
 
+  // Chart: Fluxo Financeiro — últimos 6 meses
+  const fluxoData = useMemo(() => {
+    const now = new Date()
+    const months: { key: string; label: string; rec: number; dep: number }[] = []
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      const label = d.toLocaleDateString('pt-BR', { month: 'short' })
+      months.push({ key, label, rec: 0, dep: 0 })
+    }
+    for (const t of transacoes) {
+      const key = t.data.slice(0, 7)
+      const m = months.find((x) => x.key === key)
+      if (m) { if (t.tipo === 'Receita') m.rec += t.valor; else m.dep += t.valor }
+    }
+    return {
+      labels: months.map((m) => m.label),
+      datasets: [
+        { label: 'Receitas', data: months.map((m) => m.rec / 1000), backgroundColor: 'rgba(52,211,153,.7)', borderRadius: 6 },
+        { label: 'Despesas', data: months.map((m) => m.dep / 1000), backgroundColor: 'rgba(251,113,133,.7)', borderRadius: 6 },
+      ],
+    }
+  }, [transacoes])
+
+  // Chart: Obras por Status
+  const obrasStatusData = useMemo(() => {
+    const statusMap: Record<string, { count: number; color: string }> = {
+      'Em Andamento': { count: 0, color: '#f59e0b' },
+      'Concluída': { count: 0, color: '#10b981' },
+      'Pausada': { count: 0, color: '#9ca3af' },
+      'Cancelada': { count: 0, color: '#ef4444' },
+      'Orçamento': { count: 0, color: '#3b82f6' },
+    }
+    for (const o of obras) { if (statusMap[o.status]) statusMap[o.status].count++ }
+    const entries = Object.entries(statusMap).filter(([, v]) => v.count > 0)
+    return {
+      labels: entries.map(([k]) => k),
+      datasets: [{
+        data: entries.map(([, v]) => v.count),
+        backgroundColor: entries.map(([, v]) => v.color),
+        borderWidth: 0,
+        hoverOffset: 6,
+      }],
+    }
+  }, [obras])
+
+  // Chart: Pipeline — Valor por Etapa
+  const pipelineData = useMemo(() => {
+    const cols = KANBAN_COLUMNS.filter((c) => c.id !== 'Perdido')
+    const valores = cols.map((col) =>
+      leads.filter((l) => l.status === col.id).reduce((s, l) => s + (l.valor_potencial || 0), 0)
+    )
+    return {
+      labels: cols.map((c) => c.label.replace(' ✓', '')),
+      datasets: [{
+        label: 'Valor (R$k)',
+        data: valores.map((v) => v / 1000),
+        backgroundColor: cols.map((c) => c.dot),
+        borderRadius: 6,
+      }],
+    }
+  }, [leads])
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const barOpts: any = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { display: true, position: 'top', labels: { usePointStyle: true, pointStyleWidth: 8, padding: 12, font: { size: 10 } } },
+      tooltip: { callbacks: { label: (ctx: { dataset: { label: string }; parsed: { y: number } }) => `${ctx.dataset.label}: R$${ctx.parsed.y.toFixed(1)}k` } },
+    },
+    scales: {
+      y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,.04)' }, ticks: { callback: (v: number | string) => `R$${v}k`, font: { size: 10 } } },
+      x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+    },
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const doughnutOpts: any = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'bottom', labels: { usePointStyle: true, pointStyleWidth: 8, padding: 12, font: { size: 10 } } },
+    },
+    cutout: '60%',
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const horizontalBarOpts: any = {
+    responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: (ctx: { parsed: { x: number } }) => `R$${ctx.parsed.x.toFixed(1)}k` } },
+    },
+    scales: {
+      x: { beginAtZero: true, grid: { color: 'rgba(0,0,0,.04)' }, ticks: { callback: (v: number | string) => `R$${v}k`, font: { size: 10 } } },
+      y: { grid: { display: false }, ticks: { font: { size: 10 } } },
+    },
+  }
+
   return (
     <div className="p-4 md:p-6 space-y-6">
       {/* KPIs */}
@@ -54,6 +160,32 @@ export function DashboardContent({ obras, leads, transacoes, visitas }: Dashboar
         <KpiCard icon={<Banknote className="w-5 h-5 text-emerald-600" />} iconBg="bg-emerald-100 dark:bg-emerald-900/20" value={fmt(receitas)} label="receita total" />
         <KpiCard icon={<Crown className="w-5 h-5 text-ocean-600" />} iconBg="bg-ocean-100 dark:bg-ocean-900/20" value={String(leadsAtivos)} label="leads ativos" />
         <KpiCard icon={<TrendingUp className="w-5 h-5 text-purple-600" />} iconBg="bg-purple-100 dark:bg-purple-900/20" value={fmt(saldo)} label="saldo líquido" className="col-span-2 lg:col-span-1" />
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+        <div className="glass-card rounded-3xl p-4 md:p-5">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Fluxo Financeiro</h3>
+          <div className="h-[200px]">
+            <Bar data={fluxoData} options={barOpts} />
+          </div>
+        </div>
+        <div className="glass-card rounded-3xl p-4 md:p-5">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Obras por Status</h3>
+          <div className="h-[200px]">
+            {obrasStatusData.labels.length > 0 ? (
+              <Doughnut data={obrasStatusData} options={doughnutOpts} />
+            ) : (
+              <p className="text-sm text-gray-500 text-center pt-16">Sem dados</p>
+            )}
+          </div>
+        </div>
+        <div className="glass-card rounded-3xl p-4 md:p-5">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Pipeline — Valor por Etapa</h3>
+          <div className="h-[200px]">
+            <Bar data={pipelineData} options={horizontalBarOpts} />
+          </div>
+        </div>
       </div>
 
       {/* Main Grid */}
