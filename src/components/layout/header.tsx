@@ -3,7 +3,8 @@
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useTheme } from 'next-themes'
-import { Menu, Sun, Moon, Plus, Bell } from 'lucide-react'
+import { Menu, Sun, Moon, Plus } from 'lucide-react'
+import { NotificationBell } from './notification-bell'
 
 const PAGE_TITLES: Record<string, string> = {
   '/dashboard': 'Visão Geral',
@@ -51,13 +52,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-2">
-        <button
-          className="relative p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-500"
-          title="Notificações"
-        >
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-        </button>
+        <NotificationBell />
         <button
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
           className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-500"

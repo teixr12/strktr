@@ -289,3 +289,47 @@ export interface OrgMembro {
   organizacoes?: { nome: string; plano: OrgPlano } | null
   profiles?: { nome: string; email: string | null } | null
 }
+
+// --- Fase 6: Notificações e Webhooks ---
+
+export type NotificacaoTipo = 'info' | 'warning' | 'success' | 'urgent'
+
+export interface Notificacao {
+  id: string
+  user_id: string
+  tipo: NotificacaoTipo
+  titulo: string
+  descricao: string | null
+  lida: boolean
+  link: string | null
+  created_at: string
+}
+
+export interface Webhook {
+  id: string
+  user_id: string
+  url: string
+  eventos: string[]
+  ativo: boolean
+  secret: string | null
+  created_at: string
+}
+
+// --- Fase 7: Knowledgebase ---
+
+export type KBCategoria = 'material' | 'mao_de_obra' | 'equipamento' | 'sop' | 'referencia'
+
+export interface KnowledgebaseItem {
+  id: string
+  user_id: string
+  org_id: string | null
+  categoria: KBCategoria
+  titulo: string
+  conteudo: string | null
+  unidade: string | null
+  valor_referencia: number | null
+  tags: string[]
+  ativo: boolean
+  created_at: string
+  updated_at: string
+}
