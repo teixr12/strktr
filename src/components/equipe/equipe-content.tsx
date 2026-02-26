@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import Image from 'next/image'
-import { createClient } from '@/lib/supabase/client'
+import { apiRequest } from '@/lib/api/client'
 import { toast } from '@/hooks/use-toast'
 import { fmt } from '@/lib/utils'
 import { MEMBRO_STATUS_COLORS } from '@/lib/constants'
@@ -12,7 +12,6 @@ import type { Membro, MembroStatus } from '@/types/database'
 interface Props { initialMembros: Membro[] }
 
 export function EquipeContent({ initialMembros }: Props) {
-  const supabase = createClient()
   const [membros, setMembros] = useState(initialMembros)
   const [showForm, setShowForm] = useState(false)
   const [editMembro, setEditMembro] = useState<Membro | null>(null)
@@ -59,29 +58,38 @@ export function EquipeContent({ initialMembros }: Props) {
       valor_hora: form.valor_hora ? parseFloat(form.valor_hora) : null,
     }
 
-    if (editMembro) {
-      const { error } = await supabase.from('equipe').update(payload).eq('id', editMembro.id)
-      if (error) { toast(error.message, 'error'); return }
-      setMembros((prev) => prev.map((m) => m.id === editMembro.id ? { ...m, ...payload } as Membro : m))
-      toast('Membro atualizado!', 'success')
-    } else {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data, error } = await supabase.from('equipe').insert({ ...payload, user_id: user.id }).select().single()
-      if (error) { toast(error.message, 'error'); return }
-      setMembros((prev) => [...prev, data])
-      toast('Membro adicionado!', 'success')
+    try {
+      if (editMembro) {
+        const data = await apiRequest<Membro>(`/api/v1/equipe/${editMembro.id}`, {
+          method: 'PUT',
+          body: payload,
+        })
+        setMembros((prev) => prev.map((m) => m.id === editMembro.id ? data : m))
+        toast('Membro atualizado!', 'success')
+      } else {
+        const data = await apiRequest<Membro>('/api/v1/equipe', {
+          method: 'POST',
+          body: payload,
+        })
+        setMembros((prev) => [...prev, data])
+        toast('Membro adicionado!', 'success')
+      }
+      setShowForm(false)
+      setEditMembro(null)
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao salvar membro', 'error')
     }
-    setShowForm(false)
-    setEditMembro(null)
   }
 
   async function deleteMembro(id: string) {
     if (!confirm('Excluir este membro da equipe?')) return
-    const { error } = await supabase.from('equipe').delete().eq('id', id)
-    if (error) { toast(error.message, 'error'); return }
-    setMembros((prev) => prev.filter((m) => m.id !== id))
-    toast('Membro excluído', 'info')
+    try {
+      await apiRequest<{ success: boolean }>(`/api/v1/equipe/${id}`, { method: 'DELETE' })
+      setMembros((prev) => prev.filter((m) => m.id !== id))
+      toast('Membro excluído', 'info')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao excluir membro', 'error')
+    }
   }
 
   function renderStars(rating: number) {

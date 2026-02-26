@@ -1,12 +1,20 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { toast } from '@/hooks/use-toast'
-import { logDiario } from '@/lib/diario'
+import { apiRequest } from '@/lib/api/client'
 import { fmtDate } from '@/lib/utils'
 import { Plus, Trash2, CheckSquare, Square, ChevronDown, ChevronRight, Pencil, CalendarDays, X } from 'lucide-react'
 import type { ObraChecklist, ChecklistTipo } from '@/types/database'
+import {
+  createChecklistItemSchema,
+  createChecklistSchema,
+  type CreateChecklistDTO,
+  type CreateChecklistItemDTO,
+} from '@/shared/schemas/execution'
 
 const TIPO_LABELS: Record<ChecklistTipo, string> = {
   pre_obra: 'Pre-Obra',
@@ -31,15 +39,28 @@ function getDateColor(dateStr: string | null): string {
 interface Props {
   obraId: string
   initialChecklists: ObraChecklist[]
+  onChecklistChanged?: () => void
 }
 
-export function ObraChecklistsTab({ obraId, initialChecklists }: Props) {
-  const supabase = createClient()
+type ChecklistItemForm = CreateChecklistItemDTO & { checklistId: string }
+
+export function ObraChecklistsTab({ obraId, initialChecklists, onChecklistChanged }: Props) {
+  const dueDateEnabled = process.env.NEXT_PUBLIC_FF_CHECKLIST_DUE_DATE === 'true'
   const [checklists, setChecklists] = useState(initialChecklists)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ nome: '', tipo: 'pre_obra' as ChecklistTipo })
-  const [newItemText, setNewItemText] = useState('')
+  const checklistForm = useForm<CreateChecklistDTO>({
+    resolver: zodResolver(createChecklistSchema),
+    defaultValues: { nome: '', tipo: 'pre_obra' },
+  })
+  const itemForm = useForm<ChecklistItemForm>({
+    resolver: zodResolver(
+      createChecklistItemSchema.extend({
+        checklistId: z.string().min(1),
+      })
+    ),
+    defaultValues: { checklistId: '', descricao: '', data_limite: null },
+  })
 
   // Inline edit states
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
@@ -59,85 +80,141 @@ export function ObraChecklistsTab({ obraId, initialChecklists }: Props) {
   }, [editingChecklistId])
 
   async function refresh() {
-    const { data } = await supabase
-      .from('obra_checklists')
-      .select('*, checklist_items(*)')
-      .eq('obra_id', obraId)
-      .order('ordem')
-    if (data) setChecklists(data)
+    try {
+      const data = await apiRequest<ObraChecklist[]>(`/api/v1/obras/${obraId}/checklists`)
+      setChecklists(data || [])
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao atualizar checklists'
+      toast(message, 'error')
+    }
   }
 
-  async function createChecklist() {
-    if (!form.nome.trim()) { toast('Preencha o nome', 'error'); return }
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { error } = await supabase.from('obra_checklists').insert({
-      obra_id: obraId,
-      user_id: user.id,
-      tipo: form.tipo,
-      nome: form.nome.trim(),
-    })
-    if (error) { toast(error.message, 'error'); return }
-    await logDiario(supabase, obraId, user.id, 'checklist', `Checklist "${form.nome}" criado`, `Tipo: ${TIPO_LABELS[form.tipo]}`)
-    toast('Checklist criado!', 'success')
-    setShowForm(false)
-    setForm({ nome: '', tipo: 'pre_obra' })
-    refresh()
+  async function createChecklist(values: CreateChecklistDTO) {
+    try {
+      await apiRequest(`/api/v1/obras/${obraId}/checklists`, {
+        method: 'POST',
+        body: values,
+      })
+      toast('Checklist criado!', 'success')
+      setShowForm(false)
+      checklistForm.reset({ nome: '', tipo: 'pre_obra' })
+      onChecklistChanged?.()
+      refresh()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao criar checklist'
+      toast(message, 'error')
+    }
   }
 
   async function deleteChecklist(id: string, nome: string) {
     if (!confirm(`Excluir checklist "${nome}"?`)) return
-    await supabase.from('obra_checklists').delete().eq('id', id)
-    toast('Checklist excluído', 'info')
-    refresh()
+    try {
+      await apiRequest(`/api/v1/obras/${obraId}/checklists/${id}`, { method: 'DELETE' })
+      toast('Checklist excluído', 'info')
+      onChecklistChanged?.()
+      refresh()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao excluir checklist'
+      toast(message, 'error')
+    }
   }
 
   async function updateChecklistName(clId: string, nome: string) {
     if (!nome.trim()) { setEditingChecklistId(null); return }
-    const { error } = await supabase.from('obra_checklists').update({ nome: nome.trim() }).eq('id', clId)
-    if (error) { toast(error.message, 'error'); return }
-    setEditingChecklistId(null)
-    refresh()
+    try {
+      await apiRequest(`/api/v1/obras/${obraId}/checklists/${clId}`, {
+        method: 'PATCH',
+        body: { nome: nome.trim() },
+      })
+      setEditingChecklistId(null)
+      onChecklistChanged?.()
+      refresh()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao atualizar checklist'
+      toast(message, 'error')
+    }
   }
 
-  async function addItem(checklistId: string) {
-    if (!newItemText.trim()) return
-    await supabase.from('checklist_items').insert({
-      checklist_id: checklistId,
-      descricao: newItemText.trim(),
-    })
-    setNewItemText('')
-    refresh()
+  async function addItem(values: ChecklistItemForm) {
+    if (!values.checklistId) return
+    try {
+      await apiRequest(`/api/v1/obras/${obraId}/checklists/${values.checklistId}/items`, {
+        method: 'POST',
+        body: {
+          descricao: values.descricao,
+          data_limite: dueDateEnabled ? values.data_limite || null : null,
+        },
+      })
+      itemForm.reset({ checklistId: values.checklistId, descricao: '', data_limite: null })
+      onChecklistChanged?.()
+      refresh()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao criar item'
+      toast(message, 'error')
+    }
   }
 
-  async function toggleItem(itemId: string, concluido: boolean) {
-    const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('checklist_items').update({
-      concluido: !concluido,
-      concluido_por: !concluido ? (user?.email || null) : null,
-      concluido_em: !concluido ? new Date().toISOString() : null,
-    }).eq('id', itemId)
-    refresh()
+  async function toggleItem(itemId: string) {
+    try {
+      await apiRequest(`/api/v1/obras/${obraId}/checklists/items/${itemId}/toggle`, {
+        method: 'POST',
+      })
+      onChecklistChanged?.()
+      refresh()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao atualizar item'
+      toast(message, 'error')
+    }
   }
 
   async function updateItemText(itemId: string, descricao: string) {
     if (!descricao.trim()) { setEditingItemId(null); return }
-    const { error } = await supabase.from('checklist_items').update({ descricao: descricao.trim() }).eq('id', itemId)
-    if (error) { toast(error.message, 'error'); return }
-    setEditingItemId(null)
-    refresh()
+    const checklistId = checklists.find((cl) => cl.checklist_items?.some((item) => item.id === itemId))?.id
+    if (!checklistId) return
+    try {
+      await apiRequest(`/api/v1/obras/${obraId}/checklists/${checklistId}/items/${itemId}`, {
+        method: 'PATCH',
+        body: { descricao: descricao.trim() },
+      })
+      setEditingItemId(null)
+      onChecklistChanged?.()
+      refresh()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao atualizar item'
+      toast(message, 'error')
+    }
   }
 
   async function updateItemDate(itemId: string, data_limite: string | null) {
-    const { error } = await supabase.from('checklist_items').update({ data_limite }).eq('id', itemId)
-    if (error) { toast(error.message, 'error'); return }
-    setEditingDateItemId(null)
-    refresh()
+    const checklistId = checklists.find((cl) => cl.checklist_items?.some((item) => item.id === itemId))?.id
+    if (!checklistId) return
+    try {
+      await apiRequest(`/api/v1/obras/${obraId}/checklists/${checklistId}/items/${itemId}`, {
+        method: 'PATCH',
+        body: { data_limite },
+      })
+      setEditingDateItemId(null)
+      onChecklistChanged?.()
+      refresh()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao atualizar prazo'
+      toast(message, 'error')
+    }
   }
 
   async function deleteItem(itemId: string) {
-    await supabase.from('checklist_items').delete().eq('id', itemId)
-    refresh()
+    const checklistId = checklists.find((cl) => cl.checklist_items?.some((item) => item.id === itemId))?.id
+    if (!checklistId) return
+    try {
+      await apiRequest(`/api/v1/obras/${obraId}/checklists/${checklistId}/items/${itemId}`, {
+        method: 'DELETE',
+      })
+      onChecklistChanged?.()
+      refresh()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao remover item'
+      toast(message, 'error')
+    }
   }
 
   return (
@@ -216,7 +293,7 @@ export function ObraChecklistsTab({ obraId, initialChecklists }: Props) {
                       return (
                         <div key={item.id} className="py-1.5 group">
                           <div className="flex items-center gap-2">
-                            <button onClick={() => toggleItem(item.id, item.concluido)} className="flex-shrink-0">
+                            <button onClick={() => toggleItem(item.id)} className="flex-shrink-0">
                               {item.concluido ? (
                                 <CheckSquare className="w-4 h-4 text-emerald-500" />
                               ) : (
@@ -246,13 +323,15 @@ export function ObraChecklistsTab({ obraId, initialChecklists }: Props) {
                             )}
 
                             {/* Date picker toggle */}
-                            <button
-                              onClick={() => setEditingDateItemId(isEditingDate ? null : item.id)}
-                              className={`flex-shrink-0 p-1 rounded transition-all ${item.data_limite ? dateColor : 'text-gray-300 opacity-0 group-hover:opacity-100'} hover:text-sand-600`}
-                              title={item.data_limite ? `Prazo: ${fmtDate(item.data_limite)}` : 'Definir prazo'}
-                            >
-                              <CalendarDays className="w-3.5 h-3.5" />
-                            </button>
+                            {dueDateEnabled && (
+                              <button
+                                onClick={() => setEditingDateItemId(isEditingDate ? null : item.id)}
+                                className={`flex-shrink-0 p-1 rounded transition-all ${item.data_limite ? dateColor : 'text-gray-300 opacity-0 group-hover:opacity-100'} hover:text-sand-600`}
+                                title={item.data_limite ? `Prazo: ${fmtDate(item.data_limite)}` : 'Definir prazo'}
+                              >
+                                <CalendarDays className="w-3.5 h-3.5" />
+                              </button>
+                            )}
 
                             <button
                               onClick={() => deleteItem(item.id)}
@@ -263,7 +342,7 @@ export function ObraChecklistsTab({ obraId, initialChecklists }: Props) {
                           </div>
 
                           {/* Date display and editor */}
-                          {(item.data_limite || isEditingDate) && (
+                          {dueDateEnabled && (item.data_limite || isEditingDate) && (
                             <div className="ml-6 mt-1 flex items-center gap-2">
                               {isEditingDate ? (
                                 <div className="flex items-center gap-1.5">
@@ -294,21 +373,38 @@ export function ObraChecklistsTab({ obraId, initialChecklists }: Props) {
                       )
                     })}
 
-                    <div className="flex gap-2 mt-2">
+                    <form
+                      className="flex gap-2 mt-2"
+                      onSubmit={(event) => {
+                        event.preventDefault()
+                        itemForm.setValue('checklistId', cl.id)
+                        void itemForm.handleSubmit(addItem)()
+                      }}
+                    >
                       <input
-                        value={newItemText}
-                        onChange={(e) => setNewItemText(e.target.value)}
+                        {...itemForm.register('descricao')}
                         placeholder="Adicionar item..."
                         className="flex-1 px-3 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs focus:outline-none dark:text-white"
-                        onKeyDown={(e) => e.key === 'Enter' && addItem(cl.id)}
                       />
+                      {dueDateEnabled && (
+                        <input
+                          type="date"
+                          {...itemForm.register('data_limite', {
+                            setValueAs: (value) => (value || null),
+                          })}
+                          className="px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs focus:outline-none dark:text-white"
+                        />
+                      )}
                       <button
-                        onClick={() => addItem(cl.id)}
+                        type="submit"
                         className="px-3 py-1.5 bg-sand-500 hover:bg-sand-600 text-white text-xs rounded-lg transition-all"
                       >
                         +
                       </button>
-                    </div>
+                    </form>
+                    {itemForm.formState.errors.descricao && (
+                      <p className="text-[10px] text-red-500 mt-1">{itemForm.formState.errors.descricao.message}</p>
+                    )}
 
                     <button
                       onClick={() => deleteChecklist(cl.id, cl.nome)}
@@ -329,16 +425,17 @@ export function ObraChecklistsTab({ obraId, initialChecklists }: Props) {
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="modal-glass modal-animate w-full max-w-sm rounded-3xl shadow-2xl dark:bg-gray-900 p-6">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Novo Checklist</h3>
-            <div className="space-y-3">
+            <form className="space-y-3" onSubmit={checklistForm.handleSubmit(createChecklist)}>
               <input
-                value={form.nome}
-                onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
+                {...checklistForm.register('nome')}
                 placeholder="Nome do checklist *"
                 className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none dark:text-white"
               />
+              {checklistForm.formState.errors.nome && (
+                <p className="text-xs text-red-500">{checklistForm.formState.errors.nome.message}</p>
+              )}
               <select
-                value={form.tipo}
-                onChange={(e) => setForm((f) => ({ ...f, tipo: e.target.value as ChecklistTipo }))}
+                {...checklistForm.register('tipo')}
                 className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white"
               >
                 <option value="pre_obra">Pre-Obra</option>
@@ -346,10 +443,10 @@ export function ObraChecklistsTab({ obraId, initialChecklists }: Props) {
                 <option value="custom">Personalizado</option>
               </select>
               <div className="flex gap-2">
-                <button onClick={() => setShowForm(false)} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">Cancelar</button>
-                <button onClick={createChecklist} className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all">Criar</button>
+                <button type="button" onClick={() => setShowForm(false)} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">Cancelar</button>
+                <button type="submit" className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all">Criar</button>
               </div>
-            </div>
+            </form>
           </div>
         </div>
       )}

@@ -1,34 +1,74 @@
-import { NextResponse } from 'next/server'
 import { getApiUser } from '@/lib/api/auth'
+import { fail, ok } from '@/lib/api/response'
+import { log } from '@/lib/api/logger'
+import { API_ERROR_CODES } from '@/lib/api/errors'
+import { requireDomainPermission } from '@/lib/auth/domain-permissions'
+import { createProjetoSchema } from '@/shared/schemas/business'
 
 export async function GET(request: Request) {
-  const { user, supabase, error } = await getApiUser(request)
-  if (!user || !supabase) return NextResponse.json({ error }, { status: 401 })
+  const { user, supabase, error, requestId, orgId, role } = await getApiUser(request)
+  if (!user || !supabase) return fail(request, { code: API_ERROR_CODES.UNAUTHORIZED, message: error || 'Não autorizado' }, 401)
+  if (!orgId) return fail(request, { code: API_ERROR_CODES.FORBIDDEN, message: 'Usuário sem organização ativa' }, 403)
+  const permissionError = requireDomainPermission(request, role, 'can_manage_projects')
+  if (permissionError) return permissionError
 
   const { searchParams } = new URL(request.url)
   const status = searchParams.get('status')
   const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100)
 
-  let query = supabase.from('projetos').select('*').order('created_at', { ascending: false }).limit(limit)
+  let query = supabase.from('projetos').select('*, leads(nome), obras(nome)').eq('org_id', orgId).order('created_at', { ascending: false }).limit(limit)
   if (status) query = query.eq('status', status)
 
   const { data, error: dbError } = await query
-  if (dbError) return NextResponse.json({ error: dbError.message }, { status: 500 })
+  if (dbError) {
+    log('error', 'projetos.get.failed', { requestId, orgId, userId: user.id, route: '/api/v1/projetos', error: dbError.message })
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 500)
+  }
 
-  return NextResponse.json({ data, count: data?.length || 0 })
+  return ok(request, data ?? [], { count: data?.length || 0 })
 }
 
 export async function POST(request: Request) {
-  const { user, supabase, error } = await getApiUser(request)
-  if (!user || !supabase) return NextResponse.json({ error }, { status: 401 })
+  const { user, supabase, error, requestId, orgId, role } = await getApiUser(request)
+  if (!user || !supabase) return fail(request, { code: API_ERROR_CODES.UNAUTHORIZED, message: error || 'Não autorizado' }, 401)
+  if (!orgId) return fail(request, { code: API_ERROR_CODES.FORBIDDEN, message: 'Usuário sem organização ativa' }, 403)
+  const permissionError = requireDomainPermission(request, role, 'can_manage_projects')
+  if (permissionError) return permissionError
 
-  const body = await request.json()
+  const parsed = createProjetoSchema.safeParse(await request.json())
+  if (!parsed.success) {
+    return fail(
+      request,
+      {
+        code: API_ERROR_CODES.VALIDATION_ERROR,
+        message: parsed.error.issues[0]?.message || 'Payload inválido',
+      },
+      400
+    )
+  }
+  const body = parsed.data
   const { data, error: dbError } = await supabase
     .from('projetos')
-    .insert({ ...body, user_id: user.id })
+    .insert({
+      ...body,
+      user_id: user.id,
+      org_id: orgId,
+      descricao: body.descricao || null,
+      cliente: body.cliente || null,
+      local: body.local || null,
+      area_m2: body.area_m2 || null,
+      lead_id: body.lead_id || null,
+      obra_id: body.obra_id || null,
+      data_inicio_prev: body.data_inicio_prev || null,
+      data_fim_prev: body.data_fim_prev || null,
+      notas: body.notas || null,
+    })
     .select()
     .single()
 
-  if (dbError) return NextResponse.json({ error: dbError.message }, { status: 400 })
-  return NextResponse.json({ data }, { status: 201 })
+  if (dbError) {
+    log('error', 'projetos.create.failed', { requestId, orgId, userId: user.id, route: '/api/v1/projetos', error: dbError.message })
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 400)
+  }
+  return ok(request, data, undefined, 201)
 }

@@ -1,7 +1,9 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Obra, Lead, Transacao, Visita, Orcamento, Compra, Projeto } from '@/types/database'
+import { apiRequest } from '@/lib/api/client'
+import { featureFlags } from '@/lib/feature-flags'
 import { fmt, fmtDate, fmtDateTime } from '@/lib/utils'
 import { OBRA_STATUS_COLORS, OBRA_ICON_COLORS, TEMPERATURA_COLORS, TIPO_VISITA_COLORS } from '@/lib/constants'
 import { KANBAN_COLUMNS } from '@/lib/constants'
@@ -40,7 +42,27 @@ interface DashboardContentProps {
   projetos: Projeto[]
 }
 
+interface TodayAlert {
+  code: string
+  title: string
+  severity: 'high' | 'medium' | 'low'
+  module: 'obras' | 'leads' | 'financeiro' | 'compras'
+  href: string
+}
+
+interface TodayAlertsPayload {
+  alerts: TodayAlert[]
+  totals: {
+    high: number
+    medium: number
+    low: number
+    total: number
+  }
+  warnings: string[]
+}
+
 export function DashboardContent({ obras, leads, transacoes, visitas }: DashboardContentProps) {
+  const [todayAlerts, setTodayAlerts] = useState<TodayAlertsPayload | null>(null)
   const obrasAtivas = obras.filter((o) => o.status === 'Em Andamento').length
   const receitas = transacoes
     .filter((t) => t.tipo === 'Receita')
@@ -53,6 +75,32 @@ export function DashboardContent({ obras, leads, transacoes, visitas }: Dashboar
   const hotLeads = leads.filter((l) => l.temperatura === 'Hot').slice(0, 4)
   const proxVisitas = visitas.filter((v) => v.status === 'Agendado').slice(0, 5)
   const topObras = obras.slice(0, 3)
+  const showOnboarding = obras.length === 0 || leads.length === 0
+
+  useEffect(() => {
+    async function loadAlerts() {
+      try {
+        const payload = await apiRequest<TodayAlertsPayload>('/api/v1/alerts/today')
+        setTodayAlerts(payload)
+      } catch {
+        setTodayAlerts(null)
+      }
+    }
+    loadAlerts()
+  }, [])
+
+  useEffect(() => {
+    if (!showOnboarding || !featureFlags.productAnalytics) return
+    void apiRequest('/api/v1/analytics/events', {
+      method: 'POST',
+      body: {
+        eventType: 'OnboardingStepCompleted',
+        entityType: 'dashboard',
+        entityId: 'onboarding-card-visible',
+        payload: { obrasCount: obras.length, leadsCount: leads.length },
+      },
+    }).catch(() => undefined)
+  }, [showOnboarding, obras.length, leads.length])
 
   // Chart: Fluxo Financeiro — últimos 6 meses
   const fluxoData = useMemo(() => {
@@ -161,6 +209,56 @@ export function DashboardContent({ obras, leads, transacoes, visitas }: Dashboar
         <KpiCard icon={<Crown className="w-5 h-5 text-ocean-600" />} iconBg="bg-ocean-100 dark:bg-ocean-900/20" value={String(leadsAtivos)} label="leads ativos" />
         <KpiCard icon={<TrendingUp className="w-5 h-5 text-purple-600" />} iconBg="bg-purple-100 dark:bg-purple-900/20" value={fmt(saldo)} label="saldo líquido" className="col-span-2 lg:col-span-1" />
       </div>
+
+      {showOnboarding && (
+        <div className="glass-card rounded-3xl p-4 md:p-5 border border-sand-200/50 dark:border-sand-800/50">
+          <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Onboarding Guiado</h3>
+          <p className="text-sm text-gray-500 mb-3">Complete os 2 primeiros passos para ativar o CRM operacional.</p>
+          <div className="grid gap-2 md:grid-cols-2">
+            <Link href="/obras" className="rounded-2xl px-4 py-3 bg-sand-50 dark:bg-sand-900/20 hover:bg-sand-100 dark:hover:bg-sand-900/30 transition-colors">
+              <p className="text-sm font-semibold text-sand-700 dark:text-sand-300">1. Criar primeira obra</p>
+              <p className="text-xs text-gray-500">Configure etapas, checklist e diário.</p>
+            </Link>
+            <Link href="/leads" className="rounded-2xl px-4 py-3 bg-ocean-50 dark:bg-ocean-900/20 hover:bg-ocean-100 dark:hover:bg-ocean-900/30 transition-colors">
+              <p className="text-sm font-semibold text-ocean-700 dark:text-ocean-300">2. Criar primeiro lead</p>
+              <p className="text-xs text-gray-500">Ative next-action e SLA comercial.</p>
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {featureFlags.executionAlerts && todayAlerts && todayAlerts.alerts.length > 0 && (
+        <div className="glass-card rounded-3xl p-4 md:p-5 border border-amber-200/50 dark:border-amber-800/40">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">Prioridades de Hoje</h3>
+            <span className="text-xs font-medium px-2 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+              {todayAlerts.totals.total} alertas
+            </span>
+          </div>
+          <div className="space-y-2">
+            {todayAlerts.alerts.slice(0, 4).map((alert) => (
+              <div key={`${alert.code}-${alert.href}`} className="flex items-center justify-between gap-2 rounded-2xl bg-white/60 dark:bg-gray-900/40 p-3">
+                <div className="min-w-0">
+                  <p className="text-sm text-gray-900 dark:text-white truncate">{alert.title}</p>
+                  <p className="text-xs text-gray-500 capitalize">{alert.module}</p>
+                </div>
+                <Link
+                  href={alert.href}
+                  className={`text-xs font-semibold px-2.5 py-1.5 rounded-full whitespace-nowrap ${
+                    alert.severity === 'high'
+                      ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                      : alert.severity === 'medium'
+                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                        : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                  }`}
+                >
+                  Resolver
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">

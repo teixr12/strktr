@@ -1,11 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { apiRequest } from '@/lib/api/client'
 import { toast } from '@/hooks/use-toast'
 import { getRoleLabel, getRoleBadgeColor, canAccess } from '@/lib/auth/roles'
 import { Building2, UserPlus, Shield, Crown, Users, Trash2, Mail } from 'lucide-react'
-import type { UserRole, OrgMembro, Organizacao, OrgMembroStatus } from '@/types/database'
+import type { UserRole, OrgMembro, Organizacao } from '@/types/database'
 
 interface Props {
   userId: string
@@ -15,7 +15,6 @@ interface Props {
 }
 
 export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembros, organizacao: initialOrg }: Props) {
-  const supabase = createClient()
   const [org, setOrg] = useState(initialOrg)
   const [membros, setMembros] = useState(initialMembros)
   const [showCreateOrg, setShowCreateOrg] = useState(false)
@@ -30,92 +29,78 @@ export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembr
 
   async function createOrg() {
     if (!orgForm.nome.trim()) { toast('Nome da organização é obrigatório', 'error'); return }
-    const { data: newOrg, error } = await supabase
-      .from('organizacoes')
-      .insert({ nome: orgForm.nome.trim(), cnpj: orgForm.cnpj || null })
-      .select()
-      .single()
-    if (error || !newOrg) { toast(error?.message || 'Erro ao criar organização', 'error'); return }
-
-    // Add self as admin
-    const { error: membroError } = await supabase
-      .from('org_membros')
-      .insert({ org_id: newOrg.id, user_id: userId, role: 'admin' as UserRole, status: 'ativo' as OrgMembroStatus })
-    if (membroError) { toast(membroError.message, 'error'); return }
-
-    // Update profile with org_id
-    await supabase.from('profiles').update({ org_id: newOrg.id }).eq('id', userId)
-
-    setOrg(newOrg)
-    setShowCreateOrg(false)
-    toast('Organização criada!', 'success')
-    window.location.reload()
+    try {
+      const created = await apiRequest<{ organizacao: Organizacao; membership: OrgMembro }>(
+        '/api/v1/config/org',
+        { method: 'POST', body: { nome: orgForm.nome.trim(), cnpj: orgForm.cnpj || null } }
+      )
+      setOrg(created.organizacao)
+      setMembros([created.membership])
+      setShowCreateOrg(false)
+      toast('Organização criada!', 'success')
+      window.location.reload()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao criar organização', 'error')
+    }
   }
 
   async function inviteMember() {
     if (!inviteEmail.trim()) { toast('Email é obrigatório', 'error'); return }
     if (!org) return
-
-    // Find user by email in profiles
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('email', inviteEmail.trim())
-      .single()
-
-    if (!profile) {
-      toast('Usuário não encontrado. Ele precisa se registrar primeiro.', 'error')
-      return
+    try {
+      const member = await apiRequest<OrgMembro>('/api/v1/config/org-members', {
+        method: 'POST',
+        body: { email: inviteEmail.trim(), role: inviteRole },
+      })
+      setMembros((prev) => {
+        const withoutDuplicated = prev.filter((item) => item.id !== member.id)
+        return [...withoutDuplicated, member]
+      })
+      toast('Membro adicionado!', 'success')
+      setShowInvite(false)
+      setInviteEmail('')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao adicionar membro', 'error')
     }
-
-    // Check if already member
-    const existing = membros.find((m) => (m.profiles as { email: string | null } | null)?.email === inviteEmail.trim())
-    if (existing) {
-      toast('Este usuário já faz parte da organização', 'error')
-      return
-    }
-
-    const { error } = await supabase.from('org_membros').insert({
-      org_id: org.id,
-      user_id: profile.id,
-      role: inviteRole,
-      convidado_por: userId,
-      status: 'ativo' as OrgMembroStatus,
-    })
-    if (error) { toast(error.message, 'error'); return }
-
-    // Update invited user's profile with org_id
-    await supabase.from('profiles').update({ org_id: org.id }).eq('id', profile.id)
-
-    toast('Membro adicionado!', 'success')
-    setShowInvite(false)
-    setInviteEmail('')
-    window.location.reload()
   }
 
   async function updateMemberRole(membroId: string, newRole: UserRole) {
-    const { error } = await supabase.from('org_membros').update({ role: newRole }).eq('id', membroId)
-    if (error) { toast(error.message, 'error'); return }
-    setMembros((prev) => prev.map((m) => m.id === membroId ? { ...m, role: newRole } : m))
-    toast('Role atualizado!', 'success')
+    try {
+      const updated = await apiRequest<OrgMembro>(`/api/v1/config/org-members/${membroId}/role`, {
+        method: 'PATCH',
+        body: { role: newRole },
+      })
+      setMembros((prev) => prev.map((m) => m.id === membroId ? updated : m))
+      toast('Role atualizado!', 'success')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao atualizar papel', 'error')
+    }
   }
 
   async function removeMember(membroId: string, membroUserId: string) {
     if (membroUserId === userId) { toast('Você não pode se remover da organização', 'error'); return }
     if (!confirm('Remover este membro da organização?')) return
-    const { error } = await supabase.from('org_membros').delete().eq('id', membroId)
-    if (error) { toast(error.message, 'error'); return }
-    await supabase.from('profiles').update({ org_id: null }).eq('id', membroUserId)
-    setMembros((prev) => prev.filter((m) => m.id !== membroId))
-    toast('Membro removido', 'info')
+    try {
+      await apiRequest<{ success: boolean }>(`/api/v1/config/org-members/${membroId}`, { method: 'DELETE' })
+      setMembros((prev) => prev.filter((m) => m.id !== membroId))
+      toast('Membro removido', 'info')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao remover membro', 'error')
+    }
   }
 
   async function updateOrgName(nome: string) {
     if (!org || !nome.trim()) return
-    const { error } = await supabase.from('organizacoes').update({ nome: nome.trim() }).eq('id', org.id)
-    if (error) { toast(error.message, 'error'); return }
-    setOrg((prev) => prev ? { ...prev, nome: nome.trim() } : null)
-    toast('Nome atualizado!', 'success')
+    try {
+      const updated = await apiRequest<Organizacao>('/api/v1/config/org', {
+        method: 'PATCH',
+        body: { nome: nome.trim() },
+      })
+      setOrg(updated)
+      toast('Nome atualizado!', 'success')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao atualizar organização', 'error')
+    }
   }
 
   // No organization — show create or solo mode

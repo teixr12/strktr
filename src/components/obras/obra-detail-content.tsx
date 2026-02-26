@@ -1,17 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { toast } from '@/hooks/use-toast'
 import { fmt, fmtDate } from '@/lib/utils'
 import { OBRA_STATUS_COLORS } from '@/lib/constants'
-import { ArrowLeft, Edit2, Trash2, Plus, CheckCircle, Loader, Circle, XCircle } from 'lucide-react'
+import { ArrowLeft, Edit2, Trash2, Plus, CheckCircle, Loader, Circle, XCircle, AlertTriangle } from 'lucide-react'
 import { ObraFormModal } from './obra-form-modal'
 import { DiarioObraTab } from './diario-obra'
 import { ObraChecklistsTab } from './obra-checklists'
-import { logDiario } from '@/lib/diario'
+import { apiRequest } from '@/lib/api/client'
 import type { Obra, ObraEtapa, Transacao, DiarioObra as DiarioEntry, ObraChecklist } from '@/types/database'
+import { createEtapaSchema, type CreateEtapaDTO } from '@/shared/schemas/execution'
+import type { ExecutionAlert, RecommendedAction } from '@/shared/types/execution'
 
 const etapaStatusInfo: Record<string, { c: string; Icon: React.ComponentType<{ className?: string }> }> = {
   Concluída: { c: 'text-emerald-600', Icon: CheckCircle },
@@ -28,68 +31,150 @@ interface Props {
   initialChecklists?: ObraChecklist[]
 }
 
+type ExecutionSummary = {
+  kpis: {
+    etapasTotal: number
+    etapasConcluidas: number
+    etapasBloqueadas: number
+    checklistPendentes: number
+    checklistAtrasados: number
+  }
+  risk: {
+    score: number
+    level: 'low' | 'medium' | 'high'
+  }
+  alerts: ExecutionAlert[]
+  recommendedActions: RecommendedAction[]
+}
+
 export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, initialDiario = [], initialChecklists = [] }: Props) {
   const router = useRouter()
-  const supabase = createClient()
   const [tab, setTab] = useState<'resumo' | 'etapas' | 'financeiro' | 'diario' | 'checklists'>('resumo')
   const [etapas, setEtapas] = useState(initialEtapas)
   const [showEditForm, setShowEditForm] = useState(false)
   const [showEtapaForm, setShowEtapaForm] = useState(false)
-  const [etapaForm, setEtapaForm] = useState({ nome: '', responsavel: '', status: 'Pendente' })
+  const [executionSummary, setExecutionSummary] = useState<ExecutionSummary | null>(null)
+  const [loadingSummary, setLoadingSummary] = useState(false)
+  const etapaForm = useForm<CreateEtapaDTO>({
+    resolver: zodResolver(createEtapaSchema),
+    defaultValues: { nome: '', responsavel: '', status: 'Pendente' },
+  })
 
   const txObra = initialTransacoes
   const rec = txObra.filter((t) => t.tipo === 'Receita').reduce((s, t) => s + t.valor, 0)
   const dep = txObra.filter((t) => t.tipo === 'Despesa').reduce((s, t) => s + t.valor, 0)
+  const riskEnabled = process.env.NEXT_PUBLIC_FF_EXECUTION_RISK_ENGINE === 'true'
+
+  const alertStyles: Record<ExecutionAlert['severity'], string> = {
+    high: 'bg-red-50 text-red-700 border-red-200',
+    medium: 'bg-amber-50 text-amber-700 border-amber-200',
+    low: 'bg-blue-50 text-blue-700 border-blue-200',
+  }
+
+  const actionStyles: Record<RecommendedAction['severity'], string> = {
+    high: 'border-red-200 bg-red-50/70',
+    medium: 'border-amber-200 bg-amber-50/70',
+    low: 'border-blue-200 bg-blue-50/70',
+  }
+
+  const loadExecutionSummary = useCallback(async () => {
+    setLoadingSummary(true)
+    try {
+      const data = await apiRequest<ExecutionSummary>(`/api/v1/obras/${obra.id}/execution-summary`)
+      setExecutionSummary(data)
+    } catch {
+      setExecutionSummary(null)
+    } finally {
+      setLoadingSummary(false)
+    }
+  }, [obra.id])
+
+  async function recalculateRisk() {
+    try {
+      await apiRequest(`/api/v1/obras/${obra.id}/risks/recalculate`, { method: 'POST' })
+      toast('Risco recalculado', 'success')
+      loadExecutionSummary()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao recalcular risco'
+      toast(message, 'error')
+    }
+  }
+
+  useEffect(() => {
+    loadExecutionSummary()
+  }, [loadExecutionSummary])
 
   async function refreshEtapas() {
-    const { data } = await supabase.from('obra_etapas').select('*').eq('obra_id', obra.id).order('ordem')
-    if (data) setEtapas(data)
+    try {
+      const data = await apiRequest<ObraEtapa[]>(`/api/v1/obras/${obra.id}/etapas`)
+      setEtapas(data || [])
+      loadExecutionSummary()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao atualizar etapas'
+      toast(message, 'error')
+    }
   }
 
   async function updateEtapaStatus(id: string, status: string) {
-    const { error } = await supabase.from('obra_etapas').update({ status }).eq('id', id)
-    if (error) { toast(error.message, 'error'); return }
-    toast('Etapa atualizada!', 'success')
-    refreshEtapas()
-    // Log to diario
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const etapa = etapas.find((e) => e.id === id)
-      logDiario(supabase, obra.id, user.id, 'etapa_change', `Etapa "${etapa?.nome}" → ${status}`)
+    try {
+      await apiRequest(`/api/v1/obras/${obra.id}/etapas/${id}/status`, {
+        method: 'POST',
+        body: { status },
+      })
+      toast('Etapa atualizada!', 'success')
+      refreshEtapas()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao atualizar etapa'
+      toast(message, 'error')
     }
   }
 
   async function deleteEtapa(id: string) {
     if (!confirm('Excluir esta etapa?')) return
-    await supabase.from('obra_etapas').delete().eq('id', id)
-    toast('Etapa excluída', 'info')
-    refreshEtapas()
+    try {
+      await apiRequest(`/api/v1/obras/${obra.id}/etapas/${id}`, { method: 'DELETE' })
+      toast('Etapa excluída', 'info')
+      refreshEtapas()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao excluir etapa'
+      toast(message, 'error')
+    }
   }
 
-  async function saveEtapa() {
-    if (!etapaForm.nome) { toast('Preencha o nome da etapa', 'error'); return }
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { error } = await supabase.from('obra_etapas').insert({
-      obra_id: obra.id,
-      user_id: user.id,
-      nome: etapaForm.nome,
-      responsavel: etapaForm.responsavel || null,
-      status: etapaForm.status,
-    })
-    if (error) { toast(error.message, 'error'); return }
-    toast('Etapa adicionada!', 'success')
-    setShowEtapaForm(false)
-    setEtapaForm({ nome: '', responsavel: '', status: 'Pendente' })
-    refreshEtapas()
+  async function saveEtapa(values: CreateEtapaDTO) {
+    try {
+      await apiRequest(`/api/v1/obras/${obra.id}/etapas`, {
+        method: 'POST',
+        body: values,
+      })
+      toast('Etapa adicionada!', 'success')
+      setShowEtapaForm(false)
+      etapaForm.reset({ nome: '', responsavel: '', status: 'Pendente' })
+      refreshEtapas()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao adicionar etapa'
+      toast(message, 'error')
+    }
+  }
+
+  async function runRecommendedAction(action: RecommendedAction) {
+    if (action.code === 'RECALCULATE_RISK') {
+      await recalculateRisk()
+      return
+    }
+    setTab(action.targetTab)
   }
 
   async function handleDelete() {
     if (!confirm('Excluir esta obra? Esta ação não pode ser desfeita.')) return
-    const { error } = await supabase.from('obras').delete().eq('id', obra.id)
-    if (error) { toast(error.message, 'error'); return }
-    toast('Obra excluída', 'info')
-    router.push('/obras')
+    try {
+      await apiRequest(`/api/v1/obras/${obra.id}`, { method: 'DELETE' })
+      toast('Obra excluída', 'info')
+      router.push('/obras')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao excluir obra'
+      toast(message, 'error')
+    }
   }
 
   const tabs = [
@@ -147,16 +232,118 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
 
       {/* Resumo */}
       {tab === 'resumo' && (
-        <div className="glass-card rounded-2xl p-5 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div><span className="text-xs text-gray-500">Status</span><p className="mt-1"><span className={`px-2 py-0.5 text-xs font-bold rounded-full ${OBRA_STATUS_COLORS[obra.status]}`}>{obra.status}</span></p></div>
-            <div><span className="text-xs text-gray-500">Tipo</span><p className="font-semibold text-sm mt-1">{obra.tipo}</p></div>
-            <div><span className="text-xs text-gray-500">Contrato</span><p className="font-semibold text-sm mt-1">{fmt(obra.valor_contrato)}</p></div>
-            <div><span className="text-xs text-gray-500">Área</span><p className="font-semibold text-sm mt-1">{obra.area_m2 ? `${obra.area_m2}m²` : '—'}</p></div>
-            <div><span className="text-xs text-gray-500">Início</span><p className="font-semibold text-sm mt-1">{fmtDate(obra.data_inicio)}</p></div>
-            <div><span className="text-xs text-gray-500">Previsão</span><p className="font-semibold text-sm mt-1">{fmtDate(obra.data_previsao)}</p></div>
+        <div className="space-y-4">
+          <div className="glass-card rounded-2xl p-5 space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div><span className="text-xs text-gray-500">Status</span><p className="mt-1"><span className={`px-2 py-0.5 text-xs font-bold rounded-full ${OBRA_STATUS_COLORS[obra.status]}`}>{obra.status}</span></p></div>
+              <div><span className="text-xs text-gray-500">Tipo</span><p className="font-semibold text-sm mt-1">{obra.tipo}</p></div>
+              <div><span className="text-xs text-gray-500">Contrato</span><p className="font-semibold text-sm mt-1">{fmt(obra.valor_contrato)}</p></div>
+              <div><span className="text-xs text-gray-500">Área</span><p className="font-semibold text-sm mt-1">{obra.area_m2 ? `${obra.area_m2}m²` : '—'}</p></div>
+              <div><span className="text-xs text-gray-500">Início</span><p className="font-semibold text-sm mt-1">{fmtDate(obra.data_inicio)}</p></div>
+              <div><span className="text-xs text-gray-500">Previsão</span><p className="font-semibold text-sm mt-1">{fmtDate(obra.data_previsao)}</p></div>
+            </div>
+
+            <div className="pt-3 border-t border-gray-200/50 dark:border-gray-800">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <span className="text-xs text-gray-500">Risco Operacional</span>
+                  {loadingSummary ? (
+                    <p className="text-sm text-gray-500 mt-1">Calculando...</p>
+                  ) : executionSummary ? (
+                    <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
+                      {executionSummary.risk.level.toUpperCase()} ({executionSummary.risk.score})
+                    </p>
+                  ) : (
+                    <p className="text-sm text-gray-500 mt-1">Indisponível</p>
+                  )}
+                </div>
+                {riskEnabled && (
+                  <button
+                    onClick={recalculateRisk}
+                    className="px-3 py-1.5 bg-sand-500 hover:bg-sand-600 text-white text-xs font-medium rounded-full transition-all btn-press"
+                  >
+                    Recalcular risco
+                  </button>
+                )}
+              </div>
+              {executionSummary && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Bloqueios: {executionSummary.kpis.etapasBloqueadas} · Pendentes: {executionSummary.kpis.checklistPendentes} · Atrasados: {executionSummary.kpis.checklistAtrasados}
+                </p>
+              )}
+            </div>
+
+            {obra.descricao && <div className="pt-3 border-t border-gray-200/50 dark:border-gray-800"><span className="text-xs text-gray-500">Descrição</span><p className="text-sm text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-line">{obra.descricao}</p></div>}
           </div>
-          {obra.descricao && <div className="pt-3 border-t border-gray-200/50 dark:border-gray-800"><span className="text-xs text-gray-500">Descrição</span><p className="text-sm text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-line">{obra.descricao}</p></div>}
+
+          <div className="glass-card rounded-2xl p-5 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Centro de Execução</h3>
+              <span className="text-[11px] text-gray-500">Ações recomendadas hoje</span>
+            </div>
+
+            {!executionSummary?.alerts?.length ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
+                <p className="text-xs text-emerald-700">Sem alertas críticos no momento.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {executionSummary.alerts.map((alert) => (
+                  <div key={alert.code} className={`rounded-xl border px-3 py-2 text-xs font-medium flex items-center gap-2 ${alertStyles[alert.severity]}`}>
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    {alert.title}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              {executionSummary?.recommendedActions?.length ? (
+                executionSummary.recommendedActions.map((action) => (
+                  <div key={action.code} className={`rounded-xl border p-3 ${actionStyles[action.severity]}`}>
+                    <p className="text-xs font-semibold text-gray-900 dark:text-white">{action.title}</p>
+                    <button
+                      onClick={() => runRecommendedAction(action)}
+                      className="mt-2 px-3 py-1.5 bg-gray-900 hover:bg-gray-700 text-white text-xs rounded-lg transition-all"
+                    >
+                      {action.cta}
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-gray-500">Sem recomendações pendentes para hoje.</p>
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-gray-200/50 dark:border-gray-800 space-y-2">
+              <p className="text-xs text-gray-500">Timeline recente</p>
+              {initialDiario.length === 0 ? (
+                <button
+                  onClick={() => setTab('diario')}
+                  className="text-xs text-sand-600 hover:text-sand-700 transition-colors"
+                >
+                  Registrar primeira nota no diário
+                </button>
+              ) : (
+                initialDiario.slice(0, 3).map((entry) => (
+                  <div key={entry.id} className="text-xs text-gray-600 dark:text-gray-300">
+                    {fmtDate(entry.created_at)} · {entry.titulo}
+                  </div>
+                ))
+              )}
+            </div>
+
+            {etapas.length === 0 && (
+              <button onClick={() => setTab('etapas')} className="text-xs text-sand-600 hover:text-sand-700">
+                Crie sua primeira etapa
+              </button>
+            )}
+            {initialChecklists.length === 0 && (
+              <button onClick={() => setTab('checklists')} className="block text-xs text-sand-600 hover:text-sand-700">
+                Adicione checklist base
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -200,17 +387,18 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
             <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
               <div className="modal-glass modal-animate w-full max-w-sm rounded-3xl shadow-2xl dark:bg-gray-900 p-6">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Nova Etapa</h3>
-                <div className="space-y-3">
-                  <input value={etapaForm.nome} onChange={(e) => setEtapaForm((f) => ({ ...f, nome: e.target.value }))} placeholder="Nome da etapa *" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none dark:text-white" />
-                  <input value={etapaForm.responsavel} onChange={(e) => setEtapaForm((f) => ({ ...f, responsavel: e.target.value }))} placeholder="Responsável" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none dark:text-white" />
-                  <select value={etapaForm.status} onChange={(e) => setEtapaForm((f) => ({ ...f, status: e.target.value }))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white">
+                <form className="space-y-3" onSubmit={etapaForm.handleSubmit(saveEtapa)}>
+                  <input {...etapaForm.register('nome')} placeholder="Nome da etapa *" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none dark:text-white" />
+                  {etapaForm.formState.errors.nome && <p className="text-xs text-red-500">{etapaForm.formState.errors.nome.message}</p>}
+                  <input {...etapaForm.register('responsavel')} placeholder="Responsável" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none dark:text-white" />
+                  <select {...etapaForm.register('status')} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white">
                     <option>Pendente</option><option>Em Andamento</option><option>Concluída</option><option>Bloqueada</option>
                   </select>
                   <div className="flex gap-2">
-                    <button onClick={() => setShowEtapaForm(false)} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">Cancelar</button>
-                    <button onClick={saveEtapa} className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all">Adicionar</button>
+                    <button type="button" onClick={() => setShowEtapaForm(false)} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">Cancelar</button>
+                    <button type="submit" className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all">Adicionar</button>
                   </div>
-                </div>
+                </form>
               </div>
             </div>
           )}
@@ -259,12 +447,12 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
 
       {/* Diario */}
       {tab === 'diario' && (
-        <DiarioObraTab obraId={obra.id} initialEntries={initialDiario} />
+        <DiarioObraTab obraId={obra.id} initialEntries={initialDiario} onEntryCreated={loadExecutionSummary} />
       )}
 
       {/* Checklists */}
       {tab === 'checklists' && (
-        <ObraChecklistsTab obraId={obra.id} initialChecklists={initialChecklists} />
+        <ObraChecklistsTab obraId={obra.id} initialChecklists={initialChecklists} onChecklistChanged={loadExecutionSummary} />
       )}
 
       {showEditForm && (

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { apiRequest } from '@/lib/api/client'
 import { toast } from '@/hooks/use-toast'
 import { fmt } from '@/lib/utils'
 import { Plus, X, Trash2, Edit2, Search, BookOpen, Tag } from 'lucide-react'
@@ -26,7 +26,6 @@ const KB_CATEGORIA_LABELS: Record<string, string> = {
 interface Props { initialItems: KnowledgebaseItem[] }
 
 export function KnowledgebaseContent({ initialItems }: Props) {
-  const supabase = createClient()
   const [items, setItems] = useState(initialItems)
   const [showForm, setShowForm] = useState(false)
   const [editItem, setEditItem] = useState<KnowledgebaseItem | null>(null)
@@ -80,29 +79,38 @@ export function KnowledgebaseContent({ initialItems }: Props) {
       tags: form.tags ? form.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
     }
 
-    if (editItem) {
-      const { error } = await supabase.from('knowledgebase').update(payload).eq('id', editItem.id)
-      if (error) { toast(error.message, 'error'); return }
-      setItems((prev) => prev.map((i) => i.id === editItem.id ? { ...i, ...payload } as KnowledgebaseItem : i))
-      toast('Item atualizado!', 'success')
-    } else {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data, error } = await supabase.from('knowledgebase').insert({ ...payload, user_id: user.id }).select().single()
-      if (error) { toast(error.message, 'error'); return }
-      setItems((prev) => [...prev, data])
-      toast('Item adicionado!', 'success')
+    try {
+      if (editItem) {
+        const data = await apiRequest<KnowledgebaseItem>(`/api/v1/knowledgebase/${editItem.id}`, {
+          method: 'PUT',
+          body: payload,
+        })
+        setItems((prev) => prev.map((i) => i.id === editItem.id ? data : i))
+        toast('Item atualizado!', 'success')
+      } else {
+        const data = await apiRequest<KnowledgebaseItem>('/api/v1/knowledgebase', {
+          method: 'POST',
+          body: payload,
+        })
+        setItems((prev) => [...prev, data])
+        toast('Item adicionado!', 'success')
+      }
+      setShowForm(false)
+      setEditItem(null)
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao salvar item', 'error')
     }
-    setShowForm(false)
-    setEditItem(null)
   }
 
   async function deleteItem(id: string) {
     if (!confirm('Excluir este item?')) return
-    const { error } = await supabase.from('knowledgebase').update({ ativo: false }).eq('id', id)
-    if (error) { toast(error.message, 'error'); return }
-    setItems((prev) => prev.filter((i) => i.id !== id))
-    toast('Item excluído', 'info')
+    try {
+      await apiRequest<{ success: boolean }>(`/api/v1/knowledgebase/${id}`, { method: 'DELETE' })
+      setItems((prev) => prev.filter((i) => i.id !== id))
+      toast('Item excluído', 'info')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao excluir item', 'error')
+    }
   }
 
   return (

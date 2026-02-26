@@ -15,6 +15,7 @@ export type ObraStatus = 'Em Andamento' | 'Concluída' | 'Pausada' | 'Cancelada'
 export interface Obra {
   id: string
   user_id: string
+  org_id?: string | null
   nome: string
   cliente: string
   local: string
@@ -42,6 +43,7 @@ export interface ObraEtapa {
   id: string
   obra_id: string
   user_id: string
+  org_id?: string | null
   nome: string
   descricao: string | null
   status: EtapaStatus
@@ -58,6 +60,7 @@ export type LeadTemperatura = 'Hot' | 'Morno' | 'Frio'
 export interface Lead {
   id: string
   user_id: string
+  org_id?: string | null
   nome: string
   email: string | null
   telefone: string | null
@@ -80,6 +83,7 @@ export type TransacaoStatus = 'Confirmado' | 'Pendente' | 'Cancelado'
 export interface Transacao {
   id: string
   user_id: string
+  org_id?: string | null
   obra_id: string | null
   tipo: TransacaoTipo
   categoria: string
@@ -118,6 +122,7 @@ export type VisitaStatus = 'Agendado' | 'Realizado' | 'Cancelado' | 'Reagendado'
 export interface Visita {
   id: string
   user_id: string
+  org_id?: string | null
   obra_id: string | null
   lead_id: string | null
   titulo: string
@@ -139,6 +144,7 @@ export type OrcamentoStatus = 'Rascunho' | 'Enviado' | 'Aprovado' | 'Recusado'
 export interface Orcamento {
   id: string
   user_id: string
+  org_id?: string | null
   titulo: string
   lead_id: string | null
   obra_id: string | null
@@ -170,6 +176,7 @@ export interface DiarioObra {
   id: string
   obra_id: string
   user_id: string
+  org_id?: string | null
   tipo: DiarioTipo
   titulo: string
   descricao: string | null
@@ -183,6 +190,7 @@ export interface ObraChecklist {
   id: string
   obra_id: string
   user_id: string
+  org_id?: string | null
   tipo: ChecklistTipo
   nome: string
   ordem: number
@@ -220,6 +228,7 @@ export type ProjetoStatus = 'Planejamento' | 'Em Aprovação' | 'Aprovado' | 'Em
 export interface Projeto {
   id: string
   user_id: string
+  org_id?: string | null
   nome: string
   descricao: string | null
   cliente: string | null

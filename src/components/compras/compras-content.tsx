@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { apiRequest } from '@/lib/api/client'
 import { toast } from '@/hooks/use-toast'
 import { fmt, fmtDate } from '@/lib/utils'
 import { COMPRA_STATUS_COLORS, COMPRA_URGENCIA_COLORS } from '@/lib/constants'
@@ -18,7 +18,6 @@ interface Props {
 }
 
 export function ComprasContent({ initialCompras, obras }: Props) {
-  const supabase = createClient()
   const [compras, setCompras] = useState(initialCompras)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -41,8 +40,12 @@ export function ComprasContent({ initialCompras, obras }: Props) {
   }, [compras, search, statusFilter])
 
   async function refresh() {
-    const { data } = await supabase.from('compras').select('*, obras(nome)').order('created_at', { ascending: false })
-    if (data) setCompras(data)
+    try {
+      const data = await apiRequest<Compra[]>('/api/v1/compras?limit=200')
+      setCompras(data)
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao recarregar compras', 'error')
+    }
   }
 
   function openForm(c?: Compra) {
@@ -63,8 +66,6 @@ export function ComprasContent({ initialCompras, obras }: Props) {
 
   async function save() {
     if (!form.descricao.trim()) { toast('Descricao e obrigatoria', 'error'); return }
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
     const payload = {
       descricao: form.descricao.trim(), categoria: form.categoria,
       fornecedor: form.fornecedor || null, obra_id: form.obra_id || null,
@@ -74,30 +75,40 @@ export function ComprasContent({ initialCompras, obras }: Props) {
       notas: form.notas || null,
     }
 
-    if (editing) {
-      const { error } = await supabase.from('compras').update(payload).eq('id', editing.id)
-      if (error) { toast(error.message, 'error'); return }
-      toast('Compra atualizada!', 'success')
-    } else {
-      const { error } = await supabase.from('compras').insert({ ...payload, user_id: user.id })
-      if (error) { toast(error.message, 'error'); return }
-      toast('Compra registrada!', 'success')
+    try {
+      if (editing) {
+        await apiRequest<Compra>(`/api/v1/compras/${editing.id}`, { method: 'PUT', body: payload })
+        toast('Compra atualizada!', 'success')
+      } else {
+        await apiRequest<Compra>('/api/v1/compras', { method: 'POST', body: payload })
+        toast('Compra registrada!', 'success')
+      }
+      setShowForm(false)
+      await refresh()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao salvar compra', 'error')
     }
-    setShowForm(false)
-    refresh()
   }
 
   async function updateStatus(id: string, status: CompraStatus) {
-    const { error } = await supabase.from('compras').update({ status }).eq('id', id)
-    if (error) toast(error.message, 'error')
-    else { toast('Status atualizado!', 'success'); refresh() }
+    try {
+      await apiRequest<Compra>(`/api/v1/compras/${id}`, { method: 'PUT', body: { status } })
+      toast('Status atualizado!', 'success')
+      await refresh()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao atualizar status', 'error')
+    }
   }
 
   async function deleteCompra(id: string) {
     if (!confirm('Excluir esta compra?')) return
-    await supabase.from('compras').delete().eq('id', id)
-    toast('Compra excluida', 'info')
-    refresh()
+    try {
+      await apiRequest<{ success: boolean }>(`/api/v1/compras/${id}`, { method: 'DELETE' })
+      toast('Compra excluida', 'info')
+      await refresh()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao excluir compra', 'error')
+    }
   }
 
   return (

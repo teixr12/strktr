@@ -1,36 +1,64 @@
-import { NextResponse } from 'next/server'
 import { getApiUser } from '@/lib/api/auth'
+import { fail, ok } from '@/lib/api/response'
+import { log } from '@/lib/api/logger'
+import { API_ERROR_CODES } from '@/lib/api/errors'
+import { requireDomainPermission } from '@/lib/auth/domain-permissions'
+import { createTransacaoSchema } from '@/shared/schemas/business'
 
 export async function GET(request: Request) {
-  const { user, supabase, error } = await getApiUser(request)
-  if (!user || !supabase) return NextResponse.json({ error }, { status: 401 })
+  const { user, supabase, error, requestId, orgId, role } = await getApiUser(request)
+  if (!user || !supabase) return fail(request, { code: API_ERROR_CODES.UNAUTHORIZED, message: error || 'Não autorizado' }, 401)
+  if (!orgId) return fail(request, { code: API_ERROR_CODES.FORBIDDEN, message: 'Usuário sem organização ativa' }, 403)
+  const permissionError = requireDomainPermission(request, role, 'can_manage_finance')
+  if (permissionError) return permissionError
 
   const { searchParams } = new URL(request.url)
   const tipo = searchParams.get('tipo')
   const obra_id = searchParams.get('obra_id')
   const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100)
 
-  let query = supabase.from('transacoes').select('*, obras(nome)').order('data', { ascending: false }).limit(limit)
+  let query = supabase.from('transacoes').select('*, obras(nome)').eq('org_id', orgId).order('data', { ascending: false }).limit(limit)
   if (tipo) query = query.eq('tipo', tipo)
   if (obra_id) query = query.eq('obra_id', obra_id)
 
   const { data, error: dbError } = await query
-  if (dbError) return NextResponse.json({ error: dbError.message }, { status: 500 })
+  if (dbError) {
+    log('error', 'transacoes.get.failed', { requestId, orgId, userId: user.id, route: '/api/v1/transacoes', error: dbError.message })
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 500)
+  }
 
-  return NextResponse.json({ data, count: data?.length || 0 })
+  return ok(request, data ?? [], { count: data?.length || 0 })
 }
 
 export async function POST(request: Request) {
-  const { user, supabase, error } = await getApiUser(request)
-  if (!user || !supabase) return NextResponse.json({ error }, { status: 401 })
+  const { user, supabase, error, requestId, orgId, role } = await getApiUser(request)
+  if (!user || !supabase) return fail(request, { code: API_ERROR_CODES.UNAUTHORIZED, message: error || 'Não autorizado' }, 401)
+  if (!orgId) return fail(request, { code: API_ERROR_CODES.FORBIDDEN, message: 'Usuário sem organização ativa' }, 403)
+  const permissionError = requireDomainPermission(request, role, 'can_manage_finance')
+  if (permissionError) return permissionError
 
-  const body = await request.json()
+  const parsed = createTransacaoSchema.safeParse(await request.json())
+  if (!parsed.success) {
+    return fail(request, { code: API_ERROR_CODES.VALIDATION_ERROR, message: parsed.error.issues[0]?.message || 'Payload inválido' }, 400)
+  }
+  const body = parsed.data
+
   const { data, error: dbError } = await supabase
     .from('transacoes')
-    .insert({ ...body, user_id: user.id })
-    .select()
+    .insert({
+      ...body,
+      user_id: user.id,
+      org_id: orgId,
+      obra_id: body.obra_id || null,
+      forma_pagto: body.forma_pagto || 'Não informado',
+      notas: body.notas || null,
+    })
+    .select('*, obras(nome)')
     .single()
 
-  if (dbError) return NextResponse.json({ error: dbError.message }, { status: 400 })
-  return NextResponse.json({ data }, { status: 201 })
+  if (dbError) {
+    log('error', 'transacoes.create.failed', { requestId, orgId, userId: user.id, route: '/api/v1/transacoes', error: dbError.message })
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 400)
+  }
+  return ok(request, data, undefined, 201)
 }
