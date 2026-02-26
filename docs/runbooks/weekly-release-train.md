@@ -16,8 +16,17 @@
 - `npm run build`
 - `npm run validate:api-contracts`
 - `npm run test:e2e`
+- `npm run audit:production`
+
+## Authenticated E2E prerequisites
+- GitHub Actions secrets required:
+  - `E2E_USER_EMAIL`
+  - `E2E_USER_PASSWORD`
+  - `E2E_OBRA_ID`
+- CI generates `E2E_BEARER_TOKEN` dynamically at runtime (`npm run e2e:token`).
 
 ## Canary gates
+- Canary window: 60-120 minutes in one pilot organization before general release.
 - Error rate by `/api/v1/*` within baseline.
 - p95 latency stable on critical routes.
 - No critical functional regressions.
