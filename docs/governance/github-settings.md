@@ -4,7 +4,7 @@ Apply these repository settings to enforce the engineering model.
 
 ## Branch protection for `main`
 - Require pull request before merging
-- Require at least 2 approvals
+- Require at least 1 approval
 - Dismiss stale approvals on new commits
 - Require conversation resolution before merge
 - Require status checks to pass:

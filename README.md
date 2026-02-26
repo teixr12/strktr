@@ -50,7 +50,8 @@ npm run dev
 - `npm run build`: build de produção
 - `npm run start`: start produção
 - `npm run lint`: lint
-- `npm run test:e2e`: smoke E2E (Playwright)
+- `npm run test:e2e`: suíte E2E (smoke + business flow autenticado quando configurado)
+- `npm run e2e:token`: gera `E2E_BEARER_TOKEN` via Supabase Auth para CI
 - `npm run validate:api-contracts`: valida padronização de contrato `/api/v1`
 - `npm run governance:pr`: valida regras de governança para PR
 - `npm run release:readiness`: executa checklist técnico completo de release
@@ -156,7 +157,7 @@ Erro:
 - Use feature flags para liberar funcionalidades por etapa.
 - Recomendado: deploy em preview Vercel antes de liberar em produção.
 - Checklist de release big-bang: `docs/release-bigbang-checklist.md`.
-- CI em `.github/workflows/ci.yml` (lint + build + API contract check + Playwright smoke).
+- CI em `.github/workflows/ci.yml` (lint + build + API contract check + Playwright smoke + business flow autenticado).
 
 ## Governança de Engenharia
 - Modelo operacional: `docs/governance/engineering-operating-model.md`

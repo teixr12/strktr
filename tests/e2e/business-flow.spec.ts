@@ -2,9 +2,17 @@ import { expect, test } from '@playwright/test'
 
 const E2E_BEARER_TOKEN = process.env.E2E_BEARER_TOKEN || ''
 const E2E_OBRA_ID = process.env.E2E_OBRA_ID || ''
+const isCI = process.env.CI === 'true' || process.env.CI === '1'
+const hasRequiredEnv = Boolean(E2E_BEARER_TOKEN && E2E_OBRA_ID)
 
 test.describe('business flow (authenticated)', () => {
-  test.skip(!E2E_BEARER_TOKEN || !E2E_OBRA_ID, 'Set E2E_BEARER_TOKEN and E2E_OBRA_ID to run authenticated business tests')
+  test.beforeAll(() => {
+    if (isCI && !hasRequiredEnv) {
+      throw new Error('CI must provide E2E_BEARER_TOKEN and E2E_OBRA_ID to run authenticated business flow tests')
+    }
+  })
+
+  test.skip(!hasRequiredEnv && !isCI, 'Set E2E_BEARER_TOKEN and E2E_OBRA_ID to run authenticated business tests locally')
 
   test('cronograma -> pdf -> portal approval rejection/resubmission', async ({ request }) => {
     const headers = {
