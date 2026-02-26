@@ -3,6 +3,24 @@
 ## Strategy (Mandatory)
 Use `expand -> backfill -> switch -> cleanup` for all structural changes.
 
+## Automated workflow (GitHub Actions)
+Use `.github/workflows/supabase-migrations.yml` via `workflow_dispatch`.
+
+Required repository/environment secrets:
+- `SUPABASE_ACCESS_TOKEN`
+- `SUPABASE_PROJECT_REF`
+
+Recommended GitHub environments:
+- `supabase-staging`
+- `supabase-production` (configure required reviewers for manual approval)
+
+Dispatch inputs:
+1. `target_environment`: `staging` or `production`
+2. `stage`: `expand` / `backfill` / `switch` / `cleanup`
+3. `migration_file`: path under `supabase/migrations/*.sql`
+4. `run_audits`: run pre/post SQL audits
+5. `dry_run`: validation only, no DB writes
+
 ## Pre-migration
 1. Confirm additive migration only (no destructive operations in same cycle).
 2. Run audits before applying migration:
