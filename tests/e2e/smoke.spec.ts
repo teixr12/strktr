@@ -40,6 +40,11 @@ test('novos endpoints protegidos retornam envelope canônico sem token', async (
     { endpoint: '/api/v1/notificacoes/read-all', method: 'POST' },
     { endpoint: '/api/v1/perfil/password', method: 'POST' },
     { endpoint: '/api/v1/perfil', method: 'PATCH' },
+    { endpoint: '/api/v1/agenda/arquiteto', method: 'GET' },
+    { endpoint: '/api/v1/obras/00000000-0000-0000-0000-000000000000/cronograma', method: 'GET' },
+    { endpoint: '/api/v1/obras/00000000-0000-0000-0000-000000000000/cronograma/recalculate', method: 'POST' },
+    { endpoint: '/api/v1/obras/00000000-0000-0000-0000-000000000000/cronograma/pdf', method: 'POST' },
+    { endpoint: '/api/v1/obras/00000000-0000-0000-0000-000000000000/portal/invite', method: 'POST' },
   ]
 
   for (const { endpoint, method } of checks) {
@@ -53,5 +58,25 @@ test('novos endpoints protegidos retornam envelope canônico sem token', async (
     const payload = await response.json()
     expect(payload.error.code, endpoint).toBe('UNAUTHORIZED')
     expect(payload.requestId, endpoint).toBeTruthy()
+  }
+})
+
+test('portal público exige token válido e retorna envelope de erro', async ({ request }) => {
+  const endpoints: Array<{ endpoint: string; method: 'GET' | 'POST'; body?: Record<string, unknown> }> = [
+    { endpoint: '/api/v1/portal/session/token-invalido', method: 'GET' },
+    { endpoint: '/api/v1/portal/comentarios', method: 'POST', body: { token: 'inv', mensagem: 'x' } },
+    { endpoint: '/api/v1/portal/aprovacoes/00000000-0000-0000-0000-000000000000/approve', method: 'POST', body: { token: 'inv' } },
+    { endpoint: '/api/v1/portal/aprovacoes/00000000-0000-0000-0000-000000000000/reject', method: 'POST', body: { token: 'inv', comentario: 'x' } },
+  ]
+
+  for (const entry of endpoints) {
+    const response =
+      entry.method === 'GET'
+        ? await request.get(entry.endpoint)
+        : await request.post(entry.endpoint, { data: entry.body || {} })
+
+    expect([400, 401, 500], entry.endpoint).toContain(response.status())
+    const payload = await response.json()
+    expect(payload.requestId, entry.endpoint).toBeTruthy()
   }
 })

@@ -236,6 +236,37 @@ export async function GET(request: Request) {
         error: err instanceof Error ? err.message : 'unknown',
       })
     }
+
+    try {
+      const { data: pendingApprovals, error: approvalsError } = await supabase
+        .from('aprovacoes_cliente')
+        .select('id')
+        .eq('org_id', orgId)
+        .eq('status', 'pendente')
+        .limit(300)
+
+      if (approvalsError) throw approvalsError
+      const pendingCount = pendingApprovals?.length || 0
+      if (pendingCount > 0) {
+        alerts.push({
+          code: 'CLIENT_APPROVAL_PENDING',
+          title: `${pendingCount} aprovação(ões) pendente(s) do cliente`,
+          severity: pendingCount >= 5 ? 'high' : 'medium',
+          module: 'financeiro',
+          href: '/orcamentos',
+          meta: { pendingApprovals: pendingCount },
+        })
+      }
+    } catch (err) {
+      warnings.push('Falha ao calcular alertas de aprovação do cliente')
+      log('warn', 'alerts.today.approvals.failed', {
+        requestId,
+        orgId,
+        userId: user.id,
+        route: '/api/v1/alerts/today',
+        error: err instanceof Error ? err.message : 'unknown',
+      })
+    }
   }
 
   const sorted = sortBySeverity(alerts).slice(0, 6)

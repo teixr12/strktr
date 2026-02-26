@@ -4,6 +4,7 @@ import { log } from '@/lib/api/logger'
 import { fail, ok } from '@/lib/api/response'
 import { requireDomainPermission } from '@/lib/auth/domain-permissions'
 import { updateOrcamentoSchema } from '@/shared/schemas/business'
+import { ensurePendingApproval, getApprovalStatus } from '@/server/services/portal/approval-service'
 
 function computeTotal(
   items: Array<{ quantidade: number; valor_unitario: number }>
@@ -93,6 +94,43 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const payload = parsed.data
   const { id } = await params
 
+  const { data: existingOrcamento, error: existingOrcamentoError } = await supabase
+    .from('orcamentos')
+    .select('id, obra_id, status, exige_aprovacao_cliente, aprovacao_cliente_id')
+    .eq('id', id)
+    .eq('org_id', orgId)
+    .single()
+
+  if (existingOrcamentoError || !existingOrcamento) {
+    return fail(request, { code: API_ERROR_CODES.NOT_FOUND, message: 'Orçamento não encontrado' }, 404)
+  }
+
+  const targetStatus = payload.status || existingOrcamento.status
+  const targetExigeAprovacao = payload.exige_aprovacao_cliente ?? existingOrcamento.exige_aprovacao_cliente ?? false
+  const targetObraId = payload.obra_id === undefined ? existingOrcamento.obra_id : payload.obra_id
+
+  if (targetExigeAprovacao && !targetObraId) {
+    return fail(
+      request,
+      { code: API_ERROR_CODES.VALIDATION_ERROR, message: 'obra_id é obrigatório quando exige aprovação do cliente' },
+      400
+    )
+  }
+
+  if (targetExigeAprovacao && targetStatus === 'Aprovado') {
+    const approvalStatus = await getApprovalStatus(supabase, orgId, existingOrcamento.aprovacao_cliente_id)
+    if (approvalStatus.error) {
+      return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: approvalStatus.error.message }, 400)
+    }
+    if (approvalStatus.status !== 'aprovado') {
+      return fail(
+        request,
+        { code: API_ERROR_CODES.VALIDATION_ERROR, message: 'Orçamento bloqueado até aprovação do cliente' },
+        409
+      )
+    }
+  }
+
   let computedTotal: number | undefined = undefined
   if (payload.items && payload.items.length > 0) {
     computedTotal = computeTotal(payload.items)
@@ -105,6 +143,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       lead_id: payload.lead_id === undefined ? undefined : payload.lead_id || null,
       obra_id: payload.obra_id === undefined ? undefined : payload.obra_id || null,
       status: payload.status,
+      exige_aprovacao_cliente: payload.exige_aprovacao_cliente,
       validade: payload.validade === undefined ? undefined : payload.validade || null,
       observacoes: payload.observacoes === undefined ? undefined : payload.observacoes || null,
       valor_total: computedTotal,
@@ -162,6 +201,37 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         { code: API_ERROR_CODES.DB_ERROR, message: itemsError.message },
         400
       )
+    }
+  }
+
+  if (targetExigeAprovacao && targetObraId) {
+    const approvalStatus = await getApprovalStatus(supabase, orgId, existingOrcamento.aprovacao_cliente_id)
+    if (approvalStatus.status !== 'aprovado') {
+      const ensuredApproval = await ensurePendingApproval({
+        supabase,
+        orgId,
+        obraId: targetObraId,
+        userId: user.id,
+        tipo: 'orcamento',
+        orcamentoId: id,
+      })
+
+      if (ensuredApproval.error || !ensuredApproval.data?.id) {
+        return fail(
+          request,
+          {
+            code: API_ERROR_CODES.DB_ERROR,
+            message: ensuredApproval.error?.message || 'Erro ao preparar aprovação do cliente',
+          },
+          400
+        )
+      }
+
+      await supabase
+        .from('orcamentos')
+        .update({ aprovacao_cliente_id: ensuredApproval.data.id })
+        .eq('id', id)
+        .eq('org_id', orgId)
     }
   }
 

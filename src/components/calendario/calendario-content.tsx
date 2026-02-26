@@ -7,7 +7,9 @@ import { toast } from '@/hooks/use-toast'
 import { fmtDateTime } from '@/lib/utils'
 import { TIPO_VISITA_COLORS, VISITA_STATUS_COLORS } from '@/lib/constants'
 import { Plus, X, Trash2, CalendarDays, Clock, MapPin, Pencil } from 'lucide-react'
+import { featureFlags } from '@/lib/feature-flags'
 import type { Visita, VisitaTipo, VisitaStatus, Lead, Obra } from '@/types/database'
+import type { AgendaTask } from '@/shared/types/cronograma'
 
 interface Props { initialVisitas: Visita[] }
 
@@ -18,6 +20,7 @@ export function CalendarioContent({ initialVisitas }: Props) {
   const [editingVisita, setEditingVisita] = useState<Visita | null>(null)
   const [obras, setObras] = useState<Pick<Obra, 'id' | 'nome'>[]>([])
   const [leads, setLeads] = useState<Pick<Lead, 'id' | 'nome'>[]>([])
+  const [agendaTasks, setAgendaTasks] = useState<AgendaTask[]>([])
 
   const [form, setForm] = useState({
     titulo: '', tipo: 'Visita' as VisitaTipo,
@@ -37,6 +40,22 @@ export function CalendarioContent({ initialVisitas }: Props) {
     }
     load()
   }, [supabase])
+
+  useEffect(() => {
+    async function loadAgendaTasks() {
+      if (!featureFlags.architectAgenda) {
+        setAgendaTasks([])
+        return
+      }
+      try {
+        const payload = await apiRequest<{ tasks: AgendaTask[] }>('/api/v1/agenda/arquiteto')
+        setAgendaTasks(payload.tasks || [])
+      } catch {
+        setAgendaTasks([])
+      }
+    }
+    loadAgendaTasks()
+  }, [])
 
   const now = new Date()
   const today = now.toISOString().slice(0, 10)
@@ -177,6 +196,34 @@ export function CalendarioContent({ initialVisitas }: Props) {
           <Plus className="w-4 h-4" /> Nova Visita
         </button>
       </div>
+
+      {featureFlags.architectAgenda && agendaTasks.length > 0 && (
+        <div className="glass-card rounded-2xl p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Prioridades Operacionais</h3>
+            <span className="text-[11px] text-gray-500">{agendaTasks.length} tarefas</span>
+          </div>
+          <div className="space-y-1.5">
+            {agendaTasks.slice(0, 6).map((task) => (
+              <div key={task.code} className="flex items-center justify-between rounded-xl bg-white/70 dark:bg-gray-900/40 p-2.5">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-gray-900 dark:text-white truncate">{task.title}</p>
+                  <p className="text-[11px] text-gray-500">{task.dueAt ? fmtDateTime(task.dueAt) : 'Sem prazo definido'}</p>
+                </div>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  task.severity === 'high'
+                    ? 'bg-red-100 text-red-700'
+                    : task.severity === 'medium'
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-blue-100 text-blue-700'
+                }`}>
+                  {task.severity}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {visitas.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 gap-3">

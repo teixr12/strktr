@@ -28,6 +28,11 @@ export async function GET(request: Request) {
       flags: {
         checklistDueDate: process.env.NEXT_PUBLIC_FF_CHECKLIST_DUE_DATE === 'true',
         productAnalytics: process.env.NEXT_PUBLIC_FF_PRODUCT_ANALYTICS === 'true',
+        cronogramaEngine: process.env.NEXT_PUBLIC_FF_CRONOGRAMA_ENGINE === 'true',
+        cronogramaPdf: process.env.NEXT_PUBLIC_FF_CRONOGRAMA_PDF === 'true',
+        clientPortal: process.env.NEXT_PUBLIC_FF_CLIENT_PORTAL === 'true',
+        approvalGate: process.env.NEXT_PUBLIC_FF_APPROVAL_GATE === 'true',
+        architectAgenda: process.env.NEXT_PUBLIC_FF_ARCHITECT_AGENDA === 'true',
       },
     })
   } catch (error) {

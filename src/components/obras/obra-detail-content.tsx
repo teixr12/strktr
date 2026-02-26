@@ -11,6 +11,7 @@ import { ArrowLeft, Edit2, Trash2, Plus, CheckCircle, Loader, Circle, XCircle, A
 import { ObraFormModal } from './obra-form-modal'
 import { DiarioObraTab } from './diario-obra'
 import { ObraChecklistsTab } from './obra-checklists'
+import { ObraCronogramaTab } from './obra-cronograma'
 import { apiRequest } from '@/lib/api/client'
 import type { Obra, ObraEtapa, Transacao, DiarioObra as DiarioEntry, ObraChecklist } from '@/types/database'
 import { createEtapaSchema, type CreateEtapaDTO } from '@/shared/schemas/execution'
@@ -49,7 +50,7 @@ type ExecutionSummary = {
 
 export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, initialDiario = [], initialChecklists = [] }: Props) {
   const router = useRouter()
-  const [tab, setTab] = useState<'resumo' | 'etapas' | 'financeiro' | 'diario' | 'checklists'>('resumo')
+  const [tab, setTab] = useState<'resumo' | 'etapas' | 'cronograma' | 'financeiro' | 'diario' | 'checklists'>('resumo')
   const [etapas, setEtapas] = useState(initialEtapas)
   const [showEditForm, setShowEditForm] = useState(false)
   const [showEtapaForm, setShowEtapaForm] = useState(false)
@@ -180,6 +181,7 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
   const tabs = [
     { id: 'resumo' as const, label: 'Resumo' },
     { id: 'etapas' as const, label: 'Etapas' },
+    { id: 'cronograma' as const, label: 'Cronograma' },
     { id: 'financeiro' as const, label: 'Financeiro' },
     { id: 'diario' as const, label: 'Diario' },
     { id: 'checklists' as const, label: 'Checklists' },
@@ -403,6 +405,11 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
             </div>
           )}
         </div>
+      )}
+
+      {/* Financeiro */}
+      {tab === 'cronograma' && (
+        <ObraCronogramaTab obraId={obra.id} />
       )}
 
       {/* Financeiro */}

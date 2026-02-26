@@ -44,6 +44,7 @@ export interface ObraEtapa {
   obra_id: string
   user_id: string
   org_id?: string | null
+  cronograma_item_id?: string | null
   nome: string
   descricao: string | null
   status: EtapaStatus
@@ -152,6 +153,8 @@ export interface Orcamento {
   validade: string | null
   observacoes: string | null
   valor_total: number
+  exige_aprovacao_cliente?: boolean
+  aprovacao_cliente_id?: string | null
   created_at: string
   updated_at: string
   orcamento_itens?: OrcamentoItem[]
@@ -254,12 +257,15 @@ export type CompraUrgencia = 'Baixa' | 'Normal' | 'Alta' | 'Urgente'
 export interface Compra {
   id: string
   user_id: string
+  org_id?: string | null
   obra_id: string | null
   descricao: string
   categoria: string
   fornecedor: string | null
   valor_estimado: number
   valor_real: number | null
+  exige_aprovacao_cliente?: boolean
+  aprovacao_cliente_id?: string | null
   status: CompraStatus
   urgencia: CompraUrgencia
   data_solicitacao: string
@@ -342,4 +348,103 @@ export interface KnowledgebaseItem {
   ativo: boolean
   created_at: string
   updated_at: string
+}
+
+// --- Fase 8: Cronograma + Portal Cliente ---
+
+export type CronogramaItemTipo = 'tarefa' | 'marco'
+export type CronogramaItemStatus = 'pendente' | 'em_andamento' | 'concluido' | 'bloqueado'
+
+export interface CronogramaObra {
+  id: string
+  org_id: string
+  obra_id: string
+  user_id: string
+  nome: string
+  calendario: Record<string, unknown>
+  data_inicio_planejada: string | null
+  data_fim_planejada: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CronogramaItem {
+  id: string
+  cronograma_id: string
+  org_id: string
+  obra_id: string
+  user_id: string
+  nome: string
+  descricao: string | null
+  tipo: CronogramaItemTipo
+  status: CronogramaItemStatus
+  empresa_responsavel: string | null
+  responsavel: string | null
+  data_inicio_planejada: string | null
+  data_fim_planejada: string | null
+  duracao_dias: number
+  data_inicio_real: string | null
+  data_fim_real: string | null
+  progresso: number
+  atraso_dias: number
+  ordem: number
+  metadata: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export type TipoDependenciaCronograma = 'FS' | 'SS' | 'FF'
+
+export interface CronogramaDependencia {
+  id: string
+  cronograma_id: string
+  org_id: string
+  predecessor_item_id: string
+  successor_item_id: string
+  tipo: TipoDependenciaCronograma
+  lag_dias: number
+  created_at: string
+}
+
+export interface PortalCliente {
+  id: string
+  org_id: string
+  obra_id: string
+  nome: string
+  email: string
+  telefone: string | null
+  ativo: boolean
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface PortalComentario {
+  id: string
+  org_id: string
+  obra_id: string
+  portal_cliente_id: string | null
+  user_id: string | null
+  aprovacao_id: string | null
+  origem: 'cliente' | 'interno' | 'sistema'
+  mensagem: string
+  created_at: string
+}
+
+export type AprovacaoTipo = 'compra' | 'orcamento'
+export type AprovacaoStatus = 'pendente' | 'aprovado' | 'reprovado'
+
+export interface AprovacaoCliente {
+  id: string
+  org_id: string
+  obra_id: string
+  tipo: AprovacaoTipo
+  compra_id: string | null
+  orcamento_id: string | null
+  status: AprovacaoStatus
+  solicitado_por: string
+  solicitado_em: string
+  decidido_por_portal_cliente_id: string | null
+  decisao_comentario: string | null
+  decidido_em: string | null
 }

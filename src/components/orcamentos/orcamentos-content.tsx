@@ -27,7 +27,7 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
 
   const [form, setForm] = useState({
     titulo: '', lead_id: '', obra_id: '', validade: '',
-    observacoes: '', status: 'Rascunho' as OrcamentoStatus,
+    observacoes: '', status: 'Rascunho' as OrcamentoStatus, exige_aprovacao_cliente: false,
   })
   const [items, setItems] = useState<ItemForm[]>([{ descricao: '', unidade: 'm²', quantidade: '1', valor_unitario: '0' }])
 
@@ -57,7 +57,7 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
   }, [orcamentos, filtroStatus, busca])
 
   function resetForm() {
-    setForm({ titulo: '', lead_id: '', obra_id: '', validade: '', observacoes: '', status: 'Rascunho' })
+    setForm({ titulo: '', lead_id: '', obra_id: '', validade: '', observacoes: '', status: 'Rascunho', exige_aprovacao_cliente: false })
     setItems([{ descricao: '', unidade: 'm²', quantidade: '1', valor_unitario: '0' }])
   }
 
@@ -66,7 +66,7 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
   function openEdit(o: Orcamento) {
     setForm({
       titulo: o.titulo, lead_id: o.lead_id || '', obra_id: o.obra_id || '',
-      validade: o.validade || '', observacoes: o.observacoes || '', status: o.status,
+      validade: o.validade || '', observacoes: o.observacoes || '', status: o.status, exige_aprovacao_cliente: Boolean(o.exige_aprovacao_cliente),
     })
     setItems(
       o.orcamento_itens && o.orcamento_itens.length > 0
@@ -108,6 +108,7 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
       titulo: form.titulo.trim(), status: form.status, valor_total,
       lead_id: form.lead_id || null, obra_id: form.obra_id || null,
       validade: form.validade || null, observacoes: form.observacoes || null,
+      exige_aprovacao_cliente: form.exige_aprovacao_cliente,
       items: normalizedItems,
     }
 
@@ -245,7 +246,12 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
                   <h4 className="font-semibold text-sm text-gray-900 dark:text-white">{o.titulo}</h4>
                   <p className="text-xs text-gray-500">{fmtDate(o.created_at)} · {o.orcamento_itens?.length || 0} itens</p>
                 </div>
-                <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${ORC_STATUS_COLORS[o.status] || ORC_STATUS_COLORS.Rascunho}`}>{o.status}</span>
+                <div className="flex items-center gap-1">
+                  <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${ORC_STATUS_COLORS[o.status] || ORC_STATUS_COLORS.Rascunho}`}>{o.status}</span>
+                  {o.exige_aprovacao_cliente && (
+                    <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-100 text-blue-700">Aprovação cliente</span>
+                  )}
+                </div>
               </div>
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-sand-600 dark:text-sand-400">{fmt(o.valor_total)}</span>
@@ -354,6 +360,15 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
               </div>
 
               <textarea value={form.observacoes} onChange={(e) => setForm((f) => ({ ...f, observacoes: e.target.value }))} placeholder="Observações" rows={2} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white resize-none" />
+              <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={form.exige_aprovacao_cliente}
+                  onChange={(e) => setForm((f) => ({ ...f, exige_aprovacao_cliente: e.target.checked }))}
+                  className="rounded border-gray-300"
+                />
+                Exigir aprovação do cliente no portal
+              </label>
 
               {/* Line Items */}
               <div className="border-t border-gray-200 dark:border-gray-700 pt-3">

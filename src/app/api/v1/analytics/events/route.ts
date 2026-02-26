@@ -7,7 +7,13 @@ import { emitProductEvent, type ProductEventType } from '@/lib/telemetry'
 const ALLOWED_EVENTS: ProductEventType[] = [
   'PageViewed',
   'OnboardingStepCompleted',
+  'LeadCreated',
   'LeadNextActionSuggested',
+  'LeadSlaBreached',
+  'BudgetDeviationDetected',
+  'EtapaStatusChanged',
+  'ChecklistItemToggled',
+  'RiskRecalculated',
 ]
 
 export async function POST(request: Request) {
