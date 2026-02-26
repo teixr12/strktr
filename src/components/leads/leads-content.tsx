@@ -6,7 +6,10 @@ import { apiRequest } from '@/lib/api/client'
 import { fmt, fmtDate } from '@/lib/utils'
 import { KANBAN_COLUMNS, TEMPERATURA_EMOJI, TEMPERATURA_COLORS } from '@/lib/constants'
 import { Plus, X, MessageCircle, Trash2, Edit2, GripVertical, Search } from 'lucide-react'
+import { featureFlags } from '@/lib/feature-flags'
 import { PageHeader, QuickActionBar, SectionCard, StatBadge } from '@/components/ui/enterprise'
+import { LeadLaneColumnV2 } from './lead-lane-column-v2'
+import { LeadInteractionsTableV2 } from './lead-interactions-table-v2'
 import type { Lead, LeadStatus, LeadTemperatura } from '@/types/database'
 
 interface Props { initialLeads: Lead[] }
@@ -17,6 +20,18 @@ interface LeadsSlaSummary {
   slaHours: number
   severity: 'low' | 'medium' | 'high'
 }
+
+const V2_LANES: Array<{
+  id: LeadStatus
+  title: string
+  dotClass: string
+  countToneClass: string
+}> = [
+  { id: 'Novo', title: 'Novo Lead', dotClass: 'bg-gray-400', countToneClass: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200' },
+  { id: 'Qualificado', title: 'Qualificado', dotClass: 'bg-amber-500', countToneClass: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200' },
+  { id: 'Proposta', title: 'Proposta', dotClass: 'bg-ocean-500', countToneClass: 'bg-ocean-100 text-ocean-700 dark:bg-ocean-900/40 dark:text-ocean-200' },
+  { id: 'Fechado', title: 'Fechado', dotClass: 'bg-emerald-500', countToneClass: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200' },
+]
 
 export function LeadsContent({ initialLeads }: Props) {
   const [leads, setLeads] = useState(initialLeads)
@@ -29,6 +44,7 @@ export function LeadsContent({ initialLeads }: Props) {
   const [dragOverCol, setDragOverCol] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [sla, setSla] = useState<LeadsSlaSummary | null>(null)
+  const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Leads
 
   useEffect(() => {
     const timer = setInterval(() => setNowMs(Date.now()), 60_000)
@@ -185,7 +201,7 @@ export function LeadsContent({ initialLeads }: Props) {
         actions={
           <QuickActionBar
             actions={[{
-              label: 'Novo Lead',
+              label: useV2 ? 'Adicionar Lead' : 'Novo Lead',
               icon: <Plus className="h-4 w-4" />,
               onClick: openNew,
               tone: 'warning',
@@ -216,78 +232,103 @@ export function LeadsContent({ initialLeads }: Props) {
         </div>
       </SectionCard>
 
-      {/* Kanban Board */}
-      <div className="flex gap-3 overflow-x-auto pb-4 snap-x snap-mandatory">
-        {KANBAN_COLUMNS.map((col) => {
-          const colLeads = filteredLeads.filter((l) => l.status === col.id)
-          const total = colLeads.reduce((s, l) => s + (l.valor_potencial || 0), 0)
-          return (
-            <div
-              key={col.id}
-              className={`flex-shrink-0 w-[280px] snap-center rounded-2xl p-3 transition-all ${
-                dragOverCol === col.id ? 'ring-2 ring-sand-400 bg-sand-50/50 dark:bg-sand-900/10' : 'bg-gray-50/80 dark:bg-gray-800/30'
-              }`}
-              onDragOver={(e) => handleDragOver(e, col.id)}
-              onDragLeave={handleDragLeave}
-              onDrop={(e) => handleDrop(e, col.id)}
-            >
-              {/* Column Header */}
-              <div className="flex items-center justify-between mb-3 px-1">
-                <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: col.dot }} />
-                  <span className="font-semibold text-sm text-gray-800 dark:text-gray-200">{col.label}</span>
-                  <span className="text-xs text-gray-400 bg-gray-200/60 dark:bg-gray-700 px-1.5 py-0.5 rounded-full">{colLeads.length}</span>
-                </div>
-                {total > 0 && <span className="text-xs font-medium text-gray-500">{fmt(total)}</span>}
-              </div>
+      {useV2 ? (
+        <>
+          <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 md:grid md:grid-cols-2 md:overflow-visible xl:grid-cols-4">
+            {V2_LANES.map((lane) => (
+              <LeadLaneColumnV2
+                key={lane.id}
+                laneId={lane.id}
+                title={lane.title}
+                badgeClassName={lane.dotClass}
+                countToneClassName={lane.countToneClass}
+                leads={filteredLeads.filter((lead) => lead.status === lane.id)}
+                dragOver={dragOverCol === lane.id}
+                onDragOver={(event) => handleDragOver(event, lane.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                onOpenLead={setDetailLead}
+              />
+            ))}
+          </div>
 
-              {/* Cards */}
-              <div className="space-y-2 min-h-[60px]">
-                {colLeads.length === 0 ? (
-                  <p className="text-xs text-gray-400 text-center py-4">Nenhum lead</p>
-                ) : (
-                  colLeads.map((l) => (
-                    <div
-                      key={l.id}
-                      draggable
-                      onDragStart={() => handleDragStart(l.id)}
-                      onDragEnd={handleDragEnd}
-                      onClick={() => setDetailLead(l)}
-                      className="glass-card rounded-xl p-3 cursor-grab active:cursor-grabbing hover:shadow-md transition-all group"
-                    >
-                      <div className="flex items-start justify-between mb-1.5">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <GripVertical className="w-3.5 h-3.5 text-gray-300 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                          <span className="font-semibold text-sm text-gray-900 dark:text-white truncate">{l.nome}</span>
+          <SectionCard title="Histórico de Interações" className="p-4 md:p-5">
+            <LeadInteractionsTableV2 leads={filteredLeads} />
+          </SectionCard>
+        </>
+      ) : (
+        <div className="flex gap-3 overflow-x-auto pb-4 snap-x snap-mandatory">
+          {KANBAN_COLUMNS.map((col) => {
+            const colLeads = filteredLeads.filter((l) => l.status === col.id)
+            const total = colLeads.reduce((s, l) => s + (l.valor_potencial || 0), 0)
+            return (
+              <div
+                key={col.id}
+                className={`flex-shrink-0 w-[280px] snap-center rounded-2xl p-3 transition-all ${
+                  dragOverCol === col.id ? 'ring-2 ring-sand-400 bg-sand-50/50 dark:bg-sand-900/10' : 'bg-gray-50/80 dark:bg-gray-800/30'
+                }`}
+                onDragOver={(e) => handleDragOver(e, col.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, col.id)}
+              >
+                <div className="flex items-center justify-between mb-3 px-1">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: col.dot }} />
+                    <span className="font-semibold text-sm text-gray-800 dark:text-gray-200">{col.label}</span>
+                    <span className="text-xs text-gray-400 bg-gray-200/60 dark:bg-gray-700 px-1.5 py-0.5 rounded-full">{colLeads.length}</span>
+                  </div>
+                  {total > 0 && <span className="text-xs font-medium text-gray-500">{fmt(total)}</span>}
+                </div>
+
+                <div className="space-y-2 min-h-[60px]">
+                  {colLeads.length === 0 ? (
+                    <p className="text-xs text-gray-400 text-center py-4">Nenhum lead</p>
+                  ) : (
+                    colLeads.map((l) => (
+                      <div
+                        key={l.id}
+                        draggable
+                        onDragStart={() => handleDragStart(l.id)}
+                        onDragEnd={handleDragEnd}
+                        onClick={() => setDetailLead(l)}
+                        className="glass-card rounded-xl p-3 cursor-grab active:cursor-grabbing hover:shadow-md transition-all group"
+                      >
+                        <div className="flex items-start justify-between mb-1.5">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <GripVertical className="w-3.5 h-3.5 text-gray-300 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <span className="font-semibold text-sm text-gray-900 dark:text-white truncate">{l.nome}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            {isSlaLate(l) && (
+                              <span className="px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 text-[10px] font-bold">
+                                SLA
+                              </span>
+                            )}
+                            <span className="text-sm flex-shrink-0">{TEMPERATURA_EMOJI[l.temperatura] || '🌤'}</span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          {isSlaLate(l) && (
-                            <span className="px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 text-[10px] font-bold">
-                              SLA
-                            </span>
+                        {l.tipo_projeto && <p className="text-xs text-gray-500 mb-1">{l.tipo_projeto}</p>}
+                        <div className="flex items-center justify-between">
+                          {l.valor_potencial ? (
+                            <span className="text-xs font-semibold text-sand-600 dark:text-sand-400">{fmt(l.valor_potencial)}</span>
+                          ) : <span />}
+                          {l.telefone && (
+                            <a href={whatsappUrl(l.telefone)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="p-1 text-emerald-500 hover:text-emerald-600 transition-colors">
+                              <MessageCircle className="w-3.5 h-3.5" />
+                            </a>
                           )}
-                          <span className="text-sm flex-shrink-0">{TEMPERATURA_EMOJI[l.temperatura] || '🌤'}</span>
                         </div>
                       </div>
-                      {l.tipo_projeto && <p className="text-xs text-gray-500 mb-1">{l.tipo_projeto}</p>}
-                      <div className="flex items-center justify-between">
-                        {l.valor_potencial ? (
-                          <span className="text-xs font-semibold text-sand-600 dark:text-sand-400">{fmt(l.valor_potencial)}</span>
-                        ) : <span />}
-                        {l.telefone && (
-                          <a href={whatsappUrl(l.telefone)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="p-1 text-emerald-500 hover:text-emerald-600 transition-colors">
-                            <MessageCircle className="w-3.5 h-3.5" />
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                )}
+                    ))
+                  )}
+                </div>
               </div>
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Detail Modal */}
       {detailLead && (

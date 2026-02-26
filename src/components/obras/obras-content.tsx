@@ -8,6 +8,8 @@ import { OBRA_STATUS_COLORS, OBRA_ICON_COLORS } from '@/lib/constants'
 import { Plus, HardHat, Home, Building, TreePine, Search } from 'lucide-react'
 import { ObraFormModal } from './obra-form-modal'
 import { EmptyStateAction, PageHeader, QuickActionBar, SectionCard } from '@/components/ui/enterprise'
+import { featureFlags } from '@/lib/feature-flags'
+import { ObraListCardV2 } from './obra-list-card-v2'
 import type { Obra, ObraStatus } from '@/types/database'
 
 const obraIcons: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -21,9 +23,11 @@ const STATUS_OPTIONS: ('Todas' | ObraStatus)[] = ['Todas', 'Em Andamento', 'Orç
 export function ObrasContent({ initialObras }: { initialObras: Obra[] }) {
   const [obras, setObras] = useState(initialObras)
   const [showForm, setShowForm] = useState(false)
+  const [editingObra, setEditingObra] = useState<Obra | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'Todas' | ObraStatus>('Todas')
   const supabase = createClient()
+  const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Obras
 
   async function refresh() {
     const { data } = await supabase.from('obras').select('*').order('created_at', { ascending: false })
@@ -51,7 +55,10 @@ export function ObrasContent({ initialObras }: { initialObras: Obra[] }) {
             actions={[{
               label: 'Nova Obra',
               icon: <Plus className="h-4 w-4" />,
-              onClick: () => setShowForm(true),
+              onClick: () => {
+                setEditingObra(null)
+                setShowForm(true)
+              },
               tone: 'warning',
             }]}
           />
@@ -60,7 +67,7 @@ export function ObrasContent({ initialObras }: { initialObras: Obra[] }) {
 
       {/* Search & Filters */}
       <SectionCard className="p-4">
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
@@ -70,19 +77,33 @@ export function ObrasContent({ initialObras }: { initialObras: Obra[] }) {
               className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
             />
           </div>
-          <div className="flex flex-wrap gap-1">
-            {STATUS_OPTIONS.map((s) => (
-              <button
-                key={s}
-                onClick={() => setStatusFilter(s)}
-                className={`whitespace-nowrap rounded-xl px-3 py-2 text-xs font-medium transition-all ${
-                  statusFilter === s ? 'bg-sand-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400'
-                }`}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
+          {useV2 ? (
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as 'Todas' | ObraStatus)}
+              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm sm:w-auto dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            >
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {s === 'Todas' ? 'Todas as obras' : s}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div className="flex flex-wrap gap-1">
+              {STATUS_OPTIONS.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setStatusFilter(s)}
+                  className={`whitespace-nowrap rounded-xl px-3 py-2 text-xs font-medium transition-all ${
+                    statusFilter === s ? 'bg-sand-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400'
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </SectionCard>
 
@@ -92,8 +113,20 @@ export function ObrasContent({ initialObras }: { initialObras: Obra[] }) {
           title={obras.length === 0 ? 'Nenhuma obra cadastrada ainda' : 'Nenhuma obra encontrada'}
           description="Cadastre uma obra para acompanhar progresso, etapas e custo em tempo real."
           actionLabel="Criar obra"
-          onAction={() => setShowForm(true)}
+          onAction={() => {
+            setEditingObra(null)
+            setShowForm(true)
+          }}
         />
+      ) : useV2 ? (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+          {filtered.map((obra) => (
+            <ObraListCardV2 key={obra.id} obra={obra} onUpdate={(item) => {
+              setEditingObra(item)
+              setShowForm(true)
+            }} />
+          ))}
+        </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
           {filtered.map((o) => {
@@ -144,10 +177,29 @@ export function ObrasContent({ initialObras }: { initialObras: Obra[] }) {
         </div>
       )}
 
+      {useV2 ? (
+        <button
+          type="button"
+          onClick={() => {
+            setEditingObra(null)
+            setShowForm(true)
+          }}
+          className="fixed bottom-5 right-5 z-20 inline-flex items-center gap-2 rounded-2xl bg-sand-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-sand-500/30 transition hover:bg-sand-600 sm:hidden"
+        >
+          <Plus className="h-4 w-4" />
+          Nova Obra
+        </button>
+      ) : null}
+
       {showForm && (
         <ObraFormModal
+          obra={editingObra || undefined}
           onClose={() => setShowForm(false)}
-          onSaved={() => { setShowForm(false); refresh() }}
+          onSaved={() => {
+            setEditingObra(null)
+            setShowForm(false)
+            refresh()
+          }}
         />
       )}
     </div>
