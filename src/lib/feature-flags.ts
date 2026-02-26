@@ -1,4 +1,5 @@
 export const featureFlags = {
+  uiTailadminV1: process.env.NEXT_PUBLIC_FF_UI_TAILADMIN_V1 !== 'false',
   apiObrasV2: process.env.NEXT_PUBLIC_FF_API_OBRAS_V2 === 'true',
   executionRiskEngine:
     process.env.NEXT_PUBLIC_FF_EXECUTION_RISK_ENGINE === 'true',

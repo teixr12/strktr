@@ -6,6 +6,7 @@ import { apiRequest } from '@/lib/api/client'
 import { toast } from '@/hooks/use-toast'
 import { fmtDate } from '@/lib/utils'
 import { Save, Lock, User, Eye, EyeOff } from 'lucide-react'
+import { PageHeader } from '@/components/ui/enterprise'
 import type { Profile } from '@/types/database'
 
 interface Props { profile: Profile | null }
@@ -65,7 +66,9 @@ export function PerfilContent({ profile }: Props) {
   const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(form.nome || 'U')}&background=d4a373&color=fff&size=128`
 
   return (
-    <div className="p-4 md:p-6 max-w-2xl mx-auto space-y-6">
+    <div className="tailadmin-page mx-auto max-w-2xl space-y-6">
+      <PageHeader title="Perfil" subtitle="Atualize suas informações e segurança de acesso" />
+
       {/* Header */}
       <div className="glass-card rounded-3xl p-6 flex items-center gap-5">
         <Image src={avatarUrl} alt="Avatar" width={80} height={80} className="w-20 h-20 rounded-2xl border-2 border-white dark:border-gray-700 shadow-lg" />

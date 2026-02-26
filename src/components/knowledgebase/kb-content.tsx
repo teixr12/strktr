@@ -5,6 +5,7 @@ import { apiRequest } from '@/lib/api/client'
 import { toast } from '@/hooks/use-toast'
 import { fmt } from '@/lib/utils'
 import { Plus, X, Trash2, Edit2, Search, BookOpen, Tag } from 'lucide-react'
+import { EmptyStateAction, PageHeader, QuickActionBar, SectionCard } from '@/components/ui/enterprise'
 import type { KnowledgebaseItem, KBCategoria } from '@/types/database'
 
 const KB_CATEGORIA_COLORS: Record<string, string> = {
@@ -114,22 +115,27 @@ export function KnowledgebaseContent({ initialItems }: Props) {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Base de Conhecimento</h2>
-          <p className="text-xs text-gray-500">{items.length} itens · SOPs, materiais e referências</p>
-        </div>
-        <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 bg-sand-500 hover:bg-sand-600 text-white text-sm font-medium rounded-full transition-all btn-press">
-          <Plus className="w-4 h-4" /> Novo Item
-        </button>
-      </div>
+    <div className="tailadmin-page space-y-5">
+      <PageHeader
+        title="Base de Conhecimento"
+        subtitle={`${items.length} itens · SOPs, materiais e referências`}
+        actions={
+          <QuickActionBar
+            actions={[{
+              label: 'Novo Item',
+              icon: <Plus className="h-4 w-4" />,
+              onClick: openNew,
+              tone: 'warning',
+            }]}
+          />
+        }
+      />
 
       {/* Search + Filters */}
-      <div className="space-y-3">
+      <SectionCard className="space-y-3 p-4">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por título, conteúdo ou tags..." className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white" />
+          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por título, conteúdo ou tags..." className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1">
           {categorias.map((c) => (
@@ -138,16 +144,20 @@ export function KnowledgebaseContent({ initialItems }: Props) {
             </button>
           ))}
         </div>
-      </div>
+      </SectionCard>
 
       {/* List */}
       {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 gap-3">
-          <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center"><BookOpen className="w-7 h-7 text-gray-400" /></div>
-          <p className="text-sm text-gray-500">Nenhum item encontrado</p>
-        </div>
+        <EmptyStateAction
+          icon={<BookOpen className="h-6 w-6 text-sand-600 dark:text-sand-300" />}
+          title="Nenhum item encontrado"
+          description="Documente padrões de obra, referências de preço e procedimentos para reduzir retrabalho."
+          actionLabel="Novo item"
+          onAction={openNew}
+        />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <SectionCard className="p-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
           {filtered.map((item) => (
             <div key={item.id} className="glass-card rounded-2xl p-4 group hover:shadow-lg transition-all">
               <div className="flex items-start justify-between mb-2">
@@ -175,7 +185,8 @@ export function KnowledgebaseContent({ initialItems }: Props) {
               </div>
             </div>
           ))}
-        </div>
+          </div>
+        </SectionCard>
       )}
 
       {/* Modal */}

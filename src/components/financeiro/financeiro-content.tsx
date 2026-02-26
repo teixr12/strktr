@@ -9,6 +9,7 @@ import { Plus, X, Trash2, TrendingUp, TrendingDown, Wallet, Hash, Pencil } from 
 import type { Transacao, Obra } from '@/types/database'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js'
 import { Bar } from 'react-chartjs-2'
+import { PageHeader, QuickActionBar, SectionCard } from '@/components/ui/enterprise'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
@@ -185,16 +186,24 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Financeiro</h2>
-          <p className="text-xs text-gray-500">{transacoes.length} transações</p>
-        </div>
-        <button onClick={() => { closeForm(); setShowForm(true) }} className="flex items-center gap-2 px-4 py-2 bg-sand-500 hover:bg-sand-600 text-white text-sm font-medium rounded-full transition-all btn-press">
-          <Plus className="w-4 h-4" /> Nova Transação
-        </button>
-      </div>
+    <div className="tailadmin-page space-y-5">
+      <PageHeader
+        title="Financeiro"
+        subtitle={`${transacoes.length} transações`}
+        actions={
+          <QuickActionBar
+            actions={[{
+              label: 'Nova Transação',
+              icon: <Plus className="h-4 w-4" />,
+              onClick: () => {
+                closeForm()
+                setShowForm(true)
+              },
+              tone: 'warning',
+            }]}
+          />
+        }
+      />
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -221,12 +230,12 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
       </div>
 
       {/* Chart */}
-      <div className="glass-card rounded-2xl p-4 md:p-5">
+      <SectionCard className="p-4 md:p-5">
         <h3 className="font-semibold text-sm text-gray-900 dark:text-white mb-3">Receitas vs Despesas (últimos 6 meses)</h3>
         <div className="h-[240px]">
           <Bar data={chartData} options={chartOpts as never} />
         </div>
-      </div>
+      </SectionCard>
 
       {desvioResumo && (
         <div className="glass-card rounded-2xl p-4 md:p-5">
@@ -255,19 +264,21 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
       )}
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-2">
-        <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por descrição..." className="flex-1 px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white" />
-        <div className="flex gap-1">
-          {(['Todos', 'Receita', 'Despesa'] as const).map((t) => (
-            <button key={t} onClick={() => setFiltroTipo(t)} className={`px-3 py-2 text-xs font-medium rounded-xl transition-all ${filtroTipo === t ? 'bg-sand-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200'}`}>
-              {t}
-            </button>
-          ))}
+      <SectionCard className="p-4">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por descrição..." className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+          <div className="flex gap-1">
+            {(['Todos', 'Receita', 'Despesa'] as const).map((t) => (
+              <button key={t} onClick={() => setFiltroTipo(t)} className={`rounded-xl px-3 py-2 text-xs font-medium transition-all ${filtroTipo === t ? 'bg-sand-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400'}`}>
+                {t}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      </SectionCard>
 
       {/* Transaction List */}
-      <div className="space-y-1.5">
+      <SectionCard className="space-y-1.5 p-3">
         {filtered.length === 0 ? (
           <p className="text-sm text-gray-500 text-center py-8">Nenhuma transação encontrada</p>
         ) : (
@@ -296,7 +307,7 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
             </div>
           ))
         )}
-      </div>
+      </SectionCard>
 
       {/* Form Modal */}
       {showForm && (
