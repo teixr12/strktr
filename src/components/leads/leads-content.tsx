@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useRef, useMemo } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useState, useRef, useMemo, useEffect } from 'react'
 import { toast } from '@/hooks/use-toast'
+import { apiRequest } from '@/lib/api/client'
 import { fmt, fmtDate } from '@/lib/utils'
 import { KANBAN_COLUMNS, TEMPERATURA_EMOJI, TEMPERATURA_COLORS } from '@/lib/constants'
 import { Plus, X, MessageCircle, Trash2, Edit2, GripVertical, Search } from 'lucide-react'
@@ -11,16 +11,43 @@ import type { Lead, LeadStatus, LeadTemperatura } from '@/types/database'
 interface Props { initialLeads: Lead[] }
 
 const TIPO_OPTIONS = ['Residencial', 'Comercial', 'Industrial', 'Reforma', 'Outro']
+interface LeadsSlaSummary {
+  totalParados: number
+  slaHours: number
+  severity: 'low' | 'medium' | 'high'
+}
 
 export function LeadsContent({ initialLeads }: Props) {
-  const supabase = createClient()
   const [leads, setLeads] = useState(initialLeads)
   const [showForm, setShowForm] = useState(false)
   const [editLead, setEditLead] = useState<Lead | null>(null)
   const [detailLead, setDetailLead] = useState<Lead | null>(null)
+  const [nextAction, setNextAction] = useState<Record<string, string>>({})
+  const [nowMs, setNowMs] = useState(() => Date.now())
   const dragRef = useRef<string | null>(null)
   const [dragOverCol, setDragOverCol] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [sla, setSla] = useState<LeadsSlaSummary | null>(null)
+
+  useEffect(() => {
+    const timer = setInterval(() => setNowMs(Date.now()), 60_000)
+    return () => clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    async function loadSla() {
+      try {
+        const data = await apiRequest<LeadsSlaSummary>('/api/v1/leads/sla')
+        setSla(data)
+      } catch {
+        setSla(null)
+      }
+    }
+
+    loadSla()
+    const timer = setInterval(loadSla, 60_000)
+    return () => clearInterval(timer)
+  }, [])
 
   const filteredLeads = useMemo(() => {
     if (!searchQuery) return leads
@@ -71,17 +98,25 @@ export function LeadsContent({ initialLeads }: Props) {
     }
 
     if (editLead) {
-      const { error } = await supabase.from('leads').update(payload).eq('id', editLead.id)
-      if (error) { toast(error.message, 'error'); return }
-      setLeads((prev) => prev.map((l) => l.id === editLead.id ? { ...l, ...payload } as Lead : l))
-      toast('Lead atualizado!', 'success')
+      try {
+        const data = await apiRequest<Lead>(`/api/v1/leads/${editLead.id}`, { method: 'PUT', body: payload })
+        setLeads((prev) => prev.map((l) => l.id === editLead.id ? data : l))
+        toast('Lead atualizado!', 'success')
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Erro ao atualizar lead'
+        toast(message, 'error')
+        return
+      }
     } else {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data, error } = await supabase.from('leads').insert({ ...payload, user_id: user.id }).select().single()
-      if (error) { toast(error.message, 'error'); return }
-      setLeads((prev) => [data, ...prev])
-      toast('Lead criado!', 'success')
+      try {
+        const data = await apiRequest<Lead>('/api/v1/leads', { method: 'POST', body: payload })
+        setLeads((prev) => [data, ...prev])
+        toast('Lead criado!', 'success')
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Erro ao criar lead'
+        toast(message, 'error')
+        return
+      }
     }
     setShowForm(false)
     setEditLead(null)
@@ -89,17 +124,42 @@ export function LeadsContent({ initialLeads }: Props) {
 
   async function deleteLead(id: string) {
     if (!confirm('Excluir este lead?')) return
-    const { error } = await supabase.from('leads').delete().eq('id', id)
-    if (error) { toast(error.message, 'error'); return }
-    setLeads((prev) => prev.filter((l) => l.id !== id))
-    setDetailLead(null)
-    toast('Lead excluído', 'info')
+    try {
+      await apiRequest(`/api/v1/leads/${id}`, { method: 'DELETE' })
+      setLeads((prev) => prev.filter((l) => l.id !== id))
+      setDetailLead(null)
+      toast('Lead excluído', 'info')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao excluir lead'
+      toast(message, 'error')
+    }
   }
 
   async function updateStatus(id: string, status: LeadStatus) {
-    const { error } = await supabase.from('leads').update({ status }).eq('id', id)
-    if (error) { toast(error.message, 'error'); return }
-    setLeads((prev) => prev.map((l) => l.id === id ? { ...l, status } : l))
+    try {
+      const data = await apiRequest<Lead>(`/api/v1/leads/${id}`, { method: 'PUT', body: { status } })
+      setLeads((prev) => prev.map((l) => l.id === id ? data : l))
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao mover lead'
+      toast(message, 'error')
+    }
+  }
+
+  async function suggestNextAction(id: string) {
+    try {
+      const data = await apiRequest<{ recommendation: string }>(`/api/v1/leads/${id}/next-action`, { method: 'POST' })
+      setNextAction((prev) => ({ ...prev, [id]: data.recommendation }))
+      toast('Próxima ação gerada', 'success')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao sugerir próxima ação'
+      toast(message, 'error')
+    }
+  }
+
+  function isSlaLate(lead: Lead) {
+    if (!lead.ultimo_contato || lead.status === 'Fechado' || lead.status === 'Perdido') return false
+    const hours = (nowMs - new Date(lead.ultimo_contato).getTime()) / (1000 * 60 * 60)
+    return hours >= 48
   }
 
   function handleDragStart(id: string) { dragRef.current = id }
@@ -121,7 +181,20 @@ export function LeadsContent({ initialLeads }: Props) {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Leads VIP</h2>
-          <p className="text-xs text-gray-500">{leads.length} leads no pipeline</p>
+          <p className="text-xs text-gray-500 flex items-center gap-2">
+            <span>{leads.length} leads no pipeline</span>
+            {sla && sla.totalParados > 0 && (
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                sla.severity === 'high'
+                  ? 'bg-red-100 text-red-600'
+                  : sla.severity === 'medium'
+                    ? 'bg-amber-100 text-amber-600'
+                    : 'bg-blue-100 text-blue-600'
+              }`}>
+                {sla.totalParados} parados ({sla.slaHours}h)
+              </span>
+            )}
+          </p>
         </div>
         <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 bg-sand-500 hover:bg-sand-600 text-white text-sm font-medium rounded-full transition-all btn-press">
           <Plus className="w-4 h-4" /> Novo Lead
@@ -183,7 +256,14 @@ export function LeadsContent({ initialLeads }: Props) {
                           <GripVertical className="w-3.5 h-3.5 text-gray-300 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                           <span className="font-semibold text-sm text-gray-900 dark:text-white truncate">{l.nome}</span>
                         </div>
-                        <span className="text-sm flex-shrink-0">{TEMPERATURA_EMOJI[l.temperatura] || '🌤'}</span>
+                        <div className="flex items-center gap-1.5">
+                          {isSlaLate(l) && (
+                            <span className="px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 text-[10px] font-bold">
+                              SLA
+                            </span>
+                          )}
+                          <span className="text-sm flex-shrink-0">{TEMPERATURA_EMOJI[l.temperatura] || '🌤'}</span>
+                        </div>
                       </div>
                       {l.tipo_projeto && <p className="text-xs text-gray-500 mb-1">{l.tipo_projeto}</p>}
                       <div className="flex items-center justify-between">
@@ -234,9 +314,18 @@ export function LeadsContent({ initialLeads }: Props) {
               {detailLead.origem && <div><span className="text-gray-500">Origem:</span> <span className="text-gray-900 dark:text-white">{detailLead.origem}</span></div>}
               {detailLead.notas && <div><span className="text-gray-500">Notas:</span><p className="text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-line">{detailLead.notas}</p></div>}
               <div><span className="text-gray-500">Criado:</span> <span className="text-gray-900 dark:text-white">{fmtDate(detailLead.created_at)}</span></div>
+              {nextAction[detailLead.id] && (
+                <div className="rounded-xl bg-blue-50 dark:bg-blue-900/20 p-3">
+                  <span className="text-xs text-blue-600 dark:text-blue-300 font-semibold">Próxima melhor ação</span>
+                  <p className="text-sm text-blue-800 dark:text-blue-200 mt-1">{nextAction[detailLead.id]}</p>
+                </div>
+              )}
             </div>
 
             <div className="flex gap-2 mt-5">
+              <button onClick={() => suggestNextAction(detailLead.id)} className="flex-1 py-2.5 bg-ocean-500 hover:bg-ocean-600 text-white font-medium rounded-2xl transition-all text-sm">
+                Next Action
+              </button>
               <button onClick={() => openEdit(detailLead)} className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all text-sm">
                 <Edit2 className="w-4 h-4" /> Editar
               </button>

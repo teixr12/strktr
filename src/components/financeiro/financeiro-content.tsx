@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { apiRequest } from '@/lib/api/client'
 import { toast } from '@/hooks/use-toast'
 import { fmt, fmtDate } from '@/lib/utils'
 import { Plus, X, Trash2, TrendingUp, TrendingDown, Wallet, Hash, Pencil } from 'lucide-react'
@@ -12,15 +13,31 @@ import { Bar } from 'react-chartjs-2'
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
 interface Props { initialTransacoes: Transacao[] }
+interface OrcadoVsRealizadoSummary {
+  summary: Array<{
+    obraId: string
+    nome: string
+    valorOrcado: number
+    valorRealizado: number
+    desvio: number
+    desvioPct: number
+    isCritical: boolean
+  }>
+  totals: {
+    totalObras: number
+    totalCritical: number
+  }
+}
 
 export function FinanceiroContent({ initialTransacoes }: Props) {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const [transacoes, setTransacoes] = useState(initialTransacoes)
   const [showForm, setShowForm] = useState(false)
   const [editingTx, setEditingTx] = useState<Transacao | null>(null)
   const [filtroTipo, setFiltroTipo] = useState<'Todos' | 'Receita' | 'Despesa'>('Todos')
   const [busca, setBusca] = useState('')
   const [obras, setObras] = useState<Pick<Obra, 'id' | 'nome'>[]>([])
+  const [desvioResumo, setDesvioResumo] = useState<OrcadoVsRealizadoSummary | null>(null)
 
   const [form, setForm] = useState({
     descricao: '', tipo: 'Receita' as 'Receita' | 'Despesa',
@@ -34,6 +51,29 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
     }
     loadObras()
   }, [supabase])
+
+  async function loadDesvio() {
+    try {
+      const data = await apiRequest<OrcadoVsRealizadoSummary>('/api/v1/transacoes/orcado-vs-realizado?thresholdPct=10')
+      setDesvioResumo(data)
+    } catch {
+      setDesvioResumo(null)
+    }
+  }
+
+  useEffect(() => {
+    let active = true
+    void apiRequest<OrcadoVsRealizadoSummary>('/api/v1/transacoes/orcado-vs-realizado?thresholdPct=10')
+      .then((data) => {
+        if (active) setDesvioResumo(data)
+      })
+      .catch(() => {
+        if (active) setDesvioResumo(null)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
 
   const receitas = transacoes.filter((t) => t.tipo === 'Receita').reduce((s, t) => s + t.valor, 0)
   const despesas = transacoes.filter((t) => t.tipo === 'Despesa').reduce((s, t) => s + t.valor, 0)
@@ -106,10 +146,7 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
     if (!form.descricao.trim()) { toast('Descrição é obrigatória', 'error'); return }
     if (!form.valor || parseFloat(form.valor) <= 0) { toast('Valor inválido', 'error'); return }
     if (!form.categoria.trim()) { toast('Categoria é obrigatória', 'error'); return }
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
     const payload = {
-      user_id: user.id,
       descricao: form.descricao.trim(),
       tipo: form.tipo,
       categoria: form.categoria.trim(),
@@ -118,26 +155,33 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
       obra_id: form.obra_id || null,
     }
 
-    if (editingTx) {
-      const { data, error } = await supabase.from('transacoes').update(payload).eq('id', editingTx.id).select('*, obras(nome)').single()
-      if (error) { toast(error.message, 'error'); return }
-      setTransacoes((prev) => prev.map((t) => t.id === editingTx.id ? data : t))
-      toast('Transação atualizada!', 'success')
-    } else {
-      const { data, error } = await supabase.from('transacoes').insert(payload).select('*, obras(nome)').single()
-      if (error) { toast(error.message, 'error'); return }
-      setTransacoes((prev) => [data, ...prev])
-      toast('Transação criada!', 'success')
+    try {
+      if (editingTx) {
+        const data = await apiRequest<Transacao>(`/api/v1/transacoes/${editingTx.id}`, { method: 'PUT', body: payload })
+        setTransacoes((prev) => prev.map((t) => t.id === editingTx.id ? data : t))
+        toast('Transação atualizada!', 'success')
+      } else {
+        const data = await apiRequest<Transacao>('/api/v1/transacoes', { method: 'POST', body: payload })
+        setTransacoes((prev) => [data, ...prev])
+        toast('Transação criada!', 'success')
+      }
+      await loadDesvio()
+      closeForm()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao salvar transação', 'error')
     }
-    closeForm()
   }
 
   async function deleteTx(id: string) {
     if (!confirm('Excluir esta transação?')) return
-    const { error } = await supabase.from('transacoes').delete().eq('id', id)
-    if (error) { toast(error.message, 'error'); return }
-    setTransacoes((prev) => prev.filter((t) => t.id !== id))
-    toast('Transação excluída', 'info')
+    try {
+      await apiRequest<{ success: boolean }>(`/api/v1/transacoes/${id}`, { method: 'DELETE' })
+      setTransacoes((prev) => prev.filter((t) => t.id !== id))
+      await loadDesvio()
+      toast('Transação excluída', 'info')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao excluir transação', 'error')
+    }
   }
 
   return (
@@ -183,6 +227,32 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
           <Bar data={chartData} options={chartOpts as never} />
         </div>
       </div>
+
+      {desvioResumo && (
+        <div className="glass-card rounded-2xl p-4 md:p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-sm text-gray-900 dark:text-white">Desvio Orçado x Realizado</h3>
+            <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+              desvioResumo.totals.totalCritical > 0
+                ? 'bg-red-100 text-red-600'
+                : 'bg-emerald-100 text-emerald-600'
+            }`}>
+              {desvioResumo.totals.totalCritical} críticas
+            </span>
+          </div>
+          {desvioResumo.summary.slice(0, 3).map((obra) => (
+            <div key={obra.obraId} className="flex items-center justify-between py-2 border-b last:border-0 border-gray-200/60 dark:border-gray-700/60">
+              <div>
+                <p className="text-sm text-gray-900 dark:text-white">{obra.nome}</p>
+                <p className="text-xs text-gray-500">Orçado {fmt(obra.valorOrcado)} · Realizado {fmt(obra.valorRealizado)}</p>
+              </div>
+              <span className={`text-sm font-semibold ${obra.isCritical ? 'text-red-500' : 'text-emerald-600'}`}>
+                {obra.desvioPct >= 0 ? '+' : ''}{obra.desvioPct.toFixed(1)}%
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-2">

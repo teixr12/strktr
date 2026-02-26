@@ -1,0 +1,33 @@
+name: Architecture Decision
+description: Request a decision requiring ADR
+title: "adr: "
+labels: [architecture]
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Constraints, current state, and problem statement.
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: Options Considered
+      description: Describe meaningful alternatives.
+    validations:
+      required: true
+  - type: textarea
+    id: recommendation
+    attributes:
+      label: Recommendation
+      description: Preferred option and why.
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks & Rollback
+      description: Failure modes and rollback strategy.
+    validations:
+      required: true

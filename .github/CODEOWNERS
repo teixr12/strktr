@@ -1,0 +1,15 @@
+# STRKTR CODEOWNERS
+# Replace @teixr12s with your official GitHub username/org team if needed.
+
+* @teixr12s
+
+# Critical backend domains require strict ownership
+/src/app/api/v1/** @teixr12s
+/src/lib/api/** @teixr12s
+/src/lib/auth/** @teixr12s
+/src/server/** @teixr12s
+/src/shared/** @teixr12s
+/supabase/migrations/** @teixr12s
+/scripts/** @teixr12s
+/.github/workflows/** @teixr12s
+/docs/adr/** @teixr12s

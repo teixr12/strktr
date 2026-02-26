@@ -2,13 +2,20 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+  const requestId = request.headers.get('x-request-id') || crypto.randomUUID()
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-request-id', requestId)
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   if (!supabaseUrl || !supabaseKey) {
-    return NextResponse.next()
+    const res = NextResponse.next({ request: { headers: requestHeaders } })
+    res.headers.set('x-request-id', requestId)
+    return res
   }
 
-  let supabaseResponse = NextResponse.next({ request })
+  let supabaseResponse = NextResponse.next({ request: { headers: requestHeaders } })
+  supabaseResponse.headers.set('x-request-id', requestId)
 
   try {
     const supabase = createServerClient(supabaseUrl, supabaseKey, {
@@ -20,7 +27,8 @@ export async function middleware(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           )
-          supabaseResponse = NextResponse.next({ request })
+          supabaseResponse = NextResponse.next({ request: { headers: requestHeaders } })
+          supabaseResponse.headers.set('x-request-id', requestId)
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           )
@@ -43,7 +51,9 @@ export async function middleware(request: NextRequest) {
     ) {
       const url = request.nextUrl.clone()
       url.pathname = '/login'
-      return NextResponse.redirect(url)
+      const res = NextResponse.redirect(url)
+      res.headers.set('x-request-id', requestId)
+      return res
     }
 
     // Authenticated on auth pages → redirect to dashboard
@@ -54,7 +64,9 @@ export async function middleware(request: NextRequest) {
     ) {
       const url = request.nextUrl.clone()
       url.pathname = '/dashboard'
-      return NextResponse.redirect(url)
+      const res = NextResponse.redirect(url)
+      res.headers.set('x-request-id', requestId)
+      return res
     }
   } catch (e) {
     console.error('Middleware auth error:', e)

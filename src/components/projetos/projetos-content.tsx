@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { apiRequest } from '@/lib/api/client'
 import { toast } from '@/hooks/use-toast'
 import { fmt, fmtDate } from '@/lib/utils'
 import { PROJETO_STATUS_COLORS } from '@/lib/constants'
@@ -13,12 +13,10 @@ const TIPO_OPTIONS = ['Residencial', 'Comercial', 'Industrial', 'Reforma', 'Infr
 
 interface Props {
   initialProjetos: Projeto[]
-  obras: { id: string; nome: string }[]
   leads: { id: string; nome: string }[]
 }
 
-export function ProjetosContent({ initialProjetos, obras, leads }: Props) {
-  const supabase = createClient()
+export function ProjetosContent({ initialProjetos, leads }: Props) {
   const [projetos, setProjetos] = useState(initialProjetos)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -41,8 +39,12 @@ export function ProjetosContent({ initialProjetos, obras, leads }: Props) {
   }, [projetos, search, statusFilter])
 
   async function refresh() {
-    const { data } = await supabase.from('projetos').select('*, leads(nome), obras(nome)').order('created_at', { ascending: false })
-    if (data) setProjetos(data)
+    try {
+      const data = await apiRequest<Projeto[]>('/api/v1/projetos?limit=200')
+      setProjetos(data)
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao recarregar projetos', 'error')
+    }
   }
 
   function openForm(p?: Projeto) {
@@ -64,8 +66,6 @@ export function ProjetosContent({ initialProjetos, obras, leads }: Props) {
 
   async function save() {
     if (!form.nome.trim()) { toast('Nome e obrigatorio', 'error'); return }
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
     const payload = {
       nome: form.nome.trim(), descricao: form.descricao || null,
       cliente: form.cliente || null, local: form.local || null,
@@ -78,42 +78,41 @@ export function ProjetosContent({ initialProjetos, obras, leads }: Props) {
       notas: form.notas || null,
     }
 
-    if (editing) {
-      const { error } = await supabase.from('projetos').update(payload).eq('id', editing.id)
-      if (error) { toast(error.message, 'error'); return }
-      toast('Projeto atualizado!', 'success')
-    } else {
-      const { error } = await supabase.from('projetos').insert({ ...payload, user_id: user.id })
-      if (error) { toast(error.message, 'error'); return }
-      toast('Projeto criado!', 'success')
+    try {
+      if (editing) {
+        await apiRequest<Projeto>(`/api/v1/projetos/${editing.id}`, { method: 'PUT', body: payload })
+        toast('Projeto atualizado!', 'success')
+      } else {
+        await apiRequest<Projeto>('/api/v1/projetos', { method: 'POST', body: payload })
+        toast('Projeto criado!', 'success')
+      }
+      setShowForm(false)
+      await refresh()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao salvar projeto', 'error')
     }
-    setShowForm(false)
-    refresh()
   }
 
   async function convertToObra(p: Projeto) {
     if (!confirm(`Converter "${p.nome}" em Obra?`)) return
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { data: obra, error } = await supabase.from('obras').insert({
-      user_id: user.id, nome: p.nome, cliente: p.cliente || '',
-      local: p.local || '', tipo: p.tipo, status: 'Orçamento' as const,
-      valor_contrato: p.valor_estimado, valor_gasto: 0, progresso: 0,
-      area_m2: p.area_m2, data_inicio: p.data_inicio_prev,
-      data_previsao: p.data_fim_prev, descricao: p.descricao,
-      cor: 'sand', icone: 'HardHat',
-    }).select().single()
-    if (error || !obra) { toast(error?.message || 'Erro', 'error'); return }
-    await supabase.from('projetos').update({ obra_id: obra.id, status: 'Em Execução' }).eq('id', p.id)
-    toast('Obra criada a partir do projeto!', 'success')
-    refresh()
+    try {
+      await apiRequest<{ obra: { id: string } }>(`/api/v1/projetos/${p.id}/convert-to-obra`, { method: 'POST' })
+      toast('Obra criada a partir do projeto!', 'success')
+      await refresh()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao converter projeto', 'error')
+    }
   }
 
   async function deleteProjeto(id: string) {
     if (!confirm('Excluir este projeto?')) return
-    await supabase.from('projetos').delete().eq('id', id)
-    toast('Projeto excluido', 'info')
-    refresh()
+    try {
+      await apiRequest<{ success: boolean }>(`/api/v1/projetos/${id}`, { method: 'DELETE' })
+      toast('Projeto excluido', 'info')
+      await refresh()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao excluir projeto', 'error')
+    }
   }
 
   return (

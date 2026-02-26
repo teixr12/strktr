@@ -1,12 +1,7 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
 import { ThemeProvider } from 'next-themes'
+import { ClientMonitoring } from '@/components/layout/client-monitoring'
 import './globals.css'
-
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-})
 
 export const viewport: Viewport = {
   themeColor: '#d4a373',
@@ -37,8 +32,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" className="scroll-smooth" suppressHydrationWarning>
-      <body className={`${inter.variable} font-sans bg-gray-50 dark:bg-black text-gray-900 dark:text-gray-100 antialiased`}>
+      <body className="font-sans bg-gray-50 dark:bg-black text-gray-900 dark:text-gray-100 antialiased">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <ClientMonitoring />
           {children}
         </ThemeProvider>
       </body>

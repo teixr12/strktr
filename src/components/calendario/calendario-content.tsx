@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { apiRequest } from '@/lib/api/client'
 import { toast } from '@/hooks/use-toast'
 import { fmtDateTime } from '@/lib/utils'
 import { TIPO_VISITA_COLORS, VISITA_STATUS_COLORS } from '@/lib/constants'
@@ -80,10 +81,7 @@ export function CalendarioContent({ initialVisitas }: Props) {
   async function saveVisita() {
     if (!form.titulo.trim()) { toast('Título é obrigatório', 'error'); return }
     if (!form.data_hora) { toast('Data/hora é obrigatória', 'error'); return }
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
     const payload = {
-      user_id: user.id,
       titulo: form.titulo.trim(), tipo: form.tipo,
       data_hora: new Date(form.data_hora).toISOString(),
       duracao_min: parseInt(form.duracao_min) || 60,
@@ -92,27 +90,38 @@ export function CalendarioContent({ initialVisitas }: Props) {
       status: form.status, notas: form.notas || null,
     }
 
-    if (editingVisita) {
-      const { data, error } = await supabase.from('visitas').update(payload).eq('id', editingVisita.id).select('*, obras(nome), leads(nome)').single()
-      if (error) { toast(error.message, 'error'); return }
-      setVisitas((prev) => prev.map((vi) => vi.id === editingVisita.id ? data : vi))
-      toast('Visita atualizada!', 'success')
-    } else {
-      const { data, error } = await supabase.from('visitas').insert(payload).select('*, obras(nome), leads(nome)').single()
-      if (error) { toast(error.message, 'error'); return }
-      setVisitas((prev) => [...prev, data])
-      toast('Visita agendada!', 'success')
+    try {
+      if (editingVisita) {
+        const data = await apiRequest<Visita>(`/api/v1/visitas/${editingVisita.id}`, {
+          method: 'PUT',
+          body: payload,
+        })
+        setVisitas((prev) => prev.map((vi) => vi.id === editingVisita.id ? data : vi))
+        toast('Visita atualizada!', 'success')
+      } else {
+        const data = await apiRequest<Visita>('/api/v1/visitas', {
+          method: 'POST',
+          body: payload,
+        })
+        setVisitas((prev) => [...prev, data])
+        toast('Visita agendada!', 'success')
+      }
+      setShowForm(false)
+      resetForm()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao salvar visita', 'error')
     }
-    setShowForm(false)
-    resetForm()
   }
 
   async function deleteVisita(id: string) {
     if (!confirm('Excluir esta visita?')) return
-    const { error } = await supabase.from('visitas').delete().eq('id', id)
-    if (error) { toast(error.message, 'error'); return }
-    setVisitas((prev) => prev.filter((v) => v.id !== id))
-    toast('Visita excluída', 'info')
+    try {
+      await apiRequest<{ success: boolean }>(`/api/v1/visitas/${id}`, { method: 'DELETE' })
+      setVisitas((prev) => prev.filter((v) => v.id !== id))
+      toast('Visita excluída', 'info')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao excluir visita', 'error')
+    }
   }
 
   function renderGroup(title: string, items: Visita[]) {

@@ -6,10 +6,19 @@
     "dev": "next dev",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:e2e": "playwright test",
+    "validate:api-contracts": "node scripts/validate-api-contracts.mjs",
+    "governance:pr": "node scripts/check-pr-governance.mjs",
+    "release:readiness": "./scripts/release-readiness.sh",
+    "baseline:report": "./scripts/generate-baseline-report.sh",
+    "audit:production": "./scripts/run-production-audits.sh",
+    "baseline:tag": "./scripts/create-baseline-tag.sh"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@hookform/resolvers": "^5.2.2",
+    "@sentry/nextjs": "^10.40.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.97.0",
     "chart.js": "^4.5.1",
@@ -19,9 +28,12 @@
     "react": "19.2.3",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "19.2.3",
-    "resend": "^6.9.2"
+    "react-hook-form": "^7.71.2",
+    "resend": "^6.9.2",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

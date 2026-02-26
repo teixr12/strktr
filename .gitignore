@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+/test-results
+/playwright-report
 
 # next.js
 /.next/
@@ -32,6 +34,12 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+github_keys.env.codex.txt
+supabase_keys.env.codex.txt
+vercel_keys.env.codex.txt
+*_keys.env.codex.txt
+.env.codex
+*.env.codex*
 
 # vercel
 .vercel

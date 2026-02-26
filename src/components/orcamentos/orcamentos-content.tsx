@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { apiRequest } from '@/lib/api/client'
 import { toast } from '@/hooks/use-toast'
 import { fmt, fmtDate } from '@/lib/utils'
 import { ORC_STATUS_COLORS } from '@/lib/constants'
@@ -92,53 +93,57 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
   async function saveOrcamento() {
     if (!form.titulo.trim()) { toast('Título é obrigatório', 'error'); return }
     if (items.length === 0 || !items[0].descricao.trim()) { toast('Adicione pelo menos um item', 'error'); return }
-
+    const normalizedItems = items
+      .filter((i) => i.descricao.trim())
+      .map((i, idx) => ({
+        descricao: i.descricao.trim(),
+        unidade: i.unidade,
+        quantidade: parseFloat(i.quantidade) || 1,
+        valor_unitario: parseFloat(i.valor_unitario) || 0,
+        ordem: idx,
+      }))
     const valor_total = calcTotal()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
 
     const payload = {
       titulo: form.titulo.trim(), status: form.status, valor_total,
       lead_id: form.lead_id || null, obra_id: form.obra_id || null,
       validade: form.validade || null, observacoes: form.observacoes || null,
+      items: normalizedItems,
     }
 
-    if (editOrc) {
-      const { error } = await supabase.from('orcamentos').update(payload).eq('id', editOrc.id)
-      if (error) { toast(error.message, 'error'); return }
-      // Delete old items and re-insert
-      await supabase.from('orcamento_itens').delete().eq('orcamento_id', editOrc.id)
-      const newItems = items.filter((i) => i.descricao.trim()).map((i, idx) => ({
-        orcamento_id: editOrc.id, descricao: i.descricao.trim(), unidade: i.unidade,
-        quantidade: parseFloat(i.quantidade) || 1, valor_unitario: parseFloat(i.valor_unitario) || 0, ordem: idx,
-      }))
-      if (newItems.length > 0) await supabase.from('orcamento_itens').insert(newItems)
-      // Update local state
-      const updatedOrc = { ...editOrc, ...payload, orcamento_itens: newItems.map((i, idx) => ({ ...i, id: `temp-${idx}`, created_at: '' })) } as Orcamento
-      setOrcamentos((prev) => prev.map((o) => o.id === editOrc.id ? updatedOrc : o))
-      toast('Orçamento atualizado!', 'success')
-    } else {
-      const { data, error } = await supabase.from('orcamentos').insert({ ...payload, user_id: user.id }).select().single()
-      if (error) { toast(error.message, 'error'); return }
-      const newItems = items.filter((i) => i.descricao.trim()).map((i, idx) => ({
-        orcamento_id: data.id, descricao: i.descricao.trim(), unidade: i.unidade,
-        quantidade: parseFloat(i.quantidade) || 1, valor_unitario: parseFloat(i.valor_unitario) || 0, ordem: idx,
-      }))
-      if (newItems.length > 0) await supabase.from('orcamento_itens').insert(newItems)
-      setOrcamentos((prev) => [{ ...data, orcamento_itens: newItems.map((i, idx) => ({ ...i, id: `temp-${idx}`, created_at: '' })) }, ...prev])
-      toast('Orçamento criado!', 'success')
+    try {
+      if (editOrc) {
+        const data = await apiRequest<Orcamento>(`/api/v1/orcamentos/${editOrc.id}`, {
+          method: 'PUT',
+          body: payload,
+        })
+        setOrcamentos((prev) => prev.map((o) => o.id === editOrc.id ? data : o))
+        toast('Orçamento atualizado!', 'success')
+      } else {
+        const data = await apiRequest<Orcamento>('/api/v1/orcamentos', {
+          method: 'POST',
+          body: payload,
+        })
+        setOrcamentos((prev) => [data, ...prev])
+        toast('Orçamento criado!', 'success')
+      }
+      setShowForm(false)
+      setEditOrc(null)
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao salvar orçamento', 'error')
     }
-    setShowForm(false)
-    setEditOrc(null)
   }
 
   async function deleteOrcamento(id: string) {
     if (!confirm('Excluir este orçamento?')) return
-    const { error } = await supabase.from('orcamentos').delete().eq('id', id)
-    if (error) { toast(error.message, 'error'); return }
-    setOrcamentos((prev) => prev.filter((o) => o.id !== id))
-    setViewOrc(null)
-    toast('Orçamento excluído', 'info')
+    try {
+      await apiRequest<{ success: boolean }>(`/api/v1/orcamentos/${id}`, { method: 'DELETE' })
+      setOrcamentos((prev) => prev.filter((o) => o.id !== id))
+      setViewOrc(null)
+      toast('Orçamento excluído', 'info')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao excluir orçamento', 'error')
+    }
   }
 
   function printOrcamento(o: Orcamento) {

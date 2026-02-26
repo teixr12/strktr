@@ -6,16 +6,14 @@ export const dynamic = 'force-dynamic'
 export default async function ProjetosPage() {
   const supabase = await createClient()
 
-  const [projetosRes, obrasRes, leadsRes] = await Promise.all([
+  const [projetosRes, leadsRes] = await Promise.all([
     supabase.from('projetos').select('*, leads(nome), obras(nome)').order('created_at', { ascending: false }),
-    supabase.from('obras').select('id, nome'),
     supabase.from('leads').select('id, nome'),
   ])
 
   return (
     <ProjetosContent
       initialProjetos={projetosRes.data ?? []}
-      obras={obrasRes.data ?? []}
       leads={leadsRes.data ?? []}
     />
   )

@@ -1,0 +1,15 @@
+export const featureFlags = {
+  apiObrasV2: process.env.NEXT_PUBLIC_FF_API_OBRAS_V2 === 'true',
+  executionRiskEngine:
+    process.env.NEXT_PUBLIC_FF_EXECUTION_RISK_ENGINE === 'true',
+  executionAlerts: process.env.NEXT_PUBLIC_FF_EXECUTION_ALERTS === 'true',
+  checklistDueDate:
+    process.env.NEXT_PUBLIC_FF_CHECKLIST_DUE_DATE === 'true',
+  productAnalytics: process.env.NEXT_PUBLIC_FF_PRODUCT_ANALYTICS === 'true',
+}
+
+export type FeatureFlagKey = keyof typeof featureFlags
+
+export function isFeatureEnabled(flag: FeatureFlagKey): boolean {
+  return featureFlags[flag]
+}

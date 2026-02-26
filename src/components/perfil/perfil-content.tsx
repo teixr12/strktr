@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
-import { createClient } from '@/lib/supabase/client'
+import { apiRequest } from '@/lib/api/client'
 import { toast } from '@/hooks/use-toast'
 import { fmtDate } from '@/lib/utils'
 import { Save, Lock, User, Eye, EyeOff } from 'lucide-react'
@@ -11,7 +11,6 @@ import type { Profile } from '@/types/database'
 interface Props { profile: Profile | null }
 
 export function PerfilContent({ profile }: Props) {
-  const supabase = createClient()
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
     nome: profile?.nome || '',
@@ -27,12 +26,18 @@ export function PerfilContent({ profile }: Props) {
   async function saveProfile() {
     if (!form.nome.trim()) { toast('Nome é obrigatório', 'error'); return }
     setSaving(true)
-    const { error } = await supabase.from('profiles').update({
+    const payload = {
       nome: form.nome.trim(),
       telefone: form.telefone || null,
       empresa: form.empresa || null,
       cargo: form.cargo || null,
-    }).eq('id', profile!.id)
+    }
+    let error: Error | null = null
+    try {
+      await apiRequest<Profile>('/api/v1/perfil', { method: 'PATCH', body: payload })
+    } catch (err) {
+      error = err instanceof Error ? err : new Error('Erro ao atualizar perfil')
+    }
     setSaving(false)
     if (error) { toast(error.message, 'error'); return }
     toast('Perfil atualizado!', 'success')
@@ -42,7 +47,15 @@ export function PerfilContent({ profile }: Props) {
     if (!pwForm.nova || pwForm.nova.length < 6) { toast('A senha deve ter pelo menos 6 caracteres', 'error'); return }
     if (pwForm.nova !== pwForm.confirmar) { toast('As senhas não coincidem', 'error'); return }
     setChangingPw(true)
-    const { error } = await supabase.auth.updateUser({ password: pwForm.nova })
+    let error: Error | null = null
+    try {
+      await apiRequest<{ success: boolean }>('/api/v1/perfil/password', {
+        method: 'POST',
+        body: { password: pwForm.nova },
+      })
+    } catch (err) {
+      error = err instanceof Error ? err : new Error('Erro ao alterar senha')
+    }
     setChangingPw(false)
     if (error) { toast(error.message, 'error'); return }
     toast('Senha alterada com sucesso!', 'success')

@@ -12,14 +12,20 @@ export default async function ConfiguracoesPage() {
   let organizacao = null
 
   if (user) {
-    // Get user's org membership
-    const { data: membro } = await supabase
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('org_id')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    const { data: memberships } = await supabase
       .from('org_membros')
       .select('*, organizacoes(id, nome, cnpj, plano, created_at, updated_at)')
       .eq('user_id', user.id)
       .eq('status', 'ativo')
-      .single()
+      .order('created_at', { ascending: true })
 
+    const membro = memberships?.find((membership) => membership.org_id === profile?.org_id) || memberships?.[0] || null
     orgMembro = membro
 
     if (membro?.org_id) {
@@ -29,11 +35,28 @@ export default async function ConfiguracoesPage() {
       if (membro.role === 'admin' || membro.role === 'manager') {
         const { data: membros } = await supabase
           .from('org_membros')
-          .select('*, profiles(nome, email)')
+          .select('*')
           .eq('org_id', membro.org_id)
           .order('created_at')
 
-        orgMembros = membros ?? []
+        const userIds = (membros ?? []).map((item) => item.user_id)
+        const { data: profiles } = userIds.length
+          ? await supabase
+              .from('profiles')
+              .select('id, nome, email')
+              .in('id', userIds)
+          : { data: [] }
+
+        const profilesMap = new Map((profiles ?? []).map((profile) => [profile.id, profile]))
+        orgMembros = (membros ?? []).map((item) => ({
+          ...item,
+          profiles: profilesMap.get(item.user_id)
+            ? {
+                nome: profilesMap.get(item.user_id)?.nome || 'Usuário',
+                email: profilesMap.get(item.user_id)?.email || null,
+              }
+            : null,
+        }))
       }
     }
   }

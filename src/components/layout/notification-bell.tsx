@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { apiRequest } from '@/lib/api/client'
 import { Bell, Check, CheckCheck, Info, AlertTriangle, CheckCircle, AlertCircle } from 'lucide-react'
 import type { Notificacao, NotificacaoTipo } from '@/types/database'
 
@@ -24,7 +24,6 @@ function timeAgo(date: string) {
 }
 
 export function NotificationBell() {
-  const supabase = createClient()
   const [open, setOpen] = useState(false)
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([])
   const [loading, setLoading] = useState(true)
@@ -34,19 +33,16 @@ export function NotificationBell() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data } = await supabase
-        .from('notificacoes')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(20)
-      if (data) setNotificacoes(data)
+      try {
+        const data = await apiRequest<Notificacao[]>('/api/v1/notificacoes?limit=20')
+        setNotificacoes(data)
+      } catch {
+        setNotificacoes([])
+      }
       setLoading(false)
     }
     load()
-  }, [supabase])
+  }, [])
 
   // Close on click outside
   useEffect(() => {
@@ -60,14 +56,19 @@ export function NotificationBell() {
   }, [open])
 
   async function markAsRead(id: string) {
-    await supabase.from('notificacoes').update({ lida: true }).eq('id', id)
-    setNotificacoes((prev) => prev.map((n) => n.id === id ? { ...n, lida: true } : n))
+    await apiRequest<Notificacao>(`/api/v1/notificacoes/${id}`, {
+      method: 'PATCH',
+      body: { lida: true },
+    }).catch(() => undefined)
+    setNotificacoes((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, lida: true } : n))
+    )
   }
 
   async function markAllRead() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    await supabase.from('notificacoes').update({ lida: true }).eq('user_id', user.id).eq('lida', false)
+    await apiRequest<{ success: boolean }>('/api/v1/notificacoes/read-all', {
+      method: 'POST',
+    }).catch(() => undefined)
     setNotificacoes((prev) => prev.map((n) => ({ ...n, lida: true })))
   }
 
