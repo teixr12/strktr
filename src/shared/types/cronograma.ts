@@ -14,10 +14,15 @@ export interface AgendaTask {
   code: string
   title: string
   severity: 'high' | 'medium' | 'low'
-  source: 'visita' | 'cronograma' | 'checklist'
+  source: 'visita' | 'cronograma' | 'checklist' | 'aprovacao'
   dueAt: string | null
   href: string
   meta?: Record<string, unknown>
+}
+
+export interface CronogramaCalendario {
+  dias_uteis: number[]
+  feriados?: string[]
 }
 
 export interface PortalSessionPayload {

@@ -31,7 +31,7 @@ export async function POST(
   const { id: aprovacaoId } = await params
   const { data: approval, error: approvalError } = await service
     .from('aprovacoes_cliente')
-    .select('id, org_id, obra_id, tipo, status, compra_id, orcamento_id')
+    .select('id, org_id, obra_id, tipo, status, compra_id, orcamento_id, approval_version')
     .eq('id', aprovacaoId)
     .eq('org_id', session.org_id)
     .eq('obra_id', session.obra_id)
@@ -53,6 +53,8 @@ export async function POST(
       decidido_por_portal_cliente_id: session.portal_cliente_id,
       decisao_comentario: comentario || null,
       decidido_em: nowIso,
+      sla_due_at: null,
+      sla_alert_sent_at: null,
     })
     .eq('id', approval.id)
     .eq('org_id', session.org_id)
@@ -66,7 +68,13 @@ export async function POST(
   if (approval.tipo === 'compra' && approval.compra_id) {
     await service
       .from('compras')
-      .update({ status: 'Aprovado', data_aprovacao: nowIso.slice(0, 10), aprovacao_cliente_id: approval.id })
+      .update({
+        status: 'Aprovado',
+        data_aprovacao: nowIso.slice(0, 10),
+        aprovacao_cliente_id: approval.id,
+        approval_version: approval.approval_version || 1,
+        blocked_reason: null,
+      })
       .eq('id', approval.compra_id)
       .eq('org_id', session.org_id)
   }
@@ -74,7 +82,12 @@ export async function POST(
   if (approval.tipo === 'orcamento' && approval.orcamento_id) {
     await service
       .from('orcamentos')
-      .update({ status: 'Aprovado', aprovacao_cliente_id: approval.id })
+      .update({
+        status: 'Aprovado',
+        aprovacao_cliente_id: approval.id,
+        approval_version: approval.approval_version || 1,
+        blocked_reason: null,
+      })
       .eq('id', approval.orcamento_id)
       .eq('org_id', session.org_id)
   }

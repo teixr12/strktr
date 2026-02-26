@@ -27,7 +27,7 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
 
   const [form, setForm] = useState({
     titulo: '', lead_id: '', obra_id: '', validade: '',
-    observacoes: '', status: 'Rascunho' as OrcamentoStatus, exige_aprovacao_cliente: false,
+    observacoes: '', status: 'Rascunho' as OrcamentoStatus, exige_aprovacao_cliente: false, reenviar_aprovacao_cliente: false,
   })
   const [items, setItems] = useState<ItemForm[]>([{ descricao: '', unidade: 'm²', quantidade: '1', valor_unitario: '0' }])
 
@@ -57,7 +57,16 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
   }, [orcamentos, filtroStatus, busca])
 
   function resetForm() {
-    setForm({ titulo: '', lead_id: '', obra_id: '', validade: '', observacoes: '', status: 'Rascunho', exige_aprovacao_cliente: false })
+    setForm({
+      titulo: '',
+      lead_id: '',
+      obra_id: '',
+      validade: '',
+      observacoes: '',
+      status: 'Rascunho',
+      exige_aprovacao_cliente: false,
+      reenviar_aprovacao_cliente: false,
+    })
     setItems([{ descricao: '', unidade: 'm²', quantidade: '1', valor_unitario: '0' }])
   }
 
@@ -66,7 +75,11 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
   function openEdit(o: Orcamento) {
     setForm({
       titulo: o.titulo, lead_id: o.lead_id || '', obra_id: o.obra_id || '',
-      validade: o.validade || '', observacoes: o.observacoes || '', status: o.status, exige_aprovacao_cliente: Boolean(o.exige_aprovacao_cliente),
+      validade: o.validade || '',
+      observacoes: o.observacoes || '',
+      status: o.status,
+      exige_aprovacao_cliente: Boolean(o.exige_aprovacao_cliente),
+      reenviar_aprovacao_cliente: false,
     })
     setItems(
       o.orcamento_itens && o.orcamento_itens.length > 0
@@ -109,6 +122,7 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
       lead_id: form.lead_id || null, obra_id: form.obra_id || null,
       validade: form.validade || null, observacoes: form.observacoes || null,
       exige_aprovacao_cliente: form.exige_aprovacao_cliente,
+      reenviar_aprovacao_cliente: form.reenviar_aprovacao_cliente,
       items: normalizedItems,
     }
 
@@ -226,6 +240,8 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
           <option value="Todos">Todos</option>
           <option value="Rascunho">Rascunho</option>
           <option value="Enviado">Enviado</option>
+          <option value="Pendente Aprovação Cliente">Pendente Aprovação Cliente</option>
+          <option value="Revisão Cliente">Revisão Cliente</option>
           <option value="Aprovado">Aprovado</option>
           <option value="Recusado">Recusado</option>
         </select>
@@ -251,12 +267,16 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
                   {o.exige_aprovacao_cliente && (
                     <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-100 text-blue-700">Aprovação cliente</span>
                   )}
+                  {o.blocked_reason && (
+                    <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-rose-100 text-rose-700">Bloqueado</span>
+                  )}
                 </div>
               </div>
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-sand-600 dark:text-sand-400">{fmt(o.valor_total)}</span>
                 {o.validade && <span className="text-xs text-gray-400">Válido até {fmtDate(o.validade)}</span>}
               </div>
+              {o.blocked_reason && <p className="mt-1 text-[11px] text-rose-600">{o.blocked_reason}</p>}
             </div>
           ))}
         </div>
@@ -354,6 +374,8 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
                 <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as OrcamentoStatus }))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white">
                   <option value="Rascunho">Rascunho</option>
                   <option value="Enviado">Enviado</option>
+                  <option value="Pendente Aprovação Cliente">Pendente Aprovação Cliente</option>
+                  <option value="Revisão Cliente">Revisão Cliente</option>
                   <option value="Aprovado">Aprovado</option>
                   <option value="Recusado">Recusado</option>
                 </select>
@@ -369,6 +391,17 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
                 />
                 Exigir aprovação do cliente no portal
               </label>
+              {form.exige_aprovacao_cliente && (
+                <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={form.reenviar_aprovacao_cliente}
+                    onChange={(e) => setForm((f) => ({ ...f, reenviar_aprovacao_cliente: e.target.checked }))}
+                    className="rounded border-gray-300"
+                  />
+                  Reenviar como nova versão para aprovação
+                </label>
+              )}
 
               {/* Line Items */}
               <div className="border-t border-gray-200 dark:border-gray-700 pt-3">

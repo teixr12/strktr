@@ -267,6 +267,39 @@ export async function GET(request: Request) {
         error: err instanceof Error ? err.message : 'unknown',
       })
     }
+
+    try {
+      const { data: overdueRejections, error: rejectionsError } = await supabase
+        .from('aprovacoes_cliente')
+        .select('id')
+        .eq('org_id', orgId)
+        .eq('status', 'reprovado')
+        .not('sla_due_at', 'is', null)
+        .lt('sla_due_at', new Date().toISOString())
+        .limit(300)
+
+      if (rejectionsError) throw rejectionsError
+      const overdueCount = overdueRejections?.length || 0
+      if (overdueCount > 0) {
+        alerts.push({
+          code: 'REJECTED_APPROVAL_SLA_OVERDUE',
+          title: `${overdueCount} reprovação(ões) do cliente com SLA vencido`,
+          severity: 'high',
+          module: 'financeiro',
+          href: '/orcamentos',
+          meta: { overdueRejections: overdueCount },
+        })
+      }
+    } catch (err) {
+      warnings.push('Falha ao calcular SLA de reprovação do cliente')
+      log('warn', 'alerts.today.rejections_sla.failed', {
+        requestId,
+        orgId,
+        userId: user.id,
+        route: '/api/v1/alerts/today',
+        error: err instanceof Error ? err.message : 'unknown',
+      })
+    }
   }
 
   const sorted = sortBySeverity(alerts).slice(0, 6)

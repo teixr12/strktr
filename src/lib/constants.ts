@@ -57,6 +57,8 @@ export const MEMBRO_STATUS_COLORS: Record<string, string> = {
 export const ORC_STATUS_COLORS: Record<string, string> = {
   Rascunho: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
   Enviado: 'bg-blue-100 text-blue-700',
+  'Pendente Aprovação Cliente': 'bg-amber-100 text-amber-700',
+  'Revisão Cliente': 'bg-rose-100 text-rose-700',
   Aprovado: 'bg-emerald-100 text-emerald-700',
   Recusado: 'bg-red-100 text-red-500',
 }
@@ -72,6 +74,8 @@ export const PROJETO_STATUS_COLORS: Record<string, string> = {
 
 export const COMPRA_STATUS_COLORS: Record<string, string> = {
   Solicitado: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  'Pendente Aprovação Cliente': 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+  'Revisão Cliente': 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
   Aprovado: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
   Pedido: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
   Entregue: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
