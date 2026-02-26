@@ -4,6 +4,7 @@ import { log } from '@/lib/api/logger'
 import { fail, ok } from '@/lib/api/response'
 import { requireDomainPermission } from '@/lib/auth/domain-permissions'
 import { createOrcamentoSchema } from '@/shared/schemas/business'
+import { ensurePendingApproval } from '@/server/services/portal/approval-service'
 
 function computeTotal(
   items: Array<{ quantidade: number; valor_unitario: number }>
@@ -96,6 +97,21 @@ export async function POST(request: Request) {
   }
 
   const body = parsed.data
+  if (body.exige_aprovacao_cliente && !body.obra_id) {
+    return fail(
+      request,
+      { code: API_ERROR_CODES.VALIDATION_ERROR, message: 'obra_id é obrigatório quando exige aprovação do cliente' },
+      400
+    )
+  }
+  if (body.exige_aprovacao_cliente && body.status === 'Aprovado') {
+    return fail(
+      request,
+      { code: API_ERROR_CODES.VALIDATION_ERROR, message: 'Não é possível aprovar orçamento sem decisão do cliente' },
+      409
+    )
+  }
+
   const total = computeTotal(body.items)
   const { data: orcamento, error: createError } = await supabase
     .from('orcamentos')
@@ -109,6 +125,8 @@ export async function POST(request: Request) {
       validade: body.validade || null,
       observacoes: body.observacoes || null,
       valor_total: total,
+      exige_aprovacao_cliente: body.exige_aprovacao_cliente || false,
+      aprovacao_cliente_id: null,
     })
     .select()
     .single()
@@ -155,6 +173,34 @@ export async function POST(request: Request) {
       { code: API_ERROR_CODES.DB_ERROR, message: itemsError.message },
       400
     )
+  }
+
+  if (body.exige_aprovacao_cliente && body.obra_id) {
+    const ensuredApproval = await ensurePendingApproval({
+      supabase,
+      orgId,
+      obraId: body.obra_id,
+      userId: user.id,
+      tipo: 'orcamento',
+      orcamentoId: orcamento.id,
+    })
+
+    if (ensuredApproval.error || !ensuredApproval.data?.id) {
+      return fail(
+        request,
+        {
+          code: API_ERROR_CODES.DB_ERROR,
+          message: ensuredApproval.error?.message || 'Erro ao criar aprovação do cliente',
+        },
+        400
+      )
+    }
+
+    await supabase
+      .from('orcamentos')
+      .update({ aprovacao_cliente_id: ensuredApproval.data.id })
+      .eq('id', orcamento.id)
+      .eq('org_id', orgId)
   }
 
   const { data: hydrated, error: hydratedError } = await supabase

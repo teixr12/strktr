@@ -43,6 +43,7 @@ export async function middleware(request: NextRequest) {
     // Unauthenticated → redirect to login (except auth pages and API routes)
     if (
       !user &&
+      !request.nextUrl.pathname.startsWith('/portal') &&
       !request.nextUrl.pathname.startsWith('/login') &&
       !request.nextUrl.pathname.startsWith('/register') &&
       !request.nextUrl.pathname.startsWith('/forgot-password') &&

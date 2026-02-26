@@ -33,6 +33,11 @@ NEXT_PUBLIC_FF_EXECUTION_RISK_ENGINE=false
 NEXT_PUBLIC_FF_EXECUTION_ALERTS=false
 NEXT_PUBLIC_FF_CHECKLIST_DUE_DATE=false
 NEXT_PUBLIC_FF_PRODUCT_ANALYTICS=false
+NEXT_PUBLIC_FF_CRONOGRAMA_ENGINE=false
+NEXT_PUBLIC_FF_CRONOGRAMA_PDF=false
+NEXT_PUBLIC_FF_CLIENT_PORTAL=false
+NEXT_PUBLIC_FF_APPROVAL_GATE=false
+NEXT_PUBLIC_FF_ARCHITECT_AGENDA=false
 ```
 Use `.env.example` como base oficial para novos ambientes.
 3. Rode em desenvolvimento:
@@ -93,6 +98,18 @@ Erro:
 - `GET /api/v1/transacoes/orcado-vs-realizado`
 - `POST /api/v1/analytics/events`
 - `GET /api/v1/health/ops`
+- `GET /api/v1/obras/:id/cronograma`
+- `POST /api/v1/obras/:id/cronograma/items`
+- `PATCH /api/v1/obras/:id/cronograma/items/:itemId`
+- `POST /api/v1/obras/:id/cronograma/recalculate`
+- `POST /api/v1/obras/:id/cronograma/pdf`
+- `POST /api/v1/obras/:id/portal/invite`
+- `GET /api/v1/portal/session/:token`
+- `POST /api/v1/portal/comentarios`
+- `POST /api/v1/portal/aprovacoes/:id/approve`
+- `POST /api/v1/portal/aprovacoes/:id/reject`
+- `GET /api/v1/agenda/arquiteto`
+- `POST /api/cron/alerts/daily`
 
 ### Payload adicional em `execution-summary`
 ```json
@@ -165,6 +182,7 @@ Erro:
 ## Migrations Supabase
 - `supabase/migrations/20260225_product_events.sql`
 - `supabase/migrations/20260225_org_first_backfill_rls.sql`
+- `supabase/migrations/20260226_cronograma_portal_approvals_expand.sql`
 
 ### Pipeline de migração (GitHub)
 - Workflow: `.github/workflows/supabase-migrations.yml`

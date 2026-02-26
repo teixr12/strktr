@@ -26,7 +26,7 @@ export function ComprasContent({ initialCompras, obras }: Props) {
   const [form, setForm] = useState({
     descricao: '', categoria: 'Material', fornecedor: '', obra_id: '',
     valor_estimado: '', valor_real: '', status: 'Solicitado' as CompraStatus,
-    urgencia: 'Normal' as CompraUrgencia, notas: '',
+    urgencia: 'Normal' as CompraUrgencia, notas: '', exige_aprovacao_cliente: false,
   })
 
   const filtered = useMemo(() => {
@@ -55,11 +55,11 @@ export function ComprasContent({ initialCompras, obras }: Props) {
         descricao: c.descricao, categoria: c.categoria, fornecedor: c.fornecedor || '',
         obra_id: c.obra_id || '', valor_estimado: String(c.valor_estimado || ''),
         valor_real: String(c.valor_real || ''), status: c.status,
-        urgencia: c.urgencia, notas: c.notas || '',
+        urgencia: c.urgencia, notas: c.notas || '', exige_aprovacao_cliente: Boolean(c.exige_aprovacao_cliente),
       })
     } else {
       setEditing(null)
-      setForm({ descricao: '', categoria: 'Material', fornecedor: '', obra_id: '', valor_estimado: '', valor_real: '', status: 'Solicitado', urgencia: 'Normal', notas: '' })
+      setForm({ descricao: '', categoria: 'Material', fornecedor: '', obra_id: '', valor_estimado: '', valor_real: '', status: 'Solicitado', urgencia: 'Normal', notas: '', exige_aprovacao_cliente: false })
     }
     setShowForm(true)
   }
@@ -73,6 +73,7 @@ export function ComprasContent({ initialCompras, obras }: Props) {
       valor_real: form.valor_real ? parseFloat(form.valor_real) : null,
       status: form.status, urgencia: form.urgencia,
       notas: form.notas || null,
+      exige_aprovacao_cliente: form.exige_aprovacao_cliente,
     }
 
     try {
@@ -153,6 +154,11 @@ export function ComprasContent({ initialCompras, obras }: Props) {
                     <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${COMPRA_STATUS_COLORS[c.status] || 'bg-gray-100 text-gray-600'}`}>
                       {c.status}
                     </span>
+                    {c.exige_aprovacao_cliente && (
+                      <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-100 text-blue-700">
+                        Aprovação cliente
+                      </span>
+                    )}
                     <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${COMPRA_URGENCIA_COLORS[c.urgencia] || 'bg-gray-100 text-gray-600'}`}>
                       {c.urgencia}
                     </span>
@@ -218,6 +224,15 @@ export function ComprasContent({ initialCompras, obras }: Props) {
                 </select>
               </div>
               <textarea value={form.notas} onChange={(e) => setForm((f) => ({ ...f, notas: e.target.value }))} placeholder="Notas" rows={2} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none dark:text-white resize-none" />
+              <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={form.exige_aprovacao_cliente}
+                  onChange={(e) => setForm((f) => ({ ...f, exige_aprovacao_cliente: e.target.checked }))}
+                  className="rounded border-gray-300"
+                />
+                Exigir aprovação do cliente no portal
+              </label>
               <div className="flex gap-2">
                 <button onClick={() => setShowForm(false)} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">Cancelar</button>
                 <button onClick={save} className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all">{editing ? 'Salvar' : 'Registrar'}</button>
