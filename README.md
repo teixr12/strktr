@@ -165,3 +165,9 @@ Erro:
 ## Migrations Supabase
 - `supabase/migrations/20260225_product_events.sql`
 - `supabase/migrations/20260225_org_first_backfill_rls.sql`
+
+### Pipeline de migração (GitHub)
+- Workflow: `.github/workflows/supabase-migrations.yml`
+- Execução manual com gates por estágio: `expand -> backfill -> switch -> cleanup`
+- Suporta `dry_run=true` para validação sem escrita.
+- Para produção, use ambiente `supabase-production` com reviewers obrigatórios para aprovação manual.
