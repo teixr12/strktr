@@ -66,6 +66,34 @@ metrics as (
     from public.equipe
    where org_id in (select org_id from qa_orgs)
   union all
+  select 'cronograma_obras.qa_orgs', count(*)::bigint
+    from public.cronograma_obras
+   where org_id in (select org_id from qa_orgs)
+  union all
+  select 'cronograma_itens.qa_orgs', count(*)::bigint
+    from public.cronograma_itens
+   where org_id in (select org_id from qa_orgs)
+  union all
+  select 'aprovacoes_cliente.qa_orgs', count(*)::bigint
+    from public.aprovacoes_cliente
+   where org_id in (select org_id from qa_orgs)
+  union all
+  select 'portal_clientes.qa_orgs', count(*)::bigint
+    from public.portal_clientes
+   where org_id in (select org_id from qa_orgs)
+  union all
+  select 'portal_sessions.qa_orgs', count(*)::bigint
+    from public.portal_sessions
+   where org_id in (select org_id from qa_orgs)
+  union all
+  select 'portal_comentarios.qa_orgs', count(*)::bigint
+    from public.portal_comentarios
+   where org_id in (select org_id from qa_orgs)
+  union all
+  select 'cronograma_pdf_exports.qa_orgs', count(*)::bigint
+    from public.cronograma_pdf_exports
+   where org_id in (select org_id from qa_orgs)
+  union all
   select 'notificacoes.qa_users', count(*)::bigint
     from public.notificacoes
    where user_id in (select id from qa_users)
