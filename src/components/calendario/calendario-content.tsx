@@ -8,6 +8,7 @@ import { fmtDateTime } from '@/lib/utils'
 import { TIPO_VISITA_COLORS, VISITA_STATUS_COLORS } from '@/lib/constants'
 import { Plus, X, Trash2, CalendarDays, Clock, MapPin, Pencil } from 'lucide-react'
 import { featureFlags } from '@/lib/feature-flags'
+import { PageHeader, QuickActionBar, SectionCard } from '@/components/ui/enterprise'
 import type { Visita, VisitaTipo, VisitaStatus, Lead, Obra } from '@/types/database'
 import type { AgendaTask } from '@/shared/types/cronograma'
 
@@ -186,19 +187,27 @@ export function CalendarioContent({ initialVisitas }: Props) {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Agenda</h2>
-          <p className="text-xs text-gray-500">{agendadas} visitas agendadas</p>
-        </div>
-        <button onClick={() => { resetForm(); setShowForm(true) }} className="flex items-center gap-2 px-4 py-2 bg-sand-500 hover:bg-sand-600 text-white text-sm font-medium rounded-full transition-all btn-press">
-          <Plus className="w-4 h-4" /> Nova Visita
-        </button>
-      </div>
+    <div className="tailadmin-page space-y-5">
+      <PageHeader
+        title="Agenda"
+        subtitle={`${agendadas} visitas agendadas`}
+        actions={
+          <QuickActionBar
+            actions={[{
+              label: 'Nova Visita',
+              icon: <Plus className="h-4 w-4" />,
+              onClick: () => {
+                resetForm()
+                setShowForm(true)
+              },
+              tone: 'warning',
+            }]}
+          />
+        }
+      />
 
       {featureFlags.architectAgenda && agendaTasks.length > 0 && (
-        <div className="glass-card rounded-2xl p-4">
+        <SectionCard className="p-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Prioridades Operacionais</h3>
             <span className="text-[11px] text-gray-500">{agendaTasks.length} tarefas</span>
@@ -222,7 +231,7 @@ export function CalendarioContent({ initialVisitas }: Props) {
               </div>
             ))}
           </div>
-        </div>
+        </SectionCard>
       )}
 
       {visitas.length === 0 ? (

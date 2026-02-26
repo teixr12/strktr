@@ -6,6 +6,7 @@ import { toast } from '@/hooks/use-toast'
 import { fmt, fmtDate } from '@/lib/utils'
 import { COMPRA_STATUS_COLORS, COMPRA_URGENCIA_COLORS } from '@/lib/constants'
 import { Plus, Search, ShoppingCart, X } from 'lucide-react'
+import { EmptyStateAction, PageHeader, QuickActionBar, SectionCard } from '@/components/ui/enterprise'
 import type { Compra, CompraStatus, CompraUrgencia } from '@/types/database'
 
 const STATUS_OPTIONS: CompraStatus[] = [
@@ -137,20 +138,32 @@ export function ComprasContent({ initialCompras, obras }: Props) {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
+    <div className="tailadmin-page space-y-4">
+      <PageHeader
+        title="Compras"
+        subtitle={`${compras.length} compras registradas`}
+        actions={
+          <QuickActionBar
+            actions={[{
+              label: 'Nova Compra',
+              icon: <Plus className="h-4 w-4" />,
+              onClick: () => openForm(),
+              tone: 'warning',
+            }]}
+          />
+        }
+      />
+
       {/* Header + Search */}
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar compras..." className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white" />
+      <SectionCard className="p-4">
+        <div className="relative max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar compras..." className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-9 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
         </div>
-        <button onClick={() => openForm()} className="flex items-center gap-2 px-4 py-2.5 bg-sand-500 hover:bg-sand-600 text-white text-sm font-medium rounded-xl btn-press transition-all">
-          <Plus className="w-4 h-4" /> Nova Compra
-        </button>
-      </div>
+      </SectionCard>
 
       {/* Status Filters */}
-      <div className="flex gap-2 flex-wrap">
+      <SectionCard className="flex flex-wrap gap-2 p-4">
         <button onClick={() => setStatusFilter('all')} className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all ${statusFilter === 'all' ? 'bg-sand-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}>
           Todas ({compras.length})
         </button>
@@ -159,16 +172,19 @@ export function ComprasContent({ initialCompras, obras }: Props) {
             {s} ({compras.filter((c) => c.status === s).length})
           </button>
         ))}
-      </div>
+      </SectionCard>
 
       {/* List */}
       {filtered.length === 0 ? (
-        <div className="text-center py-12">
-          <ShoppingCart className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-          <p className="text-sm text-gray-500">Nenhuma compra encontrada</p>
-        </div>
+        <EmptyStateAction
+          icon={<ShoppingCart className="h-6 w-6 text-sand-600 dark:text-sand-300" />}
+          title="Nenhuma compra encontrada"
+          description="Crie compras para controlar materiais, aprovações do cliente e urgências."
+          actionLabel="Nova compra"
+          onAction={() => openForm()}
+        />
       ) : (
-        <div className="grid gap-2">
+        <SectionCard className="grid gap-2 p-3">
           {filtered.map((c) => (
             <div key={c.id} className="glass-card rounded-2xl p-4 hover:shadow-md transition-all group">
               <div className="flex items-start justify-between gap-3">
@@ -219,7 +235,7 @@ export function ComprasContent({ initialCompras, obras }: Props) {
               </div>
             </div>
           ))}
-        </div>
+        </SectionCard>
       )}
 
       {/* Form Modal */}

@@ -7,6 +7,7 @@ import { toast } from '@/hooks/use-toast'
 import { fmt } from '@/lib/utils'
 import { MEMBRO_STATUS_COLORS } from '@/lib/constants'
 import { Plus, X, Trash2, Edit2, Search, Star, Phone, Mail } from 'lucide-react'
+import { EmptyStateAction, PageHeader, QuickActionBar, SectionCard } from '@/components/ui/enterprise'
 import type { Membro, MembroStatus } from '@/types/database'
 
 interface Props { initialMembros: Membro[] }
@@ -99,31 +100,42 @@ export function EquipeContent({ initialMembros }: Props) {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Equipe</h2>
-          <p className="text-xs text-gray-500">{membros.length} membros · {ativos} ativos</p>
-        </div>
-        <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 bg-sand-500 hover:bg-sand-600 text-white text-sm font-medium rounded-full transition-all btn-press">
-          <Plus className="w-4 h-4" /> Novo Membro
-        </button>
-      </div>
+    <div className="tailadmin-page space-y-5">
+      <PageHeader
+        title="Equipe"
+        subtitle={`${membros.length} membros · ${ativos} ativos`}
+        actions={
+          <QuickActionBar
+            actions={[{
+              label: 'Novo Membro',
+              icon: <Plus className="h-4 w-4" />,
+              onClick: openNew,
+              tone: 'warning',
+            }]}
+          />
+        }
+      />
 
       {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome ou cargo..." className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white" />
-      </div>
+      <SectionCard className="p-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome ou cargo..." className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+        </div>
+      </SectionCard>
 
       {/* Grid */}
       {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 gap-3">
-          <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center"><Search className="w-7 h-7 text-gray-400" /></div>
-          <p className="text-sm text-gray-500">Nenhum membro encontrado</p>
-        </div>
+        <EmptyStateAction
+          icon={<Search className="h-6 w-6 text-sand-600 dark:text-sand-300" />}
+          title="Nenhum membro encontrado"
+          description="Monte o time da obra para distribuir tarefas e acompanhar produtividade."
+          actionLabel="Adicionar membro"
+          onAction={openNew}
+        />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <SectionCard className="p-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
           {filtered.map((m) => (
             <div key={m.id} className="glass-card rounded-2xl p-4 group hover:shadow-lg transition-all">
               <div className="flex items-start justify-between mb-3">
@@ -165,7 +177,8 @@ export function EquipeContent({ initialMembros }: Props) {
               </div>
             </div>
           ))}
-        </div>
+          </div>
+        </SectionCard>
       )}
 
       {/* Form Modal */}

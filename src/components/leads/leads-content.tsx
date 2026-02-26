@@ -6,6 +6,7 @@ import { apiRequest } from '@/lib/api/client'
 import { fmt, fmtDate } from '@/lib/utils'
 import { KANBAN_COLUMNS, TEMPERATURA_EMOJI, TEMPERATURA_COLORS } from '@/lib/constants'
 import { Plus, X, MessageCircle, Trash2, Edit2, GripVertical, Search } from 'lucide-react'
+import { PageHeader, QuickActionBar, SectionCard, StatBadge } from '@/components/ui/enterprise'
 import type { Lead, LeadStatus, LeadTemperatura } from '@/types/database'
 
 interface Props { initialLeads: Lead[] }
@@ -177,40 +178,43 @@ export function LeadsContent({ initialLeads }: Props) {
   }
 
   return (
-    <div className="p-4 md:p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Leads VIP</h2>
-          <p className="text-xs text-gray-500 flex items-center gap-2">
-            <span>{leads.length} leads no pipeline</span>
-            {sla && sla.totalParados > 0 && (
-              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                sla.severity === 'high'
-                  ? 'bg-red-100 text-red-600'
-                  : sla.severity === 'medium'
-                    ? 'bg-amber-100 text-amber-600'
-                    : 'bg-blue-100 text-blue-600'
-              }`}>
-                {sla.totalParados} parados ({sla.slaHours}h)
-              </span>
-            )}
-          </p>
+    <div className="tailadmin-page space-y-4">
+      <PageHeader
+        title="Leads VIP"
+        subtitle={`${leads.length} leads no pipeline`}
+        actions={
+          <QuickActionBar
+            actions={[{
+              label: 'Novo Lead',
+              icon: <Plus className="h-4 w-4" />,
+              onClick: openNew,
+              tone: 'warning',
+            }]}
+          />
+        }
+      />
+
+      {sla && sla.totalParados > 0 ? (
+        <div className="flex justify-start">
+          <StatBadge
+            label={`${sla.totalParados} parados (${sla.slaHours}h)`}
+            tone={sla.severity === 'high' ? 'danger' : sla.severity === 'medium' ? 'warning' : 'info'}
+          />
         </div>
-        <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 bg-sand-500 hover:bg-sand-600 text-white text-sm font-medium rounded-full transition-all btn-press">
-          <Plus className="w-4 h-4" /> Novo Lead
-        </button>
-      </div>
+      ) : null}
 
       {/* Search */}
-      <div className="relative mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <input
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Buscar leads por nome, email, telefone..."
-          className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white"
-        />
-      </div>
+      <SectionCard className="p-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Buscar leads por nome, email, telefone..."
+            className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+          />
+        </div>
+      </SectionCard>
 
       {/* Kanban Board */}
       <div className="flex gap-3 overflow-x-auto pb-4 snap-x snap-mandatory">

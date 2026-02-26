@@ -7,6 +7,7 @@ import { fmt, fmtDate } from '@/lib/utils'
 import { OBRA_STATUS_COLORS, OBRA_ICON_COLORS } from '@/lib/constants'
 import { Plus, HardHat, Home, Building, TreePine, Search } from 'lucide-react'
 import { ObraFormModal } from './obra-form-modal'
+import { EmptyStateAction, PageHeader, QuickActionBar, SectionCard } from '@/components/ui/enterprise'
 import type { Obra, ObraStatus } from '@/types/database'
 
 const obraIcons: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -41,50 +42,58 @@ export function ObrasContent({ initialObras }: { initialObras: Obra[] }) {
   }, [obras, search, statusFilter])
 
   return (
-    <div className="p-4 md:p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-base font-semibold text-gray-900 dark:text-white">Todas as Obras</h3>
-        <button
-          onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-sand-500 hover:bg-sand-600 text-white text-sm font-medium rounded-full btn-press transition-all shadow-md"
-        >
-          <Plus className="w-4 h-4" /> Nova Obra
-        </button>
-      </div>
+    <div className="tailadmin-page space-y-4">
+      <PageHeader
+        title="Gestão de Obras"
+        subtitle={`${filtered.length} obras visualizadas`}
+        actions={
+          <QuickActionBar
+            actions={[{
+              label: 'Nova Obra',
+              icon: <Plus className="h-4 w-4" />,
+              onClick: () => setShowForm(true),
+              tone: 'warning',
+            }]}
+          />
+        }
+      />
 
       {/* Search & Filters */}
-      <div className="flex flex-col sm:flex-row gap-2 mb-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por nome, cliente ou local..."
-            className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white"
-          />
+      <SectionCard className="p-4">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por nome, cliente ou local..."
+              className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {STATUS_OPTIONS.map((s) => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={`whitespace-nowrap rounded-xl px-3 py-2 text-xs font-medium transition-all ${
+                  statusFilter === s ? 'bg-sand-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400'
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="flex gap-1 flex-wrap">
-          {STATUS_OPTIONS.map((s) => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={`px-3 py-2 text-xs font-medium rounded-xl transition-all whitespace-nowrap ${
-                statusFilter === s ? 'bg-sand-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200'
-              }`}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      </div>
+      </SectionCard>
 
       {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-            <HardHat className="w-7 h-7 text-gray-400" />
-          </div>
-          <p className="text-sm text-gray-500">{obras.length === 0 ? 'Nenhuma obra cadastrada ainda' : 'Nenhuma obra encontrada'}</p>
-        </div>
+        <EmptyStateAction
+          icon={<HardHat className="h-6 w-6 text-sand-600 dark:text-sand-300" />}
+          title={obras.length === 0 ? 'Nenhuma obra cadastrada ainda' : 'Nenhuma obra encontrada'}
+          description="Cadastre uma obra para acompanhar progresso, etapas e custo em tempo real."
+          actionLabel="Criar obra"
+          onAction={() => setShowForm(true)}
+        />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
           {filtered.map((o) => {

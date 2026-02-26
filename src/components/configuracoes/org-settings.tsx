@@ -5,6 +5,7 @@ import { apiRequest } from '@/lib/api/client'
 import { toast } from '@/hooks/use-toast'
 import { getRoleLabel, getRoleBadgeColor, canAccess } from '@/lib/auth/roles'
 import { Building2, UserPlus, Shield, Crown, Users, Trash2, Mail } from 'lucide-react'
+import { PageHeader, QuickActionBar, SectionCard } from '@/components/ui/enterprise'
 import type { UserRole, OrgMembro, Organizacao } from '@/types/database'
 
 interface Props {
@@ -106,13 +107,10 @@ export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembr
   // No organization — show create or solo mode
   if (!org) {
     return (
-      <div className="p-4 md:p-6 space-y-6">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Configurações</h2>
-          <p className="text-sm text-gray-500 mt-1">Gerencie sua organização e equipe</p>
-        </div>
+      <div className="tailadmin-page space-y-6">
+        <PageHeader title="Configurações" subtitle="Gerencie sua organização e equipe" />
 
-        <div className="glass-card rounded-2xl p-8 text-center max-w-lg mx-auto">
+        <SectionCard className="mx-auto max-w-lg p-8 text-center">
           <Building2 className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
             Modo Individual
@@ -153,18 +151,30 @@ export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembr
               </div>
             </div>
           )}
-        </div>
+        </SectionCard>
       </div>
     )
   }
 
   // Has organization — show settings
   return (
-    <div className="p-4 md:p-6 space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Configurações</h2>
-        <p className="text-sm text-gray-500 mt-1">Gerencie sua organização e equipe</p>
-      </div>
+    <div className="tailadmin-page space-y-6">
+      <PageHeader
+        title="Configurações"
+        subtitle="Gerencie sua organização e equipe"
+        actions={
+          isAdmin ? (
+            <QuickActionBar
+              actions={[{
+                label: 'Convidar membro',
+                icon: <UserPlus className="h-4 w-4" />,
+                onClick: () => setShowInvite(true),
+                tone: 'info',
+              }]}
+            />
+          ) : undefined
+        }
+      />
 
       {/* Org Info */}
       <div className="glass-card rounded-2xl p-5">

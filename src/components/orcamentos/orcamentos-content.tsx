@@ -8,6 +8,7 @@ import { fmt, fmtDate } from '@/lib/utils'
 import { ORC_STATUS_COLORS } from '@/lib/constants'
 import { Plus, X, Trash2, Edit2, Printer, FileText, Search } from 'lucide-react'
 import { AiBudgetButton } from './ai-budget-button'
+import { EmptyStateAction, PageHeader, QuickActionBar, SectionCard } from '@/components/ui/enterprise'
 import type { Orcamento, OrcamentoStatus, Lead, Obra } from '@/types/database'
 
 interface Props { initialOrcamentos: Orcamento[] }
@@ -203,16 +204,21 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Orçamentos</h2>
-          <p className="text-xs text-gray-500">{total} orçamentos</p>
-        </div>
-        <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 bg-sand-500 hover:bg-sand-600 text-white text-sm font-medium rounded-full transition-all btn-press">
-          <Plus className="w-4 h-4" /> Novo Orçamento
-        </button>
-      </div>
+    <div className="tailadmin-page space-y-5">
+      <PageHeader
+        title="Orçamentos"
+        subtitle={`${total} orçamentos`}
+        actions={
+          <QuickActionBar
+            actions={[{
+              label: 'Novo Orçamento',
+              icon: <Plus className="h-4 w-4" />,
+              onClick: openNew,
+              tone: 'warning',
+            }]}
+          />
+        }
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
@@ -231,30 +237,35 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-2">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por título..." className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white" />
+      <SectionCard className="p-4">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por título..." className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+          </div>
+          <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)} className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+            <option value="Todos">Todos</option>
+            <option value="Rascunho">Rascunho</option>
+            <option value="Enviado">Enviado</option>
+            <option value="Pendente Aprovação Cliente">Pendente Aprovação Cliente</option>
+            <option value="Revisão Cliente">Revisão Cliente</option>
+            <option value="Aprovado">Aprovado</option>
+            <option value="Recusado">Recusado</option>
+          </select>
         </div>
-        <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)} className="px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white">
-          <option value="Todos">Todos</option>
-          <option value="Rascunho">Rascunho</option>
-          <option value="Enviado">Enviado</option>
-          <option value="Pendente Aprovação Cliente">Pendente Aprovação Cliente</option>
-          <option value="Revisão Cliente">Revisão Cliente</option>
-          <option value="Aprovado">Aprovado</option>
-          <option value="Recusado">Recusado</option>
-        </select>
-      </div>
+      </SectionCard>
 
       {/* List */}
       {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 gap-3">
-          <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center"><FileText className="w-7 h-7 text-gray-400" /></div>
-          <p className="text-sm text-gray-500">Nenhum orçamento encontrado</p>
-        </div>
+        <EmptyStateAction
+          icon={<FileText className="h-6 w-6 text-sand-600 dark:text-sand-300" />}
+          title="Nenhum orçamento encontrado"
+          description="Adicione itens e gere propostas padronizadas para acelerar aprovação do cliente."
+          actionLabel="Novo orçamento"
+          onAction={openNew}
+        />
       ) : (
-        <div className="space-y-2">
+        <SectionCard className="space-y-2 p-3">
           {filtered.map((o) => (
             <div key={o.id} onClick={() => setViewOrc(o)} className="glass-card rounded-2xl p-4 cursor-pointer hover:shadow-lg transition-all group">
               <div className="flex items-start justify-between mb-2">
@@ -279,7 +290,7 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
               {o.blocked_reason && <p className="mt-1 text-[11px] text-rose-600">{o.blocked_reason}</p>}
             </div>
           ))}
-        </div>
+        </SectionCard>
       )}
 
       {/* View Modal */}

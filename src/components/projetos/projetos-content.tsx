@@ -6,6 +6,7 @@ import { toast } from '@/hooks/use-toast'
 import { fmt, fmtDate } from '@/lib/utils'
 import { PROJETO_STATUS_COLORS } from '@/lib/constants'
 import { Plus, Search, FolderKanban, ArrowRight, X } from 'lucide-react'
+import { EmptyStateAction, PageHeader, QuickActionBar, SectionCard } from '@/components/ui/enterprise'
 import type { Projeto, ProjetoStatus } from '@/types/database'
 
 const STATUS_OPTIONS: ProjetoStatus[] = ['Planejamento', 'Em Aprovação', 'Aprovado', 'Em Execução', 'Concluído', 'Arquivado']
@@ -116,20 +117,32 @@ export function ProjetosContent({ initialProjetos, leads }: Props) {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
+    <div className="tailadmin-page space-y-4">
+      <PageHeader
+        title="Projetos"
+        subtitle={`${projetos.length} projetos no workspace`}
+        actions={
+          <QuickActionBar
+            actions={[{
+              label: 'Novo Projeto',
+              icon: <Plus className="h-4 w-4" />,
+              onClick: () => openForm(),
+              tone: 'warning',
+            }]}
+          />
+        }
+      />
+
       {/* Header + Search */}
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar projetos..." className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white" />
+      <SectionCard className="p-4">
+        <div className="relative max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar projetos..." className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-9 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
         </div>
-        <button onClick={() => openForm()} className="flex items-center gap-2 px-4 py-2.5 bg-sand-500 hover:bg-sand-600 text-white text-sm font-medium rounded-xl btn-press transition-all">
-          <Plus className="w-4 h-4" /> Novo Projeto
-        </button>
-      </div>
+      </SectionCard>
 
       {/* Status Filters */}
-      <div className="flex gap-2 flex-wrap">
+      <SectionCard className="flex flex-wrap gap-2 p-4">
         <button onClick={() => setStatusFilter('all')} className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all ${statusFilter === 'all' ? 'bg-sand-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}>
           Todos ({projetos.length})
         </button>
@@ -138,16 +151,19 @@ export function ProjetosContent({ initialProjetos, leads }: Props) {
             {s} ({projetos.filter((p) => p.status === s).length})
           </button>
         ))}
-      </div>
+      </SectionCard>
 
       {/* List */}
       {filtered.length === 0 ? (
-        <div className="text-center py-12">
-          <FolderKanban className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-          <p className="text-sm text-gray-500">Nenhum projeto encontrado</p>
-        </div>
+        <EmptyStateAction
+          icon={<FolderKanban className="h-6 w-6 text-sand-600 dark:text-sand-300" />}
+          title="Nenhum projeto encontrado"
+          description="Cadastre um projeto e converta para obra quando o escopo estiver aprovado."
+          actionLabel="Novo projeto"
+          onAction={() => openForm()}
+        />
       ) : (
-        <div className="grid gap-3">
+        <SectionCard className="grid gap-3 p-3">
           {filtered.map((p) => (
             <div key={p.id} className="glass-card rounded-2xl p-4 hover:shadow-md transition-all group">
               <div className="flex items-start justify-between gap-3">
@@ -180,7 +196,7 @@ export function ProjetosContent({ initialProjetos, leads }: Props) {
               </div>
             </div>
           ))}
-        </div>
+        </SectionCard>
       )}
 
       {/* Form Modal */}

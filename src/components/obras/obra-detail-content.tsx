@@ -188,7 +188,7 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
   ]
 
   return (
-    <div className="p-4 md:p-6 max-w-3xl mx-auto">
+    <div className="tailadmin-page mx-auto max-w-5xl">
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div>
