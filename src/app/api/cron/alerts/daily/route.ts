@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   for (const org of orgs || []) {
     const orgId = org.id as string
 
-    const [membersRes, delayedCronRes, pendingApprovalsRes, checklistsRes] = await Promise.all([
+    const [membersRes, delayedCronRes, pendingApprovalsRes, rejectedSlaRes, checklistsRes] = await Promise.all([
       service
         .from('org_membros')
         .select('user_id')
@@ -57,13 +57,22 @@ export async function POST(request: Request) {
         .eq('status', 'pendente')
         .limit(400),
       service
+        .from('aprovacoes_cliente')
+        .select('id')
+        .eq('org_id', orgId)
+        .eq('status', 'reprovado')
+        .not('sla_due_at', 'is', null)
+        .lt('sla_due_at', new Date().toISOString())
+        .is('sla_alert_sent_at', null)
+        .limit(200),
+      service
         .from('obra_checklists')
         .select('id')
         .eq('org_id', orgId)
         .limit(600),
     ])
 
-    if (membersRes.error || delayedCronRes.error || pendingApprovalsRes.error || checklistsRes.error) {
+    if (membersRes.error || delayedCronRes.error || pendingApprovalsRes.error || rejectedSlaRes.error || checklistsRes.error) {
       continue
     }
 
@@ -83,8 +92,9 @@ export async function POST(request: Request) {
 
     const delayedCronCount = (delayedCronRes.data || []).length
     const pendingApprovalsCount = (pendingApprovalsRes.data || []).length
+    const rejectedSlaCount = (rejectedSlaRes.data || []).length
 
-    if (delayedCronCount + pendingApprovalsCount + overdueChecklistCount === 0) {
+    if (delayedCronCount + pendingApprovalsCount + overdueChecklistCount + rejectedSlaCount === 0) {
       results.push({ orgId, createdNotifications: 0 })
       continue
     }
@@ -94,11 +104,12 @@ export async function POST(request: Request) {
       `${delayedCronCount} item(ns) de cronograma atrasado(s)`,
       `${overdueChecklistCount} item(ns) de checklist atrasado(s)`,
       `${pendingApprovalsCount} aprovação(ões) pendente(s) do cliente`,
+      `${rejectedSlaCount} reprovação(ões) com SLA vencido`,
     ].join(' · ')
 
     const payload = (membersRes.data || []).map((member) => ({
       user_id: member.user_id,
-      tipo: delayedCronCount > 0 || overdueChecklistCount > 0 ? 'warning' : 'info',
+      tipo: delayedCronCount > 0 || overdueChecklistCount > 0 || rejectedSlaCount > 0 ? 'warning' : 'info',
       titulo,
       descricao,
       link: '/dashboard',
@@ -106,6 +117,14 @@ export async function POST(request: Request) {
 
     if (payload.length > 0) {
       await service.from('notificacoes').insert(payload)
+    }
+
+    if (rejectedSlaCount > 0) {
+      await service
+        .from('aprovacoes_cliente')
+        .update({ sla_alert_sent_at: new Date().toISOString() })
+        .in('id', (rejectedSlaRes.data || []).map((item) => item.id))
+        .eq('org_id', orgId)
     }
 
     results.push({ orgId, createdNotifications: payload.length })

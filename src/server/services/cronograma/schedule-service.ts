@@ -12,6 +12,11 @@ type DependenciaInput = {
   lag_dias: number | null
 }
 
+type CalendarioInput = {
+  dias_uteis?: number[]
+  feriados?: string[]
+} | null | undefined
+
 function toDate(value: string | null | undefined): Date | null {
   if (!value) return null
   const parsed = new Date(`${value}T00:00:00Z`)
@@ -24,21 +29,65 @@ function toIsoDate(date: Date | null): string | null {
   return date.toISOString().slice(0, 10)
 }
 
-function addDays(date: Date, days: number): Date {
-  const result = new Date(date)
-  result.setUTCDate(result.getUTCDate() + days)
-  return result
-}
-
 function diffDays(a: Date, b: Date): number {
   const ms = a.getTime() - b.getTime()
   return Math.floor(ms / (1000 * 60 * 60 * 24))
 }
 
+function addCalendarDays(date: Date, days: number): Date {
+  const result = new Date(date)
+  result.setUTCDate(result.getUTCDate() + days)
+  return result
+}
+
+function normalizeCalendar(calendario?: CalendarioInput) {
+  const fallbackWorkingDays = [1, 2, 3, 4, 5]
+  const workingDays = (calendario?.dias_uteis || fallbackWorkingDays)
+    .filter((value) => Number.isInteger(value) && value >= 0 && value <= 6)
+  const feriados = new Set((calendario?.feriados || []).filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value)))
+
+  return {
+    workingDays: workingDays.length > 0 ? workingDays : fallbackWorkingDays,
+    feriados,
+  }
+}
+
+function isWorkingDay(date: Date, calendar: { workingDays: number[]; feriados: Set<string> }) {
+  const iso = date.toISOString().slice(0, 10)
+  if (calendar.feriados.has(iso)) return false
+  return calendar.workingDays.includes(date.getUTCDay())
+}
+
+function alignToWorkingDay(date: Date, calendar: { workingDays: number[]; feriados: Set<string> }) {
+  let cursor = new Date(date)
+  let guard = 0
+  while (!isWorkingDay(cursor, calendar) && guard < 14) {
+    cursor = addCalendarDays(cursor, 1)
+    guard += 1
+  }
+  return cursor
+}
+
+function addBusinessDays(date: Date, amount: number, calendar: { workingDays: number[]; feriados: Set<string> }) {
+  let cursor = alignToWorkingDay(date, calendar)
+  if (amount <= 0) return cursor
+
+  let added = 0
+  while (added < amount) {
+    cursor = addCalendarDays(cursor, 1)
+    if (isWorkingDay(cursor, calendar)) {
+      added += 1
+    }
+  }
+  return cursor
+}
+
 export function recalculateSchedule(
   items: CronogramaItemInput[],
-  dependencias: DependenciaInput[]
+  dependencias: DependenciaInput[],
+  calendario?: CalendarioInput
 ) {
+  const calendar = normalizeCalendar(calendario)
   const itemMap = new Map<string, CronogramaItemInput>(items.map((item) => [item.id, item]))
   const incoming = new Map<string, DependenciaInput[]>()
   for (const dep of dependencias) {
@@ -65,13 +114,19 @@ export function recalculateSchedule(
       if (!predecessor) continue
       const predEnd = toDate(predecessor.data_fim_planejada)
       if (!predEnd) continue
-      const candidate = addDays(predEnd, dep.lag_dias || 0)
+      const candidate = addBusinessDays(predEnd, dep.lag_dias || 0, calendar)
       if (!computedStart || candidate > computedStart) {
         computedStart = candidate
       }
     }
 
-    const computedEnd = computedStart ? addDays(computedStart, Math.max(duration - 1, 0)) : toDate(item.data_fim_planejada)
+    if (computedStart) {
+      computedStart = alignToWorkingDay(computedStart, calendar)
+    }
+
+    const computedEnd = computedStart
+      ? addBusinessDays(computedStart, Math.max(duration - 1, 0), calendar)
+      : toDate(item.data_fim_planejada)
     const now = new Date()
     const atraso = computedEnd && item.status !== 'concluido' && now > computedEnd
       ? diffDays(now, computedEnd)

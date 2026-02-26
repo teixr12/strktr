@@ -68,7 +68,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
   const { data: existingCompra, error: existingCompraError } = await supabase
     .from('compras')
-    .select('id, obra_id, status, exige_aprovacao_cliente, aprovacao_cliente_id')
+    .select('id, obra_id, status, exige_aprovacao_cliente, aprovacao_cliente_id, approval_version')
     .eq('id', id)
     .eq('org_id', orgId)
     .single()
@@ -80,7 +80,11 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const targetStatus = body.status || existingCompra.status
   const targetExigeAprovacao = body.exige_aprovacao_cliente ?? existingCompra.exige_aprovacao_cliente ?? false
   const targetObraId = body.obra_id === undefined ? existingCompra.obra_id : body.obra_id
+  const shouldResubmitApproval = Boolean(body.reenviar_aprovacao_cliente)
   const finalStatuses = new Set(['Aprovado', 'Pedido', 'Entregue'])
+  const approvalStatus = targetExigeAprovacao
+    ? await getApprovalStatus(supabase, orgId, existingCompra.aprovacao_cliente_id)
+    : { status: null, error: null, approvalVersion: null as number | null }
 
   if (targetExigeAprovacao && !targetObraId) {
     return fail(
@@ -90,31 +94,38 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     )
   }
 
-  if (targetExigeAprovacao && finalStatuses.has(targetStatus)) {
-    const approvalStatus = await getApprovalStatus(supabase, orgId, existingCompra.aprovacao_cliente_id)
-    if (approvalStatus.error) {
-      return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: approvalStatus.error.message }, 400)
-    }
-    if (approvalStatus.status !== 'aprovado') {
-      return fail(
-        request,
-        {
-          code: API_ERROR_CODES.VALIDATION_ERROR,
-          message: 'Compra bloqueada até aprovação do cliente no portal',
-        },
-        409
-      )
-    }
+  if (approvalStatus.error) {
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: approvalStatus.error.message }, 400)
+  }
+
+  if (targetExigeAprovacao && finalStatuses.has(targetStatus) && approvalStatus.status !== 'aprovado') {
+    return fail(
+      request,
+      {
+        code: API_ERROR_CODES.VALIDATION_ERROR,
+        message: approvalStatus.status === 'reprovado'
+          ? 'Compra reprovada pelo cliente. Crie uma nova versão e reenviar aprovação.'
+          : 'Compra bloqueada até aprovação do cliente no portal',
+      },
+      409
+    )
   }
 
   const { data, error: dbError } = await supabase
     .from('compras')
     .update({
-      ...body,
+      descricao: body.descricao,
+      categoria: body.categoria,
+      valor_estimado: body.valor_estimado,
+      status: body.status,
+      urgencia: body.urgencia,
       obra_id: body.obra_id === undefined ? undefined : body.obra_id || null,
       fornecedor: body.fornecedor === undefined ? undefined : body.fornecedor || null,
       valor_real: body.valor_real === undefined ? undefined : body.valor_real || null,
       exige_aprovacao_cliente: body.exige_aprovacao_cliente,
+      blocked_reason: targetExigeAprovacao && approvalStatus.status === 'reprovado' && !shouldResubmitApproval
+        ? 'Reprovado pelo cliente. Reenviar nova versão para liberar conclusão.'
+        : null,
       notas: body.notas === undefined ? undefined : body.notas || null,
       data_solicitacao: body.data_solicitacao === undefined ? undefined : body.data_solicitacao || null,
       data_aprovacao: body.data_aprovacao === undefined ? undefined : body.data_aprovacao || null,
@@ -139,14 +150,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
 
   if (targetExigeAprovacao && targetObraId) {
-    const approvalStatus = await getApprovalStatus(supabase, orgId, existingCompra.aprovacao_cliente_id)
-    if (approvalStatus.status !== 'aprovado') {
+    if (approvalStatus.status === 'reprovado' && shouldResubmitApproval) {
+      const nextVersion = Math.max(existingCompra.approval_version || 1, approvalStatus.approvalVersion || 1) + 1
       const ensuredApproval = await ensurePendingApproval({
         supabase,
         orgId,
         obraId: targetObraId,
         userId: user.id,
         tipo: 'compra',
+        approvalVersion: nextVersion,
+        predecessorApprovalId: existingCompra.aprovacao_cliente_id,
+        forceNew: true,
         compraId: id,
       })
 
@@ -163,7 +177,43 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
       await supabase
         .from('compras')
-        .update({ aprovacao_cliente_id: ensuredApproval.data.id })
+        .update({
+          aprovacao_cliente_id: ensuredApproval.data.id,
+          approval_version: nextVersion,
+          status: 'Pendente Aprovação Cliente',
+          blocked_reason: null,
+        })
+        .eq('id', id)
+        .eq('org_id', orgId)
+    } else if (approvalStatus.status !== 'aprovado') {
+      const currentVersion = Math.max(existingCompra.approval_version || 1, approvalStatus.approvalVersion || 1)
+      const ensuredApproval = await ensurePendingApproval({
+        supabase,
+        orgId,
+        obraId: targetObraId,
+        userId: user.id,
+        tipo: 'compra',
+        approvalVersion: currentVersion,
+        compraId: id,
+      })
+
+      if (ensuredApproval.error || !ensuredApproval.data?.id) {
+        return fail(
+          request,
+          {
+            code: API_ERROR_CODES.DB_ERROR,
+            message: ensuredApproval.error?.message || 'Erro ao preparar aprovação do cliente',
+          },
+          400
+        )
+      }
+
+      await supabase
+        .from('compras')
+        .update({
+          aprovacao_cliente_id: ensuredApproval.data.id,
+          approval_version: currentVersion,
+        })
         .eq('id', id)
         .eq('org_id', orgId)
     }

@@ -68,7 +68,15 @@ export const updateTransacaoSchema = createTransacaoSchema.partial().refine(
 
 export type UpdateTransacaoDTO = z.infer<typeof updateTransacaoSchema>
 
-export const compraStatusSchema = z.enum(['Solicitado', 'Aprovado', 'Pedido', 'Entregue', 'Cancelado'])
+export const compraStatusSchema = z.enum([
+  'Solicitado',
+  'Pendente Aprovação Cliente',
+  'Revisão Cliente',
+  'Aprovado',
+  'Pedido',
+  'Entregue',
+  'Cancelado',
+])
 export const compraUrgenciaSchema = z.enum(['Baixa', 'Normal', 'Alta', 'Urgente'])
 
 export const createCompraSchema = z.object({
@@ -81,6 +89,7 @@ export const createCompraSchema = z.object({
   status: compraStatusSchema.default('Solicitado'),
   urgencia: compraUrgenciaSchema.default('Normal'),
   exige_aprovacao_cliente: z.boolean().optional().default(false),
+  reenviar_aprovacao_cliente: z.boolean().optional().default(false),
   data_solicitacao: dateStringOrNull.optional(),
   data_aprovacao: dateStringOrNull.optional(),
   data_pedido: dateStringOrNull.optional(),
@@ -138,6 +147,8 @@ export type UpdateProjetoDTO = z.infer<typeof updateProjetoSchema>
 export const orcamentoStatusSchema = z.enum([
   'Rascunho',
   'Enviado',
+  'Pendente Aprovação Cliente',
+  'Revisão Cliente',
   'Aprovado',
   'Recusado',
 ])
@@ -156,6 +167,7 @@ export const createOrcamentoSchema = z.object({
   obra_id: z.string().uuid().optional().nullable(),
   status: orcamentoStatusSchema.default('Rascunho'),
   exige_aprovacao_cliente: z.boolean().optional().default(false),
+  reenviar_aprovacao_cliente: z.boolean().optional().default(false),
   validade: dateStringOrNull.optional(),
   observacoes: z.string().trim().optional().nullable(),
   items: z.array(orcamentoItemSchema).min(1, 'Adicione pelo menos um item'),

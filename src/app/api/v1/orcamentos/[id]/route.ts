@@ -96,7 +96,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
   const { data: existingOrcamento, error: existingOrcamentoError } = await supabase
     .from('orcamentos')
-    .select('id, obra_id, status, exige_aprovacao_cliente, aprovacao_cliente_id')
+    .select('id, obra_id, status, exige_aprovacao_cliente, aprovacao_cliente_id, approval_version')
     .eq('id', id)
     .eq('org_id', orgId)
     .single()
@@ -108,6 +108,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const targetStatus = payload.status || existingOrcamento.status
   const targetExigeAprovacao = payload.exige_aprovacao_cliente ?? existingOrcamento.exige_aprovacao_cliente ?? false
   const targetObraId = payload.obra_id === undefined ? existingOrcamento.obra_id : payload.obra_id
+  const shouldResubmitApproval = Boolean(payload.reenviar_aprovacao_cliente)
+  const approvalStatus = targetExigeAprovacao
+    ? await getApprovalStatus(supabase, orgId, existingOrcamento.aprovacao_cliente_id)
+    : { status: null, error: null, approvalVersion: null as number | null }
 
   if (targetExigeAprovacao && !targetObraId) {
     return fail(
@@ -117,18 +121,21 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     )
   }
 
-  if (targetExigeAprovacao && targetStatus === 'Aprovado') {
-    const approvalStatus = await getApprovalStatus(supabase, orgId, existingOrcamento.aprovacao_cliente_id)
-    if (approvalStatus.error) {
-      return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: approvalStatus.error.message }, 400)
-    }
-    if (approvalStatus.status !== 'aprovado') {
-      return fail(
-        request,
-        { code: API_ERROR_CODES.VALIDATION_ERROR, message: 'Orçamento bloqueado até aprovação do cliente' },
-        409
-      )
-    }
+  if (approvalStatus.error) {
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: approvalStatus.error.message }, 400)
+  }
+
+  if (targetExigeAprovacao && targetStatus === 'Aprovado' && approvalStatus.status !== 'aprovado') {
+    return fail(
+      request,
+      {
+        code: API_ERROR_CODES.VALIDATION_ERROR,
+        message: approvalStatus.status === 'reprovado'
+          ? 'Orçamento reprovado pelo cliente. Crie nova versão e reenviar aprovação.'
+          : 'Orçamento bloqueado até aprovação do cliente',
+      },
+      409
+    )
   }
 
   let computedTotal: number | undefined = undefined
@@ -144,6 +151,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       obra_id: payload.obra_id === undefined ? undefined : payload.obra_id || null,
       status: payload.status,
       exige_aprovacao_cliente: payload.exige_aprovacao_cliente,
+      blocked_reason: targetExigeAprovacao && approvalStatus.status === 'reprovado' && !shouldResubmitApproval
+        ? 'Reprovado pelo cliente. Reenviar nova versão para liberação.'
+        : null,
       validade: payload.validade === undefined ? undefined : payload.validade || null,
       observacoes: payload.observacoes === undefined ? undefined : payload.observacoes || null,
       valor_total: computedTotal,
@@ -205,14 +215,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
 
   if (targetExigeAprovacao && targetObraId) {
-    const approvalStatus = await getApprovalStatus(supabase, orgId, existingOrcamento.aprovacao_cliente_id)
-    if (approvalStatus.status !== 'aprovado') {
+    if (approvalStatus.status === 'reprovado' && shouldResubmitApproval) {
+      const nextVersion = Math.max(existingOrcamento.approval_version || 1, approvalStatus.approvalVersion || 1) + 1
       const ensuredApproval = await ensurePendingApproval({
         supabase,
         orgId,
         obraId: targetObraId,
         userId: user.id,
         tipo: 'orcamento',
+        approvalVersion: nextVersion,
+        predecessorApprovalId: existingOrcamento.aprovacao_cliente_id,
+        forceNew: true,
         orcamentoId: id,
       })
 
@@ -229,7 +242,43 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
       await supabase
         .from('orcamentos')
-        .update({ aprovacao_cliente_id: ensuredApproval.data.id })
+        .update({
+          aprovacao_cliente_id: ensuredApproval.data.id,
+          approval_version: nextVersion,
+          status: 'Pendente Aprovação Cliente',
+          blocked_reason: null,
+        })
+        .eq('id', id)
+        .eq('org_id', orgId)
+    } else if (approvalStatus.status !== 'aprovado') {
+      const currentVersion = Math.max(existingOrcamento.approval_version || 1, approvalStatus.approvalVersion || 1)
+      const ensuredApproval = await ensurePendingApproval({
+        supabase,
+        orgId,
+        obraId: targetObraId,
+        userId: user.id,
+        tipo: 'orcamento',
+        approvalVersion: currentVersion,
+        orcamentoId: id,
+      })
+
+      if (ensuredApproval.error || !ensuredApproval.data?.id) {
+        return fail(
+          request,
+          {
+            code: API_ERROR_CODES.DB_ERROR,
+            message: ensuredApproval.error?.message || 'Erro ao preparar aprovação do cliente',
+          },
+          400
+        )
+      }
+
+      await supabase
+        .from('orcamentos')
+        .update({
+          aprovacao_cliente_id: ensuredApproval.data.id,
+          approval_version: currentVersion,
+        })
         .eq('id', id)
         .eq('org_id', orgId)
     }

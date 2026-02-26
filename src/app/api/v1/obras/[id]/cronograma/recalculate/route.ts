@@ -24,7 +24,7 @@ export async function POST(
   const [cronogramaRes, itensRes, depsRes] = await Promise.all([
     supabase
       .from('cronograma_obras')
-      .select('id')
+      .select('id, calendario')
       .eq('obra_id', obraId)
       .eq('org_id', orgId)
       .maybeSingle(),
@@ -44,7 +44,11 @@ export async function POST(
     return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: 'Erro ao carregar cronograma' }, 500)
   }
 
-  const schedule = recalculateSchedule(itensRes.data || [], depsRes.data || [])
+  const schedule = recalculateSchedule(
+    itensRes.data || [],
+    depsRes.data || [],
+    cronogramaRes.data?.calendario as { dias_uteis?: number[]; feriados?: string[] } | undefined
+  )
   const updates = schedule.updates
 
   for (const entry of updates) {

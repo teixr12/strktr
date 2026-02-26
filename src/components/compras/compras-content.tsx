@@ -8,7 +8,15 @@ import { COMPRA_STATUS_COLORS, COMPRA_URGENCIA_COLORS } from '@/lib/constants'
 import { Plus, Search, ShoppingCart, X } from 'lucide-react'
 import type { Compra, CompraStatus, CompraUrgencia } from '@/types/database'
 
-const STATUS_OPTIONS: CompraStatus[] = ['Solicitado', 'Aprovado', 'Pedido', 'Entregue', 'Cancelado']
+const STATUS_OPTIONS: CompraStatus[] = [
+  'Solicitado',
+  'Pendente Aprovação Cliente',
+  'Revisão Cliente',
+  'Aprovado',
+  'Pedido',
+  'Entregue',
+  'Cancelado',
+]
 const URGENCIA_OPTIONS: CompraUrgencia[] = ['Baixa', 'Normal', 'Alta', 'Urgente']
 const CATEGORIA_OPTIONS = ['Material', 'Equipamento', 'Ferramenta', 'Servico', 'EPI', 'Outro']
 
@@ -26,7 +34,7 @@ export function ComprasContent({ initialCompras, obras }: Props) {
   const [form, setForm] = useState({
     descricao: '', categoria: 'Material', fornecedor: '', obra_id: '',
     valor_estimado: '', valor_real: '', status: 'Solicitado' as CompraStatus,
-    urgencia: 'Normal' as CompraUrgencia, notas: '', exige_aprovacao_cliente: false,
+    urgencia: 'Normal' as CompraUrgencia, notas: '', exige_aprovacao_cliente: false, reenviar_aprovacao_cliente: false,
   })
 
   const filtered = useMemo(() => {
@@ -55,11 +63,26 @@ export function ComprasContent({ initialCompras, obras }: Props) {
         descricao: c.descricao, categoria: c.categoria, fornecedor: c.fornecedor || '',
         obra_id: c.obra_id || '', valor_estimado: String(c.valor_estimado || ''),
         valor_real: String(c.valor_real || ''), status: c.status,
-        urgencia: c.urgencia, notas: c.notas || '', exige_aprovacao_cliente: Boolean(c.exige_aprovacao_cliente),
+        urgencia: c.urgencia,
+        notas: c.notas || '',
+        exige_aprovacao_cliente: Boolean(c.exige_aprovacao_cliente),
+        reenviar_aprovacao_cliente: false,
       })
     } else {
       setEditing(null)
-      setForm({ descricao: '', categoria: 'Material', fornecedor: '', obra_id: '', valor_estimado: '', valor_real: '', status: 'Solicitado', urgencia: 'Normal', notas: '', exige_aprovacao_cliente: false })
+      setForm({
+        descricao: '',
+        categoria: 'Material',
+        fornecedor: '',
+        obra_id: '',
+        valor_estimado: '',
+        valor_real: '',
+        status: 'Solicitado',
+        urgencia: 'Normal',
+        notas: '',
+        exige_aprovacao_cliente: false,
+        reenviar_aprovacao_cliente: false,
+      })
     }
     setShowForm(true)
   }
@@ -74,6 +97,7 @@ export function ComprasContent({ initialCompras, obras }: Props) {
       status: form.status, urgencia: form.urgencia,
       notas: form.notas || null,
       exige_aprovacao_cliente: form.exige_aprovacao_cliente,
+      reenviar_aprovacao_cliente: form.reenviar_aprovacao_cliente,
     }
 
     try {
@@ -159,6 +183,11 @@ export function ComprasContent({ initialCompras, obras }: Props) {
                         Aprovação cliente
                       </span>
                     )}
+                    {c.blocked_reason && (
+                      <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-rose-100 text-rose-700">
+                        Bloqueado
+                      </span>
+                    )}
                     <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${COMPRA_URGENCIA_COLORS[c.urgencia] || 'bg-gray-100 text-gray-600'}`}>
                       {c.urgencia}
                     </span>
@@ -171,6 +200,9 @@ export function ComprasContent({ initialCompras, obras }: Props) {
                     {c.valor_real !== null && <span>Real: {fmt(c.valor_real)}</span>}
                     <span>{fmtDate(c.data_solicitacao)}</span>
                   </div>
+                  {c.blocked_reason && (
+                    <p className="mt-1 text-[11px] text-rose-600">{c.blocked_reason}</p>
+                  )}
                 </div>
                 <div className="flex items-center gap-1">
                   <select
@@ -233,6 +265,17 @@ export function ComprasContent({ initialCompras, obras }: Props) {
                 />
                 Exigir aprovação do cliente no portal
               </label>
+              {form.exige_aprovacao_cliente && (
+                <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={form.reenviar_aprovacao_cliente}
+                    onChange={(e) => setForm((f) => ({ ...f, reenviar_aprovacao_cliente: e.target.checked }))}
+                    className="rounded border-gray-300"
+                  />
+                  Reenviar como nova versão para aprovação
+                </label>
+              )}
               <div className="flex gap-2">
                 <button onClick={() => setShowForm(false)} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">Cancelar</button>
                 <button onClick={save} className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all">{editing ? 'Salvar' : 'Registrar'}</button>

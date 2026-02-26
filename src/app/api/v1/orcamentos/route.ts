@@ -121,12 +121,14 @@ export async function POST(request: Request) {
       titulo: body.titulo,
       lead_id: body.lead_id || null,
       obra_id: body.obra_id || null,
-      status: body.status,
+      status: body.exige_aprovacao_cliente ? 'Pendente Aprovação Cliente' : body.status,
       validade: body.validade || null,
       observacoes: body.observacoes || null,
       valor_total: total,
       exige_aprovacao_cliente: body.exige_aprovacao_cliente || false,
       aprovacao_cliente_id: null,
+      approval_version: 1,
+      blocked_reason: null,
     })
     .select()
     .single()
@@ -182,6 +184,7 @@ export async function POST(request: Request) {
       obraId: body.obra_id,
       userId: user.id,
       tipo: 'orcamento',
+      approvalVersion: 1,
       orcamentoId: orcamento.id,
     })
 
@@ -198,7 +201,10 @@ export async function POST(request: Request) {
 
     await supabase
       .from('orcamentos')
-      .update({ aprovacao_cliente_id: ensuredApproval.data.id })
+      .update({
+        aprovacao_cliente_id: ensuredApproval.data.id,
+        approval_version: ensuredApproval.data.approval_version || 1,
+      })
       .eq('id', orcamento.id)
       .eq('org_id', orgId)
   }

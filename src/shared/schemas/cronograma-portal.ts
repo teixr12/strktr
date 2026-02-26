@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+
 export const cronogramaItemTipoSchema = z.enum(['tarefa', 'marco'])
 export const cronogramaItemStatusSchema = z.enum([
   'pendente',
@@ -42,6 +44,25 @@ export const createCronogramaDependenciaSchema = z.object({
 })
 
 export type CreateCronogramaDependenciaDTO = z.infer<typeof createCronogramaDependenciaSchema>
+
+export const cronogramaCalendarioSchema = z.object({
+  dias_uteis: z
+    .array(z.number().int().min(0).max(6))
+    .min(1, 'Informe ao menos um dia útil')
+    .default([1, 2, 3, 4, 5]),
+  feriados: z.array(isoDateSchema).optional().default([]),
+})
+
+export type CronogramaCalendarioDTO = z.infer<typeof cronogramaCalendarioSchema>
+
+export const updateCronogramaSchema = z.object({
+  nome: z.string().trim().min(2).optional(),
+  calendario: cronogramaCalendarioSchema.optional(),
+}).refine((payload) => Object.keys(payload).length > 0, {
+  message: 'Payload vazio',
+})
+
+export type UpdateCronogramaDTO = z.infer<typeof updateCronogramaSchema>
 
 export const generateCronogramaPdfSchema = z.object({
   includeBaseline: z.boolean().optional().default(false),

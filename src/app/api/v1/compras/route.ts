@@ -69,14 +69,20 @@ export async function POST(request: Request) {
   const { data, error: dbError } = await supabase
     .from('compras')
     .insert({
-      ...body,
       user_id: user.id,
       org_id: orgId,
+      descricao: body.descricao,
+      categoria: body.categoria,
+      valor_estimado: body.valor_estimado,
+      urgencia: body.urgencia,
+      status: body.exige_aprovacao_cliente ? 'Pendente Aprovação Cliente' : body.status,
       obra_id: body.obra_id || null,
       fornecedor: body.fornecedor || null,
       valor_real: body.valor_real || null,
       exige_aprovacao_cliente: body.exige_aprovacao_cliente || false,
       aprovacao_cliente_id: null,
+      approval_version: 1,
+      blocked_reason: null,
       notas: body.notas || null,
       data_solicitacao: body.data_solicitacao || new Date().toISOString().slice(0, 10),
       data_aprovacao: body.data_aprovacao || null,
@@ -98,6 +104,7 @@ export async function POST(request: Request) {
       obraId: body.obra_id,
       userId: user.id,
       tipo: 'compra',
+      approvalVersion: 1,
       compraId: data.id,
     })
 
@@ -114,7 +121,10 @@ export async function POST(request: Request) {
 
     await supabase
       .from('compras')
-      .update({ aprovacao_cliente_id: ensuredApproval.data.id })
+      .update({
+        aprovacao_cliente_id: ensuredApproval.data.id,
+        approval_version: ensuredApproval.data.approval_version || 1,
+      })
       .eq('id', data.id)
       .eq('org_id', orgId)
   }

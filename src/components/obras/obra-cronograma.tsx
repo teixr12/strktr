@@ -17,11 +17,25 @@ function fmtDate(value: string | null | undefined) {
   return new Date(`${value}T00:00:00`).toLocaleDateString('pt-BR')
 }
 
+const WEEK_DAY_OPTIONS = [
+  { value: 1, label: 'Seg' },
+  { value: 2, label: 'Ter' },
+  { value: 3, label: 'Qua' },
+  { value: 4, label: 'Qui' },
+  { value: 5, label: 'Sex' },
+  { value: 6, label: 'Sáb' },
+  { value: 0, label: 'Dom' },
+]
+
 type CronogramaPayload = {
   obra: { id: string; nome: string }
   cronograma: {
     id: string
     nome: string
+    calendario?: {
+      dias_uteis?: number[]
+      feriados?: string[]
+    } | null
     data_inicio_planejada: string | null
     data_fim_planejada: string | null
   }
@@ -68,6 +82,8 @@ export function ObraCronogramaTab({ obraId }: Props) {
   const [payload, setPayload] = useState<CronogramaPayload | null>(null)
   const [drafts, setDrafts] = useState<Record<string, Partial<CronogramaPayload['itens'][number]>>>({})
   const [inviteResult, setInviteResult] = useState<InviteResult | null>(null)
+  const [calendarDays, setCalendarDays] = useState<number[]>([1, 2, 3, 4, 5])
+  const [holidayInput, setHolidayInput] = useState('')
 
   const createForm = useForm<CreateCronogramaItemFormValues>({
     resolver: zodResolver(createCronogramaItemSchema),
@@ -99,6 +115,10 @@ export function ObraCronogramaTab({ obraId }: Props) {
     try {
       const data = await apiRequest<CronogramaPayload>(`/api/v1/obras/${obraId}/cronograma`)
       setPayload(data)
+      const nextDays = data.cronograma?.calendario?.dias_uteis || [1, 2, 3, 4, 5]
+      const uniqueDays = Array.from(new Set(nextDays)).filter((value) => value >= 0 && value <= 6)
+      setCalendarDays(uniqueDays.length > 0 ? uniqueDays : [1, 2, 3, 4, 5])
+      setHolidayInput((data.cronograma?.calendario?.feriados || []).join(', '))
       const nextDrafts: Record<string, Partial<CronogramaPayload['itens'][number]>> = {}
       for (const item of data.itens || []) {
         nextDrafts[item.id] = {
@@ -182,18 +202,66 @@ export function ObraCronogramaTab({ obraId }: Props) {
     }
   }
 
+  async function saveCalendar() {
+    try {
+      const feriados = holidayInput
+        .split(',')
+        .map((value) => value.trim())
+        .filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value))
+
+      await apiRequest(`/api/v1/obras/${obraId}/cronograma`, {
+        method: 'PATCH',
+        body: {
+          calendario: {
+            dias_uteis: calendarDays,
+            feriados,
+          },
+        },
+      })
+      toast('Calendário do cronograma atualizado', 'success')
+      await loadCronograma()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao atualizar calendário', 'error')
+    }
+  }
+
+  function toggleWorkingDay(day: number) {
+    setCalendarDays((current) => {
+      if (current.includes(day)) {
+        const next = current.filter((value) => value !== day)
+        return next.length > 0 ? next : current
+      }
+      return [...current, day].sort((a, b) => a - b)
+    })
+  }
+
   async function generatePdf() {
     try {
-      const res = await apiRequest<{ fileName: string; base64: string; mimeType: string }>(
+      const res = await apiRequest<{
+        fileName: string
+        mimeType: string
+        downloadUrl: string | null
+        base64: string | null
+        fallback: boolean
+      }>(
         `/api/v1/obras/${obraId}/cronograma/pdf`,
         { method: 'POST', body: {} }
       )
 
+      if (res.downloadUrl) {
+        window.open(res.downloadUrl, '_blank', 'noopener,noreferrer')
+        toast('PDF gerado com link seguro', 'success')
+        return
+      }
+
+      if (!res.base64) {
+        toast('Não foi possível gerar o PDF agora', 'error')
+        return
+      }
+
       const bytes = atob(res.base64)
       const array = new Uint8Array(bytes.length)
-      for (let i = 0; i < bytes.length; i += 1) {
-        array[i] = bytes.charCodeAt(i)
-      }
+      for (let i = 0; i < bytes.length; i += 1) array[i] = bytes.charCodeAt(i)
       const blob = new Blob([array], { type: res.mimeType || 'application/pdf' })
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
@@ -201,7 +269,7 @@ export function ObraCronogramaTab({ obraId }: Props) {
       link.download = res.fileName || `cronograma-${obraId}.pdf`
       link.click()
       URL.revokeObjectURL(url)
-      toast('PDF gerado com sucesso', 'success')
+      toast('PDF gerado em modo de contingência', 'info')
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Erro ao gerar PDF', 'error')
     }
@@ -262,6 +330,42 @@ export function ObraCronogramaTab({ obraId }: Props) {
         <p className="text-sm text-gray-500">Carregando cronograma...</p>
       ) : (
         <>
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900/40">
+            <p className="text-xs font-semibold text-gray-600 dark:text-gray-300">Calendário do cronograma</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {WEEK_DAY_OPTIONS.map((option) => (
+                <label
+                  key={option.value}
+                  className={`cursor-pointer rounded-full border px-3 py-1 text-xs ${
+                    calendarDays.includes(option.value)
+                      ? 'border-sand-400 bg-sand-100 text-sand-700'
+                      : 'border-gray-200 bg-white text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={calendarDays.includes(option.value)}
+                    onChange={() => toggleWorkingDay(option.value)}
+                    className="hidden"
+                  />
+                  {option.label}
+                </label>
+              ))}
+            </div>
+            <input
+              value={holidayInput}
+              onChange={(event) => setHolidayInput(event.target.value)}
+              placeholder="Feriados (YYYY-MM-DD, separados por vírgula)"
+              className="mt-3 w-full rounded-xl border border-gray-200 px-3 py-2 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
+            <button
+              onClick={saveCalendar}
+              className="mt-3 rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+              Salvar calendário
+            </button>
+          </div>
+
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <div className="rounded-2xl bg-white/60 p-3 text-center dark:bg-gray-900/40">
               <p className="text-xs text-gray-500">Itens</p>

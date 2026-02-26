@@ -147,6 +147,46 @@ export async function GET(request: Request) {
     })
   }
 
+  try {
+    const { data: approvals, error: approvalsError } = await supabase
+      .from('aprovacoes_cliente')
+      .select('id, tipo, status, solicitado_em, sla_due_at')
+      .eq('org_id', orgId)
+      .in('status', ['pendente', 'reprovado'])
+      .order('solicitado_em', { ascending: false })
+      .limit(120)
+
+    if (approvalsError) throw approvalsError
+
+    for (const approval of approvals || []) {
+      const isRejectedOverdue =
+        approval.status === 'reprovado' &&
+        Boolean(approval.sla_due_at) &&
+        new Date(approval.sla_due_at).getTime() < Date.now()
+
+      tasks.push({
+        code: `APROVACAO_${approval.id}`,
+        title: isRejectedOverdue
+          ? `SLA vencido após reprovação (${approval.tipo})`
+          : `Aprovação cliente pendente (${approval.tipo})`,
+        severity: isRejectedOverdue ? 'high' : 'medium',
+        source: 'aprovacao',
+        dueAt: approval.sla_due_at || approval.solicitado_em,
+        href: approval.tipo === 'compra' ? '/compras' : '/orcamentos',
+        meta: { approvalId: approval.id, tipo: approval.tipo, status: approval.status, slaDueAt: approval.sla_due_at },
+      })
+    }
+  } catch (err) {
+    warnings.push('Falha ao carregar pendências de aprovação')
+    log('warn', 'agenda.arquiteto.approvals_failed', {
+      requestId,
+      orgId,
+      userId: user.id,
+      route: '/api/v1/agenda/arquiteto',
+      error: err instanceof Error ? err.message : 'unknown',
+    })
+  }
+
   const sorted = tasks
     .sort((a, b) => {
       const diff = severityRank(b.severity) - severityRank(a.severity)

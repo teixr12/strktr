@@ -31,7 +31,7 @@ export async function POST(
   const { id: aprovacaoId } = await params
   const { data: approval, error: approvalError } = await service
     .from('aprovacoes_cliente')
-    .select('id, org_id, obra_id, tipo, status, compra_id, orcamento_id')
+    .select('id, org_id, obra_id, tipo, status, compra_id, orcamento_id, approval_version')
     .eq('id', aprovacaoId)
     .eq('org_id', session.org_id)
     .eq('obra_id', session.obra_id)
@@ -46,6 +46,7 @@ export async function POST(
   }
 
   const nowIso = new Date().toISOString()
+  const slaDueAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
   const { data: updated, error: updateError } = await service
     .from('aprovacoes_cliente')
     .update({
@@ -53,6 +54,8 @@ export async function POST(
       decidido_por_portal_cliente_id: session.portal_cliente_id,
       decisao_comentario: comentario,
       decidido_em: nowIso,
+      sla_due_at: slaDueAt,
+      sla_alert_sent_at: null,
     })
     .eq('id', approval.id)
     .eq('org_id', session.org_id)
@@ -66,7 +69,12 @@ export async function POST(
   if (approval.tipo === 'compra' && approval.compra_id) {
     await service
       .from('compras')
-      .update({ status: 'Cancelado', aprovacao_cliente_id: approval.id })
+      .update({
+        status: 'Revisão Cliente',
+        aprovacao_cliente_id: approval.id,
+        approval_version: approval.approval_version || 1,
+        blocked_reason: 'Reprovado pelo cliente. Revise e reenviar nova versão.',
+      })
       .eq('id', approval.compra_id)
       .eq('org_id', session.org_id)
   }
@@ -74,7 +82,12 @@ export async function POST(
   if (approval.tipo === 'orcamento' && approval.orcamento_id) {
     await service
       .from('orcamentos')
-      .update({ status: 'Recusado', aprovacao_cliente_id: approval.id })
+      .update({
+        status: 'Revisão Cliente',
+        aprovacao_cliente_id: approval.id,
+        approval_version: approval.approval_version || 1,
+        blocked_reason: 'Reprovado pelo cliente. Revise e reenviar nova versão.',
+      })
       .eq('id', approval.orcamento_id)
       .eq('org_id', session.org_id)
   }
@@ -89,5 +102,33 @@ export async function POST(
     mensagem: comentario,
   })
 
-  return ok(request, { rejected: true, aprovacao: updated }, { flag: 'NEXT_PUBLIC_FF_APPROVAL_GATE' })
+  const { data: leaders } = await service
+    .from('org_membros')
+    .select('user_id')
+    .eq('org_id', session.org_id)
+    .eq('status', 'ativo')
+    .in('role', ['admin', 'manager'])
+
+  const notifications = (leaders || []).map((member) => ({
+    user_id: member.user_id,
+    tipo: 'urgent',
+    titulo: 'Aprovação reprovada pelo cliente',
+    descricao: `Ação até ${new Date(slaDueAt).toLocaleDateString('pt-BR')}: revisar e reenviar versão ${Number(approval.approval_version || 1) + 1}.`,
+    link: approval.tipo === 'compra' ? '/compras' : '/orcamentos',
+  }))
+
+  if (notifications.length > 0) {
+    await service.from('notificacoes').insert(notifications)
+  }
+
+  return ok(
+    request,
+    {
+      rejected: true,
+      aprovacao: updated,
+      slaDueAt,
+      requiredNextVersion: Number(approval.approval_version || 1) + 1,
+    },
+    { flag: 'NEXT_PUBLIC_FF_APPROVAL_GATE' }
+  )
 }

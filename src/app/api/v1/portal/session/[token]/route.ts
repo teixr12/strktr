@@ -52,7 +52,7 @@ export async function GET(
       .limit(50),
     service
       .from('aprovacoes_cliente')
-      .select('id, tipo, status, compra_id, orcamento_id, solicitado_em, decisao_comentario, decidido_em')
+      .select('id, tipo, status, approval_version, compra_id, orcamento_id, solicitado_em, sla_due_at, decisao_comentario, decidido_em')
       .eq('obra_id', session.obra_id)
       .eq('org_id', session.org_id)
       .order('solicitado_em', { ascending: false })
@@ -92,15 +92,15 @@ export async function GET(
   const [comprasRes, orcamentosRes, clientesRes, profilesRes] = await Promise.all([
     compraIds.length > 0
       ? service
-          .from('compras')
-          .select('id, descricao, status, valor_estimado, valor_real')
+      .from('compras')
+      .select('id, descricao, status, valor_estimado, valor_real, blocked_reason, approval_version')
           .in('id', compraIds)
           .eq('org_id', session.org_id)
       : Promise.resolve({ data: [], error: null }),
     orcamentoIds.length > 0
       ? service
-          .from('orcamentos')
-          .select('id, titulo, status, valor_total')
+      .from('orcamentos')
+      .select('id, titulo, status, valor_total, blocked_reason, approval_version')
           .in('id', orcamentoIds)
           .eq('org_id', session.org_id)
       : Promise.resolve({ data: [], error: null }),
@@ -126,7 +126,9 @@ export async function GET(
     id: item.id,
     tipo: item.tipo,
     status: item.status,
+    approval_version: item.approval_version,
     solicitado_em: item.solicitado_em,
+    sla_due_at: item.sla_due_at,
     decisao_comentario: item.decisao_comentario,
     decidido_em: item.decidido_em,
     compra: item.compra_id ? comprasById.get(item.compra_id) || null : null,

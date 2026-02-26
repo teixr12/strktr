@@ -140,7 +140,13 @@ export interface Visita {
   leads?: { nome: string } | null
 }
 
-export type OrcamentoStatus = 'Rascunho' | 'Enviado' | 'Aprovado' | 'Recusado'
+export type OrcamentoStatus =
+  | 'Rascunho'
+  | 'Enviado'
+  | 'Pendente Aprovação Cliente'
+  | 'Revisão Cliente'
+  | 'Aprovado'
+  | 'Recusado'
 
 export interface Orcamento {
   id: string
@@ -155,6 +161,8 @@ export interface Orcamento {
   valor_total: number
   exige_aprovacao_cliente?: boolean
   aprovacao_cliente_id?: string | null
+  approval_version?: number
+  blocked_reason?: string | null
   created_at: string
   updated_at: string
   orcamento_itens?: OrcamentoItem[]
@@ -251,7 +259,14 @@ export interface Projeto {
   obras?: { nome: string } | null
 }
 
-export type CompraStatus = 'Solicitado' | 'Aprovado' | 'Pedido' | 'Entregue' | 'Cancelado'
+export type CompraStatus =
+  | 'Solicitado'
+  | 'Pendente Aprovação Cliente'
+  | 'Revisão Cliente'
+  | 'Aprovado'
+  | 'Pedido'
+  | 'Entregue'
+  | 'Cancelado'
 export type CompraUrgencia = 'Baixa' | 'Normal' | 'Alta' | 'Urgente'
 
 export interface Compra {
@@ -266,6 +281,8 @@ export interface Compra {
   valor_real: number | null
   exige_aprovacao_cliente?: boolean
   aprovacao_cliente_id?: string | null
+  approval_version?: number
+  blocked_reason?: string | null
   status: CompraStatus
   urgencia: CompraUrgencia
   data_solicitacao: string
@@ -442,6 +459,10 @@ export interface AprovacaoCliente {
   compra_id: string | null
   orcamento_id: string | null
   status: AprovacaoStatus
+  approval_version?: number
+  predecessor_aprovacao_id?: string | null
+  sla_due_at?: string | null
+  sla_alert_sent_at?: string | null
   solicitado_por: string
   solicitado_em: string
   decidido_por_portal_cliente_id: string | null
