@@ -15,7 +15,16 @@ with tracked_tables as (
     ('visitas'),
     ('equipe'),
     ('knowledgebase'),
-    ('eventos_produto')
+    ('eventos_produto'),
+    ('cronograma_obras'),
+    ('cronograma_itens'),
+    ('cronograma_dependencias'),
+    ('cronograma_baselines'),
+    ('portal_clientes'),
+    ('portal_sessions'),
+    ('portal_comentarios'),
+    ('aprovacoes_cliente'),
+    ('cronograma_pdf_exports')
   ) t(table_name)
 ),
 rls_status as (
