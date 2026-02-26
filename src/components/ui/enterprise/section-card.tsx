@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { UiCardVariant } from '@/shared/types/ui'
+import type { UiCardVariant, UiDensity, UiSurfaceVariant } from '@/shared/types/ui'
 
 interface SectionCardProps {
   title?: string
@@ -8,6 +8,8 @@ interface SectionCardProps {
   children: ReactNode
   className?: string
   variant?: UiCardVariant
+  density?: UiDensity
+  surface?: UiSurfaceVariant
 }
 
 const VARIANT_CLASS: Record<UiCardVariant, string> = {
@@ -16,9 +18,29 @@ const VARIANT_CLASS: Record<UiCardVariant, string> = {
   elevated: 'enterprise-card enterprise-card-elevated',
 }
 
-export function SectionCard({ title, subtitle, right, children, className = '', variant = 'default' }: SectionCardProps) {
+const DENSITY_CLASS: Record<UiDensity, string> = {
+  compact: 'p-3 md:p-4',
+  comfortable: 'p-4 md:p-5',
+}
+
+const SURFACE_CLASS: Record<UiSurfaceVariant, string> = {
+  solid: '',
+  soft: 'bg-gray-50/70 dark:bg-gray-900/40',
+  outline: 'bg-transparent shadow-none',
+}
+
+export function SectionCard({
+  title,
+  subtitle,
+  right,
+  children,
+  className = '',
+  variant = 'default',
+  density = 'comfortable',
+  surface = 'solid',
+}: SectionCardProps) {
   return (
-    <section className={`${VARIANT_CLASS[variant]} ${className}`.trim()}>
+    <section className={`${VARIANT_CLASS[variant]} ${DENSITY_CLASS[density]} ${SURFACE_CLASS[surface]} ${className}`.trim()}>
       {title || right ? (
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
