@@ -3,6 +3,7 @@ import { fail, ok } from '@/lib/api/response'
 import { log } from '@/lib/api/logger'
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { obraFormSchema } from '@/shared/schemas/execution'
+import { runAutomation } from '@/server/services/automation/automation-service'
 
 export async function GET(request: Request) {
   const { user, supabase, error, requestId, orgId } = await getApiUser(request)
@@ -72,5 +73,24 @@ export async function POST(request: Request) {
     log('error', 'obras.create.failed', { requestId, orgId, userId: user.id, route: '/api/v1/obras', error: dbError.message })
     return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 400)
   }
+
+  if (process.env.NEXT_PUBLIC_FF_SEMI_AUTOMATION === 'true') {
+    await runAutomation(
+      supabase,
+      {
+        orgId,
+        userId: user.id,
+        trigger: 'ObraCreated',
+        triggerEntityType: 'obra',
+        triggerEntityId: data.id,
+        payload: { status: data.status, etapaAtual: data.etapa_atual || null },
+      },
+      {
+        confirm: false,
+        source: 'trigger',
+      }
+    ).catch(() => undefined)
+  }
+
   return ok(request, data, undefined, 201)
 }

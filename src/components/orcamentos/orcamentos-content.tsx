@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { apiRequest } from '@/lib/api/client'
 import { toast } from '@/hooks/use-toast'
 import { fmt, fmtDate } from '@/lib/utils'
@@ -16,7 +15,6 @@ interface Props { initialOrcamentos: Orcamento[] }
 interface ItemForm { descricao: string; unidade: string; quantidade: string; valor_unitario: string }
 
 export function OrcamentosContent({ initialOrcamentos }: Props) {
-  const supabase = createClient()
   const [orcamentos, setOrcamentos] = useState(initialOrcamentos)
   const [showForm, setShowForm] = useState(false)
   const [editOrc, setEditOrc] = useState<Orcamento | null>(null)
@@ -34,15 +32,20 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
 
   useEffect(() => {
     async function loadRelated() {
-      const [l, o] = await Promise.all([
-        supabase.from('leads').select('id, nome').order('nome'),
-        supabase.from('obras').select('id, nome').order('nome'),
-      ])
-      if (l.data) setLeads(l.data)
-      if (o.data) setObras(o.data)
+      try {
+        const [leadsData, obrasData] = await Promise.all([
+          apiRequest<Pick<Lead, 'id' | 'nome'>[]>('/api/v1/leads?limit=200'),
+          apiRequest<Pick<Obra, 'id' | 'nome'>[]>('/api/v1/obras?limit=200'),
+        ])
+        setLeads(leadsData)
+        setObras(obrasData)
+      } catch {
+        setLeads([])
+        setObras([])
+      }
     }
     loadRelated()
-  }, [supabase])
+  }, [])
 
   const total = orcamentos.length
   const aprovados = orcamentos.filter((o) => o.status === 'Aprovado')

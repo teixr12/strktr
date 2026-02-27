@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
+import { apiRequest } from '@/lib/api/client'
 import { fmt, fmtDate } from '@/lib/utils'
 import { OBRA_STATUS_COLORS, OBRA_ICON_COLORS } from '@/lib/constants'
 import { Plus, HardHat, Home, Building, TreePine, Search } from 'lucide-react'
@@ -26,12 +26,15 @@ export function ObrasContent({ initialObras }: { initialObras: Obra[] }) {
   const [editingObra, setEditingObra] = useState<Obra | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'Todas' | ObraStatus>('Todas')
-  const supabase = createClient()
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Obras
 
   async function refresh() {
-    const { data } = await supabase.from('obras').select('*').order('created_at', { ascending: false })
-    if (data) setObras(data)
+    try {
+      const data = await apiRequest<Obra[]>('/api/v1/obras?limit=100')
+      setObras(data)
+    } catch {
+      // keep current list if refresh fails
+    }
   }
 
   const filtered = useMemo(() => {

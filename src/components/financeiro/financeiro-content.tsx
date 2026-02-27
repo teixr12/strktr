@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { apiRequest } from '@/lib/api/client'
 import { toast } from '@/hooks/use-toast'
 import { fmt, fmtDate } from '@/lib/utils'
@@ -31,7 +30,6 @@ interface OrcadoVsRealizadoSummary {
 }
 
 export function FinanceiroContent({ initialTransacoes }: Props) {
-  const supabase = useMemo(() => createClient(), [])
   const [transacoes, setTransacoes] = useState(initialTransacoes)
   const [showForm, setShowForm] = useState(false)
   const [editingTx, setEditingTx] = useState<Transacao | null>(null)
@@ -47,11 +45,15 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
 
   useEffect(() => {
     async function loadObras() {
-      const { data } = await supabase.from('obras').select('id, nome').order('nome')
-      if (data) setObras(data)
+      try {
+        const data = await apiRequest<Pick<Obra, 'id' | 'nome'>[]>('/api/v1/obras?limit=200')
+        setObras(data)
+      } catch {
+        setObras([])
+      }
     }
     loadObras()
-  }, [supabase])
+  }, [])
 
   async function loadDesvio() {
     try {

@@ -5,6 +5,7 @@ import { emitProductEvent } from '@/lib/telemetry'
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { requireDomainPermission } from '@/lib/auth/domain-permissions'
 import { createLeadSchema } from '@/shared/schemas/business'
+import { runAutomation } from '@/server/services/automation/automation-service'
 
 export async function GET(request: Request) {
   const { user, supabase, error, requestId, orgId, role } = await getApiUser(request)
@@ -65,5 +66,24 @@ export async function POST(request: Request) {
     entityId: data.id,
     payload: { status: data.status, origem: data.origem },
   }).catch(() => undefined)
+
+  if (process.env.NEXT_PUBLIC_FF_SEMI_AUTOMATION === 'true') {
+    await runAutomation(
+      supabase,
+      {
+        orgId,
+        userId: user.id,
+        trigger: 'LeadCreated',
+        triggerEntityType: 'lead',
+        triggerEntityId: data.id,
+        payload: { status: data.status, origem: data.origem },
+      },
+      {
+        confirm: true,
+        source: 'trigger',
+      }
+    ).catch(() => undefined)
+  }
+
   return ok(request, data, undefined, 201)
 }
