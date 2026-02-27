@@ -30,8 +30,8 @@ jobs:
             HEALTH_BODY="$(curl -sS -m 20 "$HEALTH_URL" || true)"
             LAST_RELEASE="$RELEASE_BODY"
             LAST_HEALTH="$HEALTH_BODY"
-            STATUS="$(echo "$HEALTH_BODY" | jq -r '.data.status // empty')"
-            VERSION="$(echo "$RELEASE_BODY" | jq -r '.data.version // empty')"
+            STATUS="$(echo "$HEALTH_BODY" | jq -r '.data.status // empty' 2>/dev/null || true)"
+            VERSION="$(echo "$RELEASE_BODY" | jq -r '.data.version // empty' 2>/dev/null || true)"
 
             echo "Attempt $i/$ATTEMPTS -> status=$STATUS version=$VERSION"
 
