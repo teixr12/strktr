@@ -14,6 +14,7 @@ import type { AgendaTask } from '@/shared/types/cronograma'
 interface Props { initialVisitas: Visita[] }
 
 export function CalendarioContent({ initialVisitas }: Props) {
+  const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Agenda
   const [visitas, setVisitas] = useState(initialVisitas)
   const [showForm, setShowForm] = useState(false)
   const [editingVisita, setEditingVisita] = useState<Visita | null>(null)
@@ -190,7 +191,7 @@ export function CalendarioContent({ initialVisitas }: Props) {
   }
 
   return (
-    <div className="tailadmin-page space-y-5">
+    <div className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} space-y-5`}>
       <PageHeader
         title="Agenda"
         subtitle={`${agendadas} visitas agendadas`}

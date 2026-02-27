@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import Image from 'next/image'
 import { apiRequest } from '@/lib/api/client'
+import { featureFlags } from '@/lib/feature-flags'
 import { toast } from '@/hooks/use-toast'
 import { fmt } from '@/lib/utils'
 import { MEMBRO_STATUS_COLORS } from '@/lib/constants'
@@ -13,6 +14,7 @@ import type { Membro, MembroStatus } from '@/types/database'
 interface Props { initialMembros: Membro[] }
 
 export function EquipeContent({ initialMembros }: Props) {
+  const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Equipe
   const [membros, setMembros] = useState(initialMembros)
   const [showForm, setShowForm] = useState(false)
   const [editMembro, setEditMembro] = useState<Membro | null>(null)
@@ -100,7 +102,7 @@ export function EquipeContent({ initialMembros }: Props) {
   }
 
   return (
-    <div className="tailadmin-page space-y-5">
+    <div className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} space-y-5`}>
       <PageHeader
         title="Equipe"
         subtitle={`${membros.length} membros · ${ativos} ativos`}

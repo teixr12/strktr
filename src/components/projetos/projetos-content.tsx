@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { apiRequest } from '@/lib/api/client'
+import { featureFlags } from '@/lib/feature-flags'
 import { toast } from '@/hooks/use-toast'
 import { fmt, fmtDate } from '@/lib/utils'
 import { PROJETO_STATUS_COLORS } from '@/lib/constants'
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export function ProjetosContent({ initialProjetos, leads }: Props) {
+  const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Projetos
   const [projetos, setProjetos] = useState(initialProjetos)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -117,7 +119,7 @@ export function ProjetosContent({ initialProjetos, leads }: Props) {
   }
 
   return (
-    <div className="tailadmin-page space-y-4">
+    <div className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} space-y-4`}>
       <PageHeader
         title="Projetos"
         subtitle={`${projetos.length} projetos no workspace`}

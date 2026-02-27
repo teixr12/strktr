@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { apiRequest } from '@/lib/api/client'
+import { featureFlags } from '@/lib/feature-flags'
 import { toast } from '@/hooks/use-toast'
 import { fmt } from '@/lib/utils'
 import { Plus, X, Trash2, Edit2, Search, BookOpen, Tag } from 'lucide-react'
@@ -27,6 +28,7 @@ const KB_CATEGORIA_LABELS: Record<string, string> = {
 interface Props { initialItems: KnowledgebaseItem[] }
 
 export function KnowledgebaseContent({ initialItems }: Props) {
+  const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Knowledgebase
   const [items, setItems] = useState(initialItems)
   const [showForm, setShowForm] = useState(false)
   const [editItem, setEditItem] = useState<KnowledgebaseItem | null>(null)
@@ -115,7 +117,7 @@ export function KnowledgebaseContent({ initialItems }: Props) {
   }
 
   return (
-    <div className="tailadmin-page space-y-5">
+    <div className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} space-y-5`}>
       <PageHeader
         title="Base de Conhecimento"
         subtitle={`${items.length} itens · SOPs, materiais e referências`}

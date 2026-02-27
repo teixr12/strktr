@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { apiRequest } from '@/lib/api/client'
+import { featureFlags } from '@/lib/feature-flags'
 import { toast } from '@/hooks/use-toast'
 import { getRoleLabel, getRoleBadgeColor, canAccess } from '@/lib/auth/roles'
 import { Building2, UserPlus, Shield, Crown, Users, Trash2, Mail } from 'lucide-react'
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembros, organizacao: initialOrg }: Props) {
+  const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Configuracoes
   const [org, setOrg] = useState(initialOrg)
   const [membros, setMembros] = useState(initialMembros)
   const [showCreateOrg, setShowCreateOrg] = useState(false)
@@ -107,7 +109,7 @@ export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembr
   // No organization — show create or solo mode
   if (!org) {
     return (
-      <div className="tailadmin-page space-y-6">
+      <div className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} space-y-6`}>
         <PageHeader title="Configurações" subtitle="Gerencie sua organização e equipe" />
 
         <SectionCard className="mx-auto max-w-lg p-8 text-center">
@@ -158,7 +160,7 @@ export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembr
 
   // Has organization — show settings
   return (
-    <div className="tailadmin-page space-y-6">
+    <div className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} space-y-6`}>
       <PageHeader
         title="Configurações"
         subtitle="Gerencie sua organização e equipe"

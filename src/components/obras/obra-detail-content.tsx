@@ -13,6 +13,7 @@ import { DiarioObraTab } from './diario-obra'
 import { ObraChecklistsTab } from './obra-checklists'
 import { ObraCronogramaTab } from './obra-cronograma'
 import { apiRequest } from '@/lib/api/client'
+import { featureFlags } from '@/lib/feature-flags'
 import type { Obra, ObraEtapa, Transacao, DiarioObra as DiarioEntry, ObraChecklist } from '@/types/database'
 import { createEtapaSchema, type CreateEtapaDTO } from '@/shared/schemas/execution'
 import type { ExecutionAlert, RecommendedAction } from '@/shared/types/execution'
@@ -49,6 +50,7 @@ type ExecutionSummary = {
 }
 
 export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, initialDiario = [], initialChecklists = [] }: Props) {
+  const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2ObraTabs
   const router = useRouter()
   const [tab, setTab] = useState<'resumo' | 'etapas' | 'cronograma' | 'financeiro' | 'diario' | 'checklists'>('resumo')
   const [etapas, setEtapas] = useState(initialEtapas)
@@ -64,7 +66,7 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
   const txObra = initialTransacoes
   const rec = txObra.filter((t) => t.tipo === 'Receita').reduce((s, t) => s + t.valor, 0)
   const dep = txObra.filter((t) => t.tipo === 'Despesa').reduce((s, t) => s + t.valor, 0)
-  const riskEnabled = process.env.NEXT_PUBLIC_FF_EXECUTION_RISK_ENGINE === 'true'
+  const riskEnabled = featureFlags.executionRiskEngine
 
   const alertStyles: Record<ExecutionAlert['severity'], string> = {
     high: 'bg-red-50 text-red-700 border-red-200',
@@ -188,7 +190,7 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
   ]
 
   return (
-    <div className="tailadmin-page mx-auto max-w-5xl">
+    <div className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} mx-auto max-w-5xl`}>
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div>
