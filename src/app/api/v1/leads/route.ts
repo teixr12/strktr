@@ -67,7 +67,7 @@ export async function POST(request: Request) {
     payload: { status: data.status, origem: data.origem },
   }).catch(() => undefined)
 
-  if (process.env.NEXT_PUBLIC_FF_SEMI_AUTOMATION === 'true') {
+  if (process.env.NEXT_PUBLIC_FF_SEMI_AUTOMATION !== 'false') {
     await runAutomation(
       supabase,
       {

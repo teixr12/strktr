@@ -74,7 +74,7 @@ export async function POST(request: Request) {
     return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 400)
   }
 
-  if (process.env.NEXT_PUBLIC_FF_SEMI_AUTOMATION === 'true') {
+  if (process.env.NEXT_PUBLIC_FF_SEMI_AUTOMATION !== 'false') {
     await runAutomation(
       supabase,
       {
