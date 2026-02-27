@@ -14,7 +14,17 @@ export function Footer() {
           <button className="hover:text-gray-900 dark:hover:text-gray-100 transition-colors">Privacidade</button>
           <button className="hover:text-gray-900 dark:hover:text-gray-100 transition-colors">Suporte</button>
           <span className="text-gray-300 dark:text-gray-700">|</span>
-          <span>Powered by <span className="font-semibold text-sand-600 dark:text-sand-400">APXLBS</span></span>
+          <span>
+            Powered by{' '}
+            <a
+              href="https://apxlbs.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-sand-600 transition-colors hover:text-sand-700 dark:text-sand-400 dark:hover:text-sand-300"
+            >
+              APXLBS
+            </a>
+          </span>
         </div>
       </div>
     </footer>

@@ -2,6 +2,7 @@
 
 import { MessageCircle, MoreHorizontal, GripVertical, Flame } from 'lucide-react'
 import type { Lead, LeadStatus } from '@/types/database'
+import { featureFlags } from '@/lib/feature-flags'
 import { fmt } from '@/lib/utils'
 import type { DragEvent } from 'react'
 
@@ -18,6 +19,7 @@ interface LeadLaneColumnV2Props {
   onDragStart: (leadId: string) => void
   onDragEnd: () => void
   onOpenLead: (lead: Lead) => void
+  nowMs: number
 }
 
 function whatsappUrl(phone: string) {
@@ -44,7 +46,34 @@ export function LeadLaneColumnV2({
   onDragStart,
   onDragEnd,
   onOpenLead,
+  nowMs,
 }: LeadLaneColumnV2Props) {
+  function getProposalProgress(lead: Lead) {
+    if (!featureFlags.leadsProgressV2) {
+      return { width: 62, label: 'Enviada' }
+    }
+
+    let progress = 22
+    if ((lead.valor_potencial || 0) > 0) progress += 23
+    if (lead.temperatura === 'Hot') progress += 22
+    if (lead.temperatura === 'Morno') progress += 14
+
+    if (lead.ultimo_contato) {
+      const diffHours = (nowMs - new Date(lead.ultimo_contato).getTime()) / (1000 * 60 * 60)
+      if (diffHours <= 24) progress += 30
+      else if (diffHours <= 72) progress += 20
+      else progress += 8
+    } else {
+      progress += 4
+    }
+
+    const width = Math.max(15, Math.min(Math.round(progress), 98))
+    let label = 'Em preparação'
+    if (width >= 75) label = 'Em revisão'
+    if (width >= 90) label = 'Pronta para fechamento'
+    return { width, label }
+  }
+
   return (
     <section
       className={`min-w-[280px] snap-center rounded-3xl border p-4 transition-all md:min-w-0 ${
@@ -113,10 +142,22 @@ export function LeadLaneColumnV2({
 
               {lead.status === 'Proposta' ? (
                 <div className="mb-2">
-                  <div className="h-1.5 rounded-full bg-gray-200 dark:bg-gray-700">
-                    <div className="h-1.5 rounded-full bg-ocean-500" style={{ width: '62%' }} />
-                  </div>
-                  <p className="mt-1 text-right text-xs font-semibold text-ocean-600 dark:text-ocean-300">Enviada</p>
+                  {(() => {
+                    const proposalProgress = getProposalProgress(lead)
+                    return (
+                      <>
+                        <div className="h-1.5 rounded-full bg-gray-200 dark:bg-gray-700">
+                          <div
+                            className="h-1.5 rounded-full bg-ocean-500 transition-all duration-200"
+                            style={{ width: `${proposalProgress.width}%` }}
+                          />
+                        </div>
+                        <p className="mt-1 text-right text-xs font-semibold text-ocean-600 dark:text-ocean-300">
+                          {proposalProgress.label}
+                        </p>
+                      </>
+                    )
+                  })()}
                 </div>
               ) : null}
 

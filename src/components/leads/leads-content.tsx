@@ -250,6 +250,7 @@ export function LeadsContent({ initialLeads }: Props) {
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
                 onOpenLead={setDetailLead}
+                nowMs={nowMs}
               />
             ))}
           </div>
