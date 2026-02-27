@@ -11,6 +11,7 @@ TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 HEALTH_OUT="$TMP_DIR/health.json"
+RELEASE_OUT="$TMP_DIR/release.json"
 MIGRATIONS_OUT="$TMP_DIR/migrations.json"
 RLS_OUT="$TMP_DIR/rls.json"
 NULLS_OUT="$TMP_DIR/org_id_nulls.json"
@@ -21,6 +22,14 @@ if /usr/bin/curl -4 -sS --connect-timeout 5 -m 20 \
   HEALTH_STATUS="ok"
 else
   HEALTH_STATUS="failed"
+fi
+
+RELEASE_STATUS="unknown"
+if /usr/bin/curl -4 -sS --connect-timeout 5 -m 20 \
+  "https://strktr.vercel.app/api/v1/ops/release" > "$RELEASE_OUT"; then
+  RELEASE_STATUS="ok"
+else
+  RELEASE_STATUS="failed"
 fi
 
 MIGRATIONS_STATUS="skipped"
@@ -52,6 +61,7 @@ fi
   echo
   echo "- GeneratedAt: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
   echo "- HealthCheck: ${HEALTH_STATUS}"
+  echo "- ReleaseMarker: ${RELEASE_STATUS}"
   echo "- SupabaseMigrationsAudit: ${MIGRATIONS_STATUS}"
   echo "- SupabaseRlsAudit: ${RLS_STATUS:-skipped}"
   echo "- SupabaseOrgIdNullsAudit: ${NULLS_STATUS:-skipped}"
@@ -59,6 +69,12 @@ fi
   echo "## Health Endpoint"
   echo '```json'
   cat "$HEALTH_OUT" 2>/dev/null || true
+  echo
+  echo '```'
+  echo
+  echo "## Release Marker Endpoint"
+  echo '```json'
+  cat "$RELEASE_OUT" 2>/dev/null || true
   echo
   echo '```'
   echo

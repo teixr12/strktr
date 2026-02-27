@@ -11,23 +11,27 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Wait for production deployment and validate health
+      - name: Wait for production deployment and validate release marker + health
         env:
           EXPECTED_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
 
-          URL="https://strktr.vercel.app/api/v1/health/ops"
+          RELEASE_URL="https://strktr.vercel.app/api/v1/ops/release"
+          HEALTH_URL="https://strktr.vercel.app/api/v1/health/ops"
           ATTEMPTS=30
           SLEEP_SECONDS=20
           MATCHED=false
-          LAST_BODY="{}"
+          LAST_RELEASE="{}"
+          LAST_HEALTH="{}"
 
           for i in $(seq 1 "$ATTEMPTS"); do
-            BODY="$(curl -sS -m 20 "$URL" || true)"
-            LAST_BODY="$BODY"
-            STATUS="$(echo "$BODY" | jq -r '.data.status // empty')"
-            VERSION="$(echo "$BODY" | jq -r '.data.version // empty')"
+            RELEASE_BODY="$(curl -sS -m 20 "$RELEASE_URL" || true)"
+            HEALTH_BODY="$(curl -sS -m 20 "$HEALTH_URL" || true)"
+            LAST_RELEASE="$RELEASE_BODY"
+            LAST_HEALTH="$HEALTH_BODY"
+            STATUS="$(echo "$HEALTH_BODY" | jq -r '.data.status // empty')"
+            VERSION="$(echo "$RELEASE_BODY" | jq -r '.data.version // empty')"
 
             echo "Attempt $i/$ATTEMPTS -> status=$STATUS version=$VERSION"
 
@@ -41,7 +45,10 @@ jobs:
 
           if [[ "$MATCHED" != "true" ]]; then
             echo "Production did not converge to expected commit in time."
-            echo "$LAST_BODY"
+            echo "Last release marker payload:"
+            echo "$LAST_RELEASE"
+            echo "Last health payload:"
+            echo "$LAST_HEALTH"
             exit 1
           fi
 
@@ -54,12 +61,26 @@ jobs:
           APP_CODE="$(curl -sS -o /tmp/app.html -w "%{http_code}" https://strktr.vercel.app/)"
           LOGIN_CODE="$(curl -sS -o /tmp/login.html -w "%{http_code}" https://strktr.vercel.app/login)"
           HEALTH_CODE="$(curl -sS -o /tmp/health.json -w "%{http_code}" https://strktr.vercel.app/api/v1/health/ops)"
+          RELEASE_CODE="$(curl -sS -o /tmp/release.json -w "%{http_code}" https://strktr.vercel.app/api/v1/ops/release)"
 
           [[ "$APP_CODE" == "200" || "$APP_CODE" == "301" || "$APP_CODE" == "302" || "$APP_CODE" == "307" || "$APP_CODE" == "308" ]]
           [[ "$LOGIN_CODE" == "200" ]]
           [[ "$HEALTH_CODE" == "200" ]]
+          [[ "$RELEASE_CODE" == "200" ]]
 
           HEALTH_STATUS="$(jq -r '.data.status // empty' /tmp/health.json)"
+          RELEASE_VERSION="$(jq -r '.data.version // empty' /tmp/release.json)"
           [[ "$HEALTH_STATUS" == "ok" ]]
+          [[ "$RELEASE_VERSION" == "${{ github.sha }}" ]]
 
-          echo "Smoke checks passed: app=$APP_CODE login=$LOGIN_CODE health=$HEALTH_CODE status=$HEALTH_STATUS"
+          echo "Smoke checks passed: app=$APP_CODE login=$LOGIN_CODE health=$HEALTH_CODE release=$RELEASE_CODE status=$HEALTH_STATUS version=$RELEASE_VERSION"
+
+      - name: Release summary
+        run: |
+          {
+            echo "## Release Ops"
+            echo "- Expected SHA: \`${{ github.sha }}\`"
+            echo "- App URL: https://strktr.vercel.app"
+            echo "- Health endpoint: /api/v1/health/ops"
+            echo "- Release marker: /api/v1/ops/release"
+          } >> "$GITHUB_STEP_SUMMARY"
