@@ -14,6 +14,10 @@ export const featureFlags = {
   uiV2Configuracoes: process.env.NEXT_PUBLIC_FF_UI_V2_CONFIG !== 'false',
   uiV2Perfil: process.env.NEXT_PUBLIC_FF_UI_V2_PERFIL !== 'false',
   uiV2ObraTabs: process.env.NEXT_PUBLIC_FF_UI_V2_OBRA_TABS !== 'false',
+  profileAvatarV2: process.env.NEXT_PUBLIC_FF_PROFILE_AVATAR_V2 === 'true',
+  navCountsV2: process.env.NEXT_PUBLIC_FF_NAV_COUNTS_V2 === 'true',
+  leadsProgressV2: process.env.NEXT_PUBLIC_FF_LEADS_PROGRESS_V2 === 'true',
+  orcamentoPdfV2: process.env.NEXT_PUBLIC_FF_ORCAMENTO_PDF_V2 === 'true',
   apiObrasV2: process.env.NEXT_PUBLIC_FF_API_OBRAS_V2 === 'true',
   executionRiskEngine:
     process.env.NEXT_PUBLIC_FF_EXECUTION_RISK_ENGINE === 'true',

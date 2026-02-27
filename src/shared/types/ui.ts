@@ -6,6 +6,13 @@ export type UiCardVariant = 'default' | 'soft' | 'elevated'
 export type UiDensity = 'compact' | 'comfortable'
 export type UiPriorityTone = 'critical' | 'attention' | 'normal' | 'done'
 export type UiSurfaceVariant = 'solid' | 'soft' | 'outline'
+export type UiAvatarSource = 'profile' | 'fallback'
+
+export type UiNavCounts = {
+  obras_ativas: number | null
+  leads_hot: number | null
+  compras_pendentes_aprovacao: number | null
+}
 
 export type UiQuickAction = {
   label: string

@@ -1,7 +1,6 @@
 'use client'
 
-import { useState } from 'react'
-import Image from 'next/image'
+import { useMemo, useState } from 'react'
 import { apiRequest } from '@/lib/api/client'
 import { featureFlags } from '@/lib/feature-flags'
 import { toast } from '@/hooks/use-toast'
@@ -9,31 +8,70 @@ import { fmtDate } from '@/lib/utils'
 import { Save, Lock, User, Eye, EyeOff } from 'lucide-react'
 import { PageHeader } from '@/components/ui/enterprise'
 import type { Profile } from '@/types/database'
+import type { UiAvatarSource } from '@/shared/types/ui'
 
 interface Props { profile: Profile | null }
 
 export function PerfilContent({ profile }: Props) {
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Perfil
+  const useAvatarV2 = featureFlags.profileAvatarV2
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
     nome: profile?.nome || '',
     telefone: profile?.telefone || '',
     empresa: profile?.empresa || '',
     cargo: profile?.cargo || '',
+    avatar_url: profile?.avatar_url || '',
   })
   const [pwForm, setPwForm] = useState({ nova: '', confirmar: '' })
   const [changingPw, setChangingPw] = useState(false)
   const [showNewPw, setShowNewPw] = useState(false)
   const [showConfirmPw, setShowConfirmPw] = useState(false)
+  const [failedAvatarSrc, setFailedAvatarSrc] = useState<string | null>(null)
+
+  const fallbackAvatar = useMemo(
+    () =>
+      `https://ui-avatars.com/api/?name=${encodeURIComponent(
+        form.nome || 'U'
+      )}&background=d4a373&color=fff&size=128`,
+    [form.nome]
+  )
+
+  const canUseCustomAvatar = useMemo(
+    () =>
+      useAvatarV2 &&
+      form.avatar_url.trim().startsWith('http') &&
+      form.avatar_url.trim() !== failedAvatarSrc,
+    [form.avatar_url, failedAvatarSrc, useAvatarV2]
+  )
+
+  const avatarUrl = canUseCustomAvatar ? form.avatar_url : fallbackAvatar
+  const avatarSource: UiAvatarSource =
+    canUseCustomAvatar ? 'profile' : 'fallback'
 
   async function saveProfile() {
     if (!form.nome.trim()) { toast('Nome é obrigatório', 'error'); return }
+    const trimmedAvatar = form.avatar_url.trim()
+    if (useAvatarV2 && trimmedAvatar) {
+      try {
+        const parsed = new URL(trimmedAvatar)
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+          toast('Use uma URL de avatar válida (http/https)', 'error')
+          return
+        }
+      } catch {
+        toast('Use uma URL de avatar válida (http/https)', 'error')
+        return
+      }
+    }
+
     setSaving(true)
     const payload = {
       nome: form.nome.trim(),
       telefone: form.telefone || null,
       empresa: form.empresa || null,
       cargo: form.cargo || null,
+      avatar_url: useAvatarV2 ? trimmedAvatar || null : undefined,
     }
     let error: Error | null = null
     try {
@@ -65,19 +103,27 @@ export function PerfilContent({ profile }: Props) {
     setPwForm({ nova: '', confirmar: '' })
   }
 
-  const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(form.nome || 'U')}&background=d4a373&color=fff&size=128`
-
   return (
     <div className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} mx-auto max-w-2xl space-y-6`}>
       <PageHeader title="Perfil" subtitle="Atualize suas informações e segurança de acesso" />
 
       {/* Header */}
       <div className="glass-card rounded-3xl p-6 flex items-center gap-5">
-        <Image src={avatarUrl} alt="Avatar" width={80} height={80} className="w-20 h-20 rounded-2xl border-2 border-white dark:border-gray-700 shadow-lg" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={avatarUrl}
+          alt="Avatar"
+          className="h-20 w-20 rounded-2xl border-2 border-white object-cover shadow-lg dark:border-gray-700"
+          onError={() => setFailedAvatarSrc(form.avatar_url.trim())}
+          referrerPolicy="no-referrer"
+        />
         <div>
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{form.nome || 'Usuário'}</h2>
           <p className="text-sm text-gray-500">{profile?.email || ''}</p>
           {profile?.empresa && <p className="text-xs text-sand-600 dark:text-sand-400 mt-0.5">{profile.empresa}</p>}
+          <p className="text-[11px] text-gray-400 mt-1">
+            Avatar {avatarSource === 'profile' ? 'personalizado' : 'padrão'}
+          </p>
         </div>
       </div>
 
@@ -114,6 +160,27 @@ export function PerfilContent({ profile }: Props) {
             <label className="text-xs text-gray-500 mb-1 block">Empresa</label>
             <input value={form.empresa} onChange={(e) => setForm((f) => ({ ...f, empresa: e.target.value }))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white" />
           </div>
+
+          {useAvatarV2 ? (
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">URL do avatar</label>
+              <input
+                value={form.avatar_url}
+                onChange={(e) => setForm((f) => ({ ...f, avatar_url: e.target.value }))}
+                placeholder="https://..."
+                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white"
+              />
+              <div className="mt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, avatar_url: '' }))}
+                  className="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-gray-100"
+                >
+                  Resetar avatar
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           {profile?.created_at && (
             <p className="text-xs text-gray-400 pt-2">Membro desde {fmtDate(profile.created_at)}</p>

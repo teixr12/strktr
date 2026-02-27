@@ -4,7 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   LayoutGrid,
   HardHat,
@@ -20,10 +20,11 @@ import {
   X,
   Building2,
   BookOpen,
-  Plug,
 } from 'lucide-react'
 import type { Profile } from '@/types/database'
 import { featureFlags } from '@/lib/feature-flags'
+import { apiRequest } from '@/lib/api/client'
+import type { UiAvatarSource, UiNavCounts } from '@/shared/types/ui'
 
 const icons = {
   LayoutGrid,
@@ -65,14 +66,8 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const router = useRouter()
   const supabase = createClient()
   const [profile, setProfile] = useState<Profile | null>(null)
-
-  const chipsByItem = useMemo(
-    () => ({
-      obras: '5',
-      leads: '3 Hot',
-    }),
-    []
-  )
+  const [navCounts, setNavCounts] = useState<UiNavCounts | null>(null)
+  const [failedAvatarSrc, setFailedAvatarSrc] = useState<string | null>(null)
 
   useEffect(() => {
     async function loadProfile() {
@@ -84,13 +79,49 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
         if (data) setProfile(data)
       }
     }
+
+    async function loadNavCounts() {
+      if (!featureFlags.navCountsV2) {
+        setNavCounts(null)
+        return
+      }
+      try {
+        const counts = await apiRequest<UiNavCounts>('/api/v1/dashboard/nav-counts')
+        setNavCounts(counts)
+      } catch {
+        setNavCounts(null)
+      }
+    }
+
     loadProfile()
+    loadNavCounts()
   }, [supabase])
 
   async function handleLogout() {
     await supabase.auth.signOut()
     router.push('/login')
     router.refresh()
+  }
+
+  const fallbackAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+    profile?.nome || 'U'
+  )}&background=d4a373&color=fff`
+  const customAvatar = profile?.avatar_url?.trim() || null
+  const canUseCustomAvatar =
+    featureFlags.profileAvatarV2 &&
+    Boolean(customAvatar?.startsWith('http')) &&
+    customAvatar !== failedAvatarSrc
+  const avatarSrc = canUseCustomAvatar ? customAvatar! : fallbackAvatar
+  const avatarSource: UiAvatarSource =
+    canUseCustomAvatar ? 'profile' : 'fallback'
+
+  const chipsByItem: Partial<Record<(typeof NAV_ITEMS)[number]['id'], string>> = {}
+  if (featureFlags.navCountsV2 && navCounts) {
+    if ((navCounts.obras_ativas ?? 0) > 0) chipsByItem.obras = String(navCounts.obras_ativas)
+    if ((navCounts.leads_hot ?? 0) > 0) chipsByItem.leads = `${navCounts.leads_hot} Hot`
+    if ((navCounts.compras_pendentes_aprovacao ?? 0) > 0) {
+      chipsByItem.compras = String(navCounts.compras_pendentes_aprovacao)
+    }
   }
 
   if (!featureFlags.uiTailadminV1) {
@@ -145,14 +176,21 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
         }`}
       >
         <div className="flex items-center justify-between border-b border-gray-200/70 px-5 py-5 dark:border-gray-800">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sand-500/20 text-sand-700 dark:text-sand-300">
-              <Plug className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">STRKTR</p>
-              <p className="text-xs font-medium text-sand-600 dark:text-sand-400">Premium</p>
-            </div>
+          <div className="flex items-center">
+            <Image
+              src="/strktr-logo-black.png"
+              alt="STRKTR"
+              width={136}
+              height={26}
+              className="dark:hidden"
+            />
+            <Image
+              src="/strktr-logo-white.png"
+              alt="STRKTR"
+              width={136}
+              height={26}
+              className="hidden dark:block"
+            />
           </div>
           <button onClick={onClose} className="rounded-xl p-2 hover:bg-gray-100 md:hidden dark:hover:bg-gray-800">
             <X className="h-5 w-5" />
@@ -164,7 +202,7 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
             {NAV_ITEMS.map((item) => {
               const Icon = icons[item.icon]
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-              const chip = chipsByItem[item.id as keyof typeof chipsByItem]
+              const chip = chipsByItem[item.id]
               return (
                 <Link
                   key={item.id}
@@ -189,12 +227,15 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
           </div>
 
           <div className="mt-6 border-t border-gray-200/80 pt-5 dark:border-gray-800">
-            <p className="mb-3 px-2 text-xs font-semibold uppercase tracking-wider text-gray-400">Integrações</p>
+            <p className="mb-3 px-2 text-xs font-semibold uppercase tracking-wider text-gray-400">Integrações disponíveis</p>
             <div className="space-y-2 px-2">
               {INTEGRATIONS.map((integration) => (
                 <div key={integration} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                  <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                  {integration}
+                  <span className="h-2 w-2 rounded-full bg-gray-300 dark:bg-gray-600" />
+                  <span className="flex-1">{integration}</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                    Conectável
+                  </span>
                 </div>
               ))}
             </div>
@@ -203,16 +244,20 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
 
         <div className="border-t border-gray-200/70 p-4 dark:border-gray-800">
           <div className="flex items-center gap-3 rounded-2xl bg-gray-50 p-3 dark:bg-gray-900">
-            <Image
-              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.nome || 'U')}&background=d4a373&color=fff`}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={avatarSrc}
               alt="Avatar"
-              width={40}
-              height={40}
-              className="h-10 w-10 rounded-full"
+              className="h-10 w-10 rounded-full object-cover"
+              onError={() => setFailedAvatarSrc(customAvatar)}
+              referrerPolicy="no-referrer"
             />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">{profile?.nome || 'Usuário'}</p>
-              <p className="truncate text-xs text-gray-500 dark:text-gray-400">{profile?.email || ''}</p>
+              <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                {profile?.email || ''}
+                {avatarSource === 'fallback' ? '' : ' · Foto'}
+              </p>
             </div>
             <Link href="/perfil" className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-800">
               <Settings className="h-4 w-4" />

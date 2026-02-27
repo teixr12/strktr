@@ -14,9 +14,16 @@ import type { Orcamento, OrcamentoStatus, Lead, Obra } from '@/types/database'
 interface Props { initialOrcamentos: Orcamento[] }
 
 interface ItemForm { descricao: string; unidade: string; quantidade: string; valor_unitario: string }
+interface OrcamentoPdfPayload {
+  fileName: string
+  downloadUrl: string | null
+  base64: string | null
+  fallback: boolean
+}
 
 export function OrcamentosContent({ initialOrcamentos }: Props) {
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Orcamentos
+  const usePdfV2 = featureFlags.orcamentoPdfV2
   const [orcamentos, setOrcamentos] = useState(initialOrcamentos)
   const [showForm, setShowForm] = useState(false)
   const [editOrc, setEditOrc] = useState<Orcamento | null>(null)
@@ -25,6 +32,7 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
   const [filtroStatus, setFiltroStatus] = useState<string>('Todos')
   const [leads, setLeads] = useState<Pick<Lead, 'id' | 'nome'>[]>([])
   const [obras, setObras] = useState<Pick<Obra, 'id' | 'nome'>[]>([])
+  const [downloadingPdfId, setDownloadingPdfId] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     titulo: '', lead_id: '', obra_id: '', validade: '',
@@ -167,7 +175,7 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
     }
   }
 
-  function printOrcamento(o: Orcamento) {
+  function printOrcamentoLegacy(o: Orcamento) {
     const w = window.open('', '_blank')
     if (!w) return
     const itensHtml = (o.orcamento_itens || []).map((i, idx) => `
@@ -206,6 +214,53 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
       <button class="no-print" onclick="window.print()" style="position:fixed;bottom:20px;right:20px;padding:12px 24px;background:#d4a373;color:#fff;border:none;border-radius:12px;cursor:pointer;font-size:14px">Imprimir</button>
       </body></html>`)
     w.document.close()
+  }
+
+  function triggerBase64Download(fileName: string, base64: string) {
+    const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))
+    const blob = new Blob([bytes], { type: 'application/pdf' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = fileName
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  async function exportOrcamentoPdf(o: Orcamento) {
+    if (!usePdfV2) {
+      printOrcamentoLegacy(o)
+      return
+    }
+
+    setDownloadingPdfId(o.id)
+    try {
+      const data = await apiRequest<OrcamentoPdfPayload>(`/api/v1/orcamentos/${o.id}/pdf`, {
+        method: 'POST',
+      })
+
+      if (data.downloadUrl) {
+        window.open(data.downloadUrl, '_blank', 'noopener,noreferrer')
+      } else if (data.base64) {
+        triggerBase64Download(data.fileName || `${o.titulo}.pdf`, data.base64)
+      } else {
+        throw new Error('Não foi possível gerar o PDF')
+      }
+
+      if (data.fallback) {
+        toast('PDF gerado em modo compatível', 'info')
+      } else {
+        toast('PDF gerado com sucesso', 'success')
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao gerar PDF'
+      toast(message, 'error')
+      printOrcamentoLegacy(o)
+    } finally {
+      setDownloadingPdfId(null)
+    }
   }
 
   return (
@@ -351,8 +406,13 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
               <button onClick={() => openEdit(viewOrc)} className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all text-sm">
                 <Edit2 className="w-4 h-4" /> Editar
               </button>
-              <button onClick={() => printOrcamento(viewOrc)} className="flex items-center justify-center gap-2 py-2.5 px-4 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-2xl transition-all text-sm">
+              <button
+                onClick={() => exportOrcamentoPdf(viewOrc)}
+                disabled={downloadingPdfId === viewOrc.id}
+                className="flex items-center justify-center gap-2 py-2.5 px-4 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-2xl transition-all text-sm disabled:opacity-60"
+              >
                 <Printer className="w-4 h-4" />
+                {downloadingPdfId === viewOrc.id ? 'Gerando...' : null}
               </button>
               <button onClick={() => deleteOrcamento(viewOrc.id)} className="flex items-center justify-center gap-2 py-2.5 px-4 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 text-red-600 rounded-2xl transition-all text-sm">
                 <Trash2 className="w-4 h-4" />
