@@ -1,37 +1,60 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getApiUser } from '@/lib/api/auth'
+import { API_ERROR_CODES } from '@/lib/api/errors'
+import { requireDomainPermission } from '@/lib/auth/domain-permissions'
+import { fail, ok } from '@/lib/api/response'
 import { sendNotificationEmail } from '@/lib/email/resend'
 
+type SendEmailPayload = {
+  to?: string
+  subject?: string
+  titulo?: string
+  descricao?: string
+  link?: string
+}
+
 export async function POST(request: Request) {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
-    }
-
-    const body = await request.json()
-    const { to, subject, titulo, descricao, link } = body
-
-    if (!to || !subject || !titulo) {
-      return NextResponse.json(
-        { error: 'Campos obrigatórios: to, subject, titulo' },
-        { status: 400 }
-      )
-    }
-
-    const result = await sendNotificationEmail(to, subject, titulo, descricao || '', link)
-
-    if (!result) {
-      return NextResponse.json(
-        { error: 'Resend API key não configurada ou erro no envio' },
-        { status: 503 }
-      )
-    }
-
-    return NextResponse.json({ success: true, id: result.id })
-  } catch (error) {
-    console.error('[API Email] Erro:', error)
-    return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
+  const { user, supabase, error, role } = await getApiUser(request)
+  if (!user || !supabase) {
+    return fail(
+      request,
+      { code: API_ERROR_CODES.UNAUTHORIZED, message: error || 'Não autorizado' },
+      401
+    )
   }
+
+  const permissionError = requireDomainPermission(request, role, 'can_manage_team')
+  if (permissionError) return permissionError
+
+  const body = (await request.json().catch(() => null)) as SendEmailPayload | null
+  if (!body?.to || !body.subject || !body.titulo) {
+    return fail(
+      request,
+      {
+        code: API_ERROR_CODES.VALIDATION_ERROR,
+        message: 'Campos obrigatórios: to, subject, titulo',
+      },
+      400
+    )
+  }
+
+  const result = await sendNotificationEmail(
+    body.to,
+    body.subject,
+    body.titulo,
+    body.descricao || '',
+    body.link
+  )
+
+  if (!result) {
+    return fail(
+      request,
+      {
+        code: API_ERROR_CODES.DB_ERROR,
+        message: 'Resend API key não configurada ou erro no envio',
+      },
+      503
+    )
+  }
+
+  return ok(request, { success: true, id: result.id })
 }

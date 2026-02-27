@@ -10,6 +10,7 @@ import { apiRequest } from '@/lib/api/client'
 import { featureFlags } from '@/lib/feature-flags'
 import { fmt, fmtDateTime } from '@/lib/utils'
 import { KANBAN_COLUMNS, TIPO_VISITA_COLORS } from '@/lib/constants'
+import type { RoadmapAction } from '@/shared/types/roadmap-automation'
 import {
   AlertBanner,
   EmptyStateAction,
@@ -19,7 +20,7 @@ import {
   SectionCard,
   StatBadge,
 } from '@/components/ui/enterprise'
-import { HardHat, Banknote, Crown, TrendingUp, ArrowRight, Wrench, Flame } from 'lucide-react'
+import { HardHat, Banknote, Crown, TrendingUp, ArrowRight, Wrench, Flame, CheckCircle2 } from 'lucide-react'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
@@ -52,6 +53,16 @@ interface TodayAlertsPayload {
   warnings: string[]
 }
 
+interface RoadmapPayload {
+  profileType: string
+  progress: {
+    total: number
+    pending: number
+    completedToday: number
+  }
+  actions: RoadmapAction[]
+}
+
 function toneFromSeverity(severity: TodayAlert['severity']) {
   if (severity === 'high') return 'danger' as const
   if (severity === 'medium') return 'warning' as const
@@ -60,6 +71,8 @@ function toneFromSeverity(severity: TodayAlert['severity']) {
 
 export function DashboardContent({ obras, leads, transacoes, visitas, compras }: DashboardContentProps) {
   const [todayAlerts, setTodayAlerts] = useState<TodayAlertsPayload | null>(null)
+  const [roadmap, setRoadmap] = useState<RoadmapPayload | null>(null)
+  const [completingActionId, setCompletingActionId] = useState<string | null>(null)
 
   const obrasAtivas = obras.filter((o) => o.status === 'Em Andamento').length
   const receitas = transacoes.filter((t) => t.tipo === 'Receita').reduce((s, t) => s + (t.valor || 0), 0)
@@ -84,6 +97,40 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras }:
 
     loadAlerts()
   }, [])
+
+  useEffect(() => {
+    async function loadRoadmap() {
+      if (!featureFlags.personalRoadmap) {
+        setRoadmap(null)
+        return
+      }
+      try {
+        const payload = await apiRequest<RoadmapPayload>('/api/v1/roadmap/me')
+        setRoadmap(payload)
+      } catch {
+        setRoadmap(null)
+      }
+    }
+
+    loadRoadmap()
+  }, [])
+
+  async function completeRoadmapAction(actionId: string) {
+    if (!featureFlags.personalRoadmap) return
+    setCompletingActionId(actionId)
+    try {
+      await apiRequest(`/api/v1/roadmap/actions/${actionId}/complete`, {
+        method: 'POST',
+        body: { status: 'completed' },
+      })
+      const payload = await apiRequest<RoadmapPayload>('/api/v1/roadmap/me')
+      setRoadmap(payload)
+    } catch {
+      // no-op for dashboard quick action
+    } finally {
+      setCompletingActionId(null)
+    }
+  }
 
   useEffect(() => {
     if (!showOnboarding || !featureFlags.productAnalytics) return
@@ -248,6 +295,64 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras }:
         </div>
       ) : null}
 
+      {featureFlags.personalRoadmap && roadmap ? (
+        <SectionCard
+          title="Seu Plano de Hoje"
+          subtitle={`Perfil: ${roadmap.profileType} · ${roadmap.progress.pending} pendente(s)`}
+          className="p-5"
+          right={(
+            <span className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
+              {roadmap.progress.completedToday} concluída(s) hoje
+            </span>
+          )}
+        >
+          {roadmap.actions.length === 0 ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400">Sem ações pendentes no momento.</p>
+          ) : (
+            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {roadmap.actions.slice(0, 3).map((action) => (
+                <div
+                  key={action.id}
+                  className="rounded-xl border border-gray-200 p-3 dark:border-gray-800"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{action.title}</p>
+                    <StatBadge
+                      label={action.priority}
+                      tone={
+                        action.priority === 'high'
+                          ? 'danger'
+                          : action.priority === 'medium'
+                            ? 'warning'
+                            : 'info'
+                      }
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{action.whyItMatters}</p>
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <Link
+                      href={action.href}
+                      className="text-xs font-semibold text-sand-600 hover:text-sand-700 dark:text-sand-400"
+                    >
+                      Abrir ação
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => completeRoadmapAction(action.id)}
+                      disabled={completingActionId === action.id}
+                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-200 disabled:opacity-60 dark:bg-emerald-900/20 dark:text-emerald-300"
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      {completingActionId === action.id ? '...' : 'Concluir'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </SectionCard>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <SectionCard
           title="Obras em Destaque"
@@ -402,6 +507,24 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras }:
                   <StatBadge label={alert.module} tone="neutral" />
                   <StatBadge label={alert.severity.toUpperCase()} tone={toneFromSeverity(alert.severity)} />
                 </div>
+              </Link>
+            ))}
+          </div>
+        </SectionCard>
+      ) : null}
+
+      {featureFlags.behaviorPrompts && roadmap?.actions?.length ? (
+        <SectionCard title="Faça Agora" subtitle="Ações sugeridas para acelerar resultado" className="p-5">
+          <div className="grid gap-2 md:grid-cols-3">
+            {roadmap.actions.slice(0, 3).map((action) => (
+              <Link
+                key={`prompt-${action.id}`}
+                href={action.href}
+                className="rounded-xl border border-gray-200 p-3 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-900"
+              >
+                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{action.title}</p>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Tempo estimado: {action.estimatedMinutes} min</p>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Por que importa: {action.whyItMatters}</p>
               </Link>
             ))}
           </div>

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { apiRequest } from '@/lib/api/client'
 import { toast } from '@/hooks/use-toast'
 import { fmtDateTime } from '@/lib/utils'
@@ -15,7 +14,6 @@ import type { AgendaTask } from '@/shared/types/cronograma'
 interface Props { initialVisitas: Visita[] }
 
 export function CalendarioContent({ initialVisitas }: Props) {
-  const supabase = createClient()
   const [visitas, setVisitas] = useState(initialVisitas)
   const [showForm, setShowForm] = useState(false)
   const [editingVisita, setEditingVisita] = useState<Visita | null>(null)
@@ -32,15 +30,20 @@ export function CalendarioContent({ initialVisitas }: Props) {
 
   useEffect(() => {
     async function load() {
-      const [o, l] = await Promise.all([
-        supabase.from('obras').select('id, nome').order('nome'),
-        supabase.from('leads').select('id, nome').order('nome'),
-      ])
-      if (o.data) setObras(o.data)
-      if (l.data) setLeads(l.data)
+      try {
+        const [obrasData, leadsData] = await Promise.all([
+          apiRequest<Pick<Obra, 'id' | 'nome'>[]>('/api/v1/obras?limit=200'),
+          apiRequest<Pick<Lead, 'id' | 'nome'>[]>('/api/v1/leads?limit=200'),
+        ])
+        setObras(obrasData)
+        setLeads(leadsData)
+      } catch {
+        setObras([])
+        setLeads([])
+      }
     }
     load()
-  }, [supabase])
+  }, [])
 
   useEffect(() => {
     async function loadAgendaTasks() {

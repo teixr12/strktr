@@ -2,6 +2,7 @@ import { API_ERROR_CODES } from '@/lib/api/errors'
 import { fail, ok } from '@/lib/api/response'
 import { createServiceRoleClient } from '@/lib/supabase/service'
 import { getValidPortalSession } from '@/server/services/portal/session-service'
+import { runAutomation } from '@/server/services/automation/automation-service'
 import { rejectDecisionSchema } from '@/shared/schemas/cronograma-portal'
 
 export async function POST(
@@ -31,7 +32,7 @@ export async function POST(
   const { id: aprovacaoId } = await params
   const { data: approval, error: approvalError } = await service
     .from('aprovacoes_cliente')
-    .select('id, org_id, obra_id, tipo, status, compra_id, orcamento_id, approval_version')
+    .select('id, org_id, obra_id, tipo, status, compra_id, orcamento_id, approval_version, solicitado_por')
     .eq('id', aprovacaoId)
     .eq('org_id', session.org_id)
     .eq('obra_id', session.obra_id)
@@ -119,6 +120,32 @@ export async function POST(
 
   if (notifications.length > 0) {
     await service.from('notificacoes').insert(notifications)
+  }
+
+  const automationUserId = approval.solicitado_por || notifications[0]?.user_id || null
+
+  if (
+    process.env.NEXT_PUBLIC_FF_SEMI_AUTOMATION === 'true' &&
+    automationUserId
+  ) {
+    await runAutomation(
+      service,
+      {
+        orgId: session.org_id,
+        userId: automationUserId,
+        trigger: 'ApprovalRejected',
+        triggerEntityType: approval.tipo,
+        triggerEntityId: approval.id,
+        payload: {
+          approvalType: approval.tipo,
+          approvalVersion: approval.approval_version || 1,
+        },
+      },
+      {
+        confirm: true,
+        source: 'trigger',
+      }
+    ).catch(() => undefined)
   }
 
   return ok(

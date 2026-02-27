@@ -469,3 +469,58 @@ export interface AprovacaoCliente {
   decisao_comentario: string | null
   decidido_em: string | null
 }
+
+// --- Fase 9: Roadmap + Automacao ---
+
+export type UserProfileType = 'owner' | 'manager' | 'architect' | 'finance' | 'field'
+export type RoadmapActionStatus = 'pending' | 'in_progress' | 'completed' | 'dismissed'
+export type AutomationTrigger = 'LeadCreated' | 'ObraCreated' | 'ApprovalRejected'
+export type AutomationRunStatus = 'preview' | 'applied' | 'skipped' | 'error' | 'pending_review'
+
+export interface RoadmapActionRecord {
+  id: string
+  org_id: string
+  user_id: string
+  profile_type: UserProfileType
+  action_code: string
+  title: string
+  description: string | null
+  status: RoadmapActionStatus
+  due_at: string | null
+  source_module: string
+  metadata: Record<string, unknown>
+  created_at: string
+  completed_at: string | null
+}
+
+export interface AutomationRuleRecord {
+  id: string
+  org_id: string
+  trigger: AutomationTrigger
+  template_code: string
+  enabled: boolean
+  requires_review: boolean
+  cooldown_hours: number
+  created_by: string
+  metadata: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export interface AutomationRunRecord {
+  id: string
+  org_id: string
+  rule_id: string | null
+  trigger: AutomationTrigger
+  trigger_entity_type: string
+  trigger_entity_id: string
+  status: AutomationRunStatus
+  summary: string | null
+  error: string | null
+  requires_review: boolean
+  run_source: 'manual' | 'trigger'
+  preview: Record<string, unknown>
+  result: Record<string, unknown>
+  created_by: string | null
+  created_at: string
+}
