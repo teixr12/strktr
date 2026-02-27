@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     return fail(request, { code: API_ERROR_CODES.FORBIDDEN, message: 'Usuário sem organização ativa' }, 403)
   }
 
-  const roadmapEnabled = process.env.NEXT_PUBLIC_FF_PERSONAL_ROADMAP === 'true'
+  const roadmapEnabled = process.env.NEXT_PUBLIC_FF_PERSONAL_ROADMAP !== 'false'
   if (!roadmapEnabled) {
     return ok(
       request,

@@ -125,7 +125,7 @@ export async function POST(
   const automationUserId = approval.solicitado_por || notifications[0]?.user_id || null
 
   if (
-    process.env.NEXT_PUBLIC_FF_SEMI_AUTOMATION === 'true' &&
+    process.env.NEXT_PUBLIC_FF_SEMI_AUTOMATION !== 'false' &&
     automationUserId
   ) {
     await runAutomation(

@@ -33,6 +33,9 @@ export async function GET(request: Request) {
         clientPortal: process.env.NEXT_PUBLIC_FF_CLIENT_PORTAL === 'true',
         approvalGate: process.env.NEXT_PUBLIC_FF_APPROVAL_GATE === 'true',
         architectAgenda: process.env.NEXT_PUBLIC_FF_ARCHITECT_AGENDA === 'true',
+        personalRoadmap: process.env.NEXT_PUBLIC_FF_PERSONAL_ROADMAP !== 'false',
+        semiAutomation: process.env.NEXT_PUBLIC_FF_SEMI_AUTOMATION !== 'false',
+        behaviorPrompts: process.env.NEXT_PUBLIC_FF_BEHAVIOR_PROMPTS !== 'false',
       },
     })
   } catch (error) {
