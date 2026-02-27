@@ -1,0 +1,63 @@
+name: Release Ops
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  production-health-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Wait for production deployment and validate health
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          URL="https://strktr.vercel.app/api/v1/health/ops"
+          ATTEMPTS=30
+          SLEEP_SECONDS=20
+          MATCHED=false
+          LAST_BODY="{}"
+
+          for i in $(seq 1 "$ATTEMPTS"); do
+            BODY="$(curl -sS -m 20 "$URL" || true)"
+            LAST_BODY="$BODY"
+            STATUS="$(echo "$BODY" | jq -r '.data.status // empty')"
+            VERSION="$(echo "$BODY" | jq -r '.data.version // empty')"
+
+            echo "Attempt $i/$ATTEMPTS -> status=$STATUS version=$VERSION"
+
+            if [[ "$STATUS" == "ok" && "$VERSION" == "$EXPECTED_SHA" ]]; then
+              MATCHED=true
+              break
+            fi
+
+            sleep "$SLEEP_SECONDS"
+          done
+
+          if [[ "$MATCHED" != "true" ]]; then
+            echo "Production did not converge to expected commit in time."
+            echo "$LAST_BODY"
+            exit 1
+          fi
+
+          echo "Production health gate passed for commit: $EXPECTED_SHA"
+
+      - name: Public smoke checks
+        run: |
+          set -euo pipefail
+
+          APP_CODE="$(curl -sS -o /tmp/app.html -w "%{http_code}" https://strktr.vercel.app/)"
+          HEALTH_CODE="$(curl -sS -o /tmp/health.json -w "%{http_code}" https://strktr.vercel.app/api/v1/health/ops)"
+
+          [[ "$APP_CODE" == "200" ]]
+          [[ "$HEALTH_CODE" == "200" ]]
+
+          HEALTH_STATUS="$(jq -r '.data.status // empty' /tmp/health.json)"
+          [[ "$HEALTH_STATUS" == "ok" ]]
+
+          echo "Smoke checks passed: app=$APP_CODE health=$HEALTH_CODE status=$HEALTH_STATUS"

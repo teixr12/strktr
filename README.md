@@ -159,6 +159,15 @@ Erro:
 - Checklist de release big-bang: `docs/release-bigbang-checklist.md`.
 - CI em `.github/workflows/ci.yml` (lint + build + API contract check + Playwright smoke + business flow autenticado).
 
+### Always-Live (produção contínua segura)
+- Deploy de app é automático no merge da `main` (GitHub -> Vercel).
+- Banco continua controlado por workflow manual de migration com aprovação.
+- Pós-merge, o workflow `.github/workflows/release-ops.yml` valida:
+  - convergência do commit em `https://strktr.vercel.app`
+  - `health/ops` com status `ok`
+  - smoke público básico
+- Runbook oficial: `docs/runbooks/always-live-production-flow.md`.
+
 ## Governança de Engenharia
 - Modelo operacional: `docs/governance/engineering-operating-model.md`
 - Arquitetura oficial: `ARCHITECTURE.md`
@@ -176,6 +185,7 @@ Erro:
 - Release semanal: `docs/runbooks/weekly-release-train.md`
 - Canary rollout: `docs/runbooks/release-canary-rollout.md`
 - Migrações seguras Supabase: `docs/runbooks/supabase-migration-safety.md`
+- Always-live produção contínua: `docs/runbooks/always-live-production-flow.md`
 - Incidentes API/RLS/Cron: `docs/runbooks/incident-api-rls-cron.md`
 - Rotação de credenciais: `docs/runbooks/credential-rotation.md`
 - Limpeza de dados QA: `docs/runbooks/qa-data-cleanup.md`
