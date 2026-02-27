@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { apiRequest } from '@/lib/api/client'
+import { featureFlags } from '@/lib/feature-flags'
 import { toast } from '@/hooks/use-toast'
 import { fmt, fmtDate } from '@/lib/utils'
 import { COMPRA_STATUS_COLORS, COMPRA_URGENCIA_COLORS } from '@/lib/constants'
@@ -27,6 +28,7 @@ interface Props {
 }
 
 export function ComprasContent({ initialCompras, obras }: Props) {
+  const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Compras
   const [compras, setCompras] = useState(initialCompras)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -138,7 +140,7 @@ export function ComprasContent({ initialCompras, obras }: Props) {
   }
 
   return (
-    <div className="tailadmin-page space-y-4">
+    <div className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} space-y-4`}>
       <PageHeader
         title="Compras"
         subtitle={`${compras.length} compras registradas`}

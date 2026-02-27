@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { apiRequest } from '@/lib/api/client'
+import { featureFlags } from '@/lib/feature-flags'
 import { toast } from '@/hooks/use-toast'
 import { fmt, fmtDate } from '@/lib/utils'
 import { Plus, X, Trash2, TrendingUp, TrendingDown, Wallet, Hash, Pencil } from 'lucide-react'
@@ -30,6 +31,7 @@ interface OrcadoVsRealizadoSummary {
 }
 
 export function FinanceiroContent({ initialTransacoes }: Props) {
+  const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Financeiro
   const [transacoes, setTransacoes] = useState(initialTransacoes)
   const [showForm, setShowForm] = useState(false)
   const [editingTx, setEditingTx] = useState<Transacao | null>(null)
@@ -188,7 +190,7 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
   }
 
   return (
-    <div className="tailadmin-page space-y-5">
+    <div className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} space-y-5`}>
       <PageHeader
         title="Financeiro"
         subtitle={`${transacoes.length} transações`}

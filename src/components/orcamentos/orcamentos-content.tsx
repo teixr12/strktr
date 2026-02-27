@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { apiRequest } from '@/lib/api/client'
+import { featureFlags } from '@/lib/feature-flags'
 import { toast } from '@/hooks/use-toast'
 import { fmt, fmtDate } from '@/lib/utils'
 import { ORC_STATUS_COLORS } from '@/lib/constants'
@@ -15,6 +16,7 @@ interface Props { initialOrcamentos: Orcamento[] }
 interface ItemForm { descricao: string; unidade: string; quantidade: string; valor_unitario: string }
 
 export function OrcamentosContent({ initialOrcamentos }: Props) {
+  const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Orcamentos
   const [orcamentos, setOrcamentos] = useState(initialOrcamentos)
   const [showForm, setShowForm] = useState(false)
   const [editOrc, setEditOrc] = useState<Orcamento | null>(null)
@@ -207,7 +209,7 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
   }
 
   return (
-    <div className="tailadmin-page space-y-5">
+    <div className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} space-y-5`}>
       <PageHeader
         title="Orçamentos"
         subtitle={`${total} orçamentos`}

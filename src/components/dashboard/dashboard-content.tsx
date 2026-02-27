@@ -70,6 +70,7 @@ function toneFromSeverity(severity: TodayAlert['severity']) {
 }
 
 export function DashboardContent({ obras, leads, transacoes, visitas, compras }: DashboardContentProps) {
+  const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Dashboard
   const [todayAlerts, setTodayAlerts] = useState<TodayAlertsPayload | null>(null)
   const [roadmap, setRoadmap] = useState<RoadmapPayload | null>(null)
   const [completingActionId, setCompletingActionId] = useState<string | null>(null)
@@ -216,7 +217,7 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras }:
   ).length
 
   return (
-    <div className="tailadmin-page space-y-5">
+    <div className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} space-y-5`}>
       <PageHeader
         title="Visão Geral da Operação"
         statusLabel="Sistema Online"
