@@ -20,6 +20,7 @@
 - Validar contagens pré/pós migração.
 - Deploy em produção via Vercel.
 - Confirmar convergência da `main` no `health/ops` (campo `version` = SHA merged).
+- Confirmar convergência no `ops/release` (campo `version` = SHA merged).
 
 ## Pós-release (0h-48h)
 - Workflow `Release Ops` concluído com sucesso.

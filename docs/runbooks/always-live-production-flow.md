@@ -25,8 +25,19 @@ Permitir release contínuo para usuários finais sem quebrar produção:
 5. Aguardar workflow `Release Ops` concluir.
 6. Monitorar 30-60 min:
    - `https://strktr.vercel.app/api/v1/health/ops`
+   - `https://strktr.vercel.app/api/v1/ops/release`
    - Sentry (erros client/server)
    - rotas críticas da release
+
+## Modo cloud-first (quando DNS local falhar)
+Se o terminal local perder DNS/conectividade, não bloquear release:
+1. Fazer merge via GitHub web.
+2. Acompanhar `Release Ops` e `CI` no GitHub Actions.
+3. Ajustar feature flags no dashboard do Vercel.
+4. Validar `health/ops` e `ops/release` via checks da Action.
+5. Rodar smoke manual no navegador.
+
+Consulte: `docs/runbooks/dns-hardening-macos.md`.
 
 ## Fluxo de migration Supabase (quando necessário)
 1. Criar migration aditiva em `supabase/migrations/*.sql`.
@@ -58,4 +69,4 @@ Permitir release contínuo para usuários finais sem quebrar produção:
 - Link do PR
 - SHA merged
 - Resultado do `Release Ops`
-- 3 screenshots/sinais de saúde (health + Sentry + fluxo crítico)
+- 3 screenshots/sinais de saúde (`health/ops` + `ops/release` + fluxo crítico)

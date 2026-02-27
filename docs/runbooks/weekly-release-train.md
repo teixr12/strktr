@@ -30,6 +30,8 @@
 - Error rate by `/api/v1/*` within baseline.
 - p95 latency stable on critical routes.
 - No critical functional regressions.
+- `GET /api/v1/ops/release` returns merged SHA in `data.version`.
+- `GET /api/v1/health/ops` returns `data.status=ok`.
 
 ## Rollback order
 1. Disable related feature flag.
