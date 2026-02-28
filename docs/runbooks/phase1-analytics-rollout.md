@@ -33,6 +33,9 @@ Se `NEXT_PUBLIC_POSTHOG_KEY` ou `NEXT_PUBLIC_POSTHOG_HOST` não existir em produ
    - volume de eventos internos e externos.
 5. Comparar por 7 dias:
    - desvio de contagem interno vs externo alvo `< 5%`.
+   - executar diariamente:
+     - `npm run audit:analytics-drift`
+   - validar relatório em `docs/reports/analytics-drift-*.md`.
 6. Se estável, liberar geral.
 
 ## Rollback
@@ -44,3 +47,4 @@ Se `NEXT_PUBLIC_POSTHOG_KEY` ou `NEXT_PUBLIC_POSTHOG_HOST` não existir em produ
 - Fluxos core sem regressão funcional.
 - Tracking interno contínuo.
 - Tracking externo ativo e estável após canário.
+- Drift diário (24h) com `MaxAbsDriftPct <= 5` por 7 dias consecutivos.
