@@ -254,6 +254,31 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras }:
   const compraPendenteCount = compras.filter((compra) =>
     compra.status === 'Pendente Aprovação Cliente' || compra.status === 'Revisão Cliente'
   ).length
+  const receitasLancamentos = transacoes.filter((t) => t.tipo === 'Receita').length
+  const despesasLancamentos = transacoes.filter((t) => t.tipo === 'Despesa').length
+  const saldoStatus = saldo >= 0 ? 'Positivo' : 'Atenção'
+  const actionNow = todayAlerts?.alerts?.[0]
+    ? {
+        title: todayAlerts.alerts[0].title,
+        description: `Ação prioritária no módulo ${todayAlerts.alerts[0].module.toUpperCase()}.`,
+        href: todayAlerts.alerts[0].href,
+        cta: 'Resolver agora',
+      }
+    : roadmap?.actions?.[0]
+      ? {
+          title: roadmap.actions[0].title,
+          description: roadmap.actions[0].whyItMatters,
+          href: roadmap.actions[0].href,
+          cta: 'Executar ação',
+        }
+      : showOnboarding
+        ? {
+            title: 'Configure o primeiro fluxo',
+            description: 'Crie a primeira obra e primeiro lead para ativar automações e indicadores.',
+            href: '/obras',
+            cta: 'Começar agora',
+          }
+        : null
 
   return (
     <div className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} space-y-5`}>
@@ -307,15 +332,19 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras }:
           trend={obrasAtivas > 0 ? `+${obrasAtivas}` : undefined}
           progress={Math.min(obrasAtivas * 10, 100)}
           accent="sand"
+          href="/obras"
+          drilldownLabel="Ver obras ativas"
         />
         <KpiCard
           icon={<Banknote className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />}
           label="Receita 2026"
           hint="Soma de transações do tipo Receita no ano corrente da visualização."
           value={fmt(receitas)}
-          trend="↗ 23%"
+          trend={`${receitasLancamentos} lançamentos`}
           progress={70}
           accent="emerald"
+          href="/financeiro"
+          drilldownLabel="Abrir financeiro"
         />
         <KpiCard
           icon={<Crown className="h-5 w-5 text-ocean-700 dark:text-ocean-300" />}
@@ -325,17 +354,59 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras }:
           trend={`${pipelineSummary.find((p) => p.id === 'Qualificado')?.count || 0} novos`}
           progress={50}
           accent="ocean"
+          href="/leads"
+          drilldownLabel="Abrir pipeline"
         />
         <KpiCard
           icon={<TrendingUp className="h-5 w-5 text-violet-700 dark:text-violet-300" />}
-          label="Meta Q4 2026"
+          label="Saldo Operacional"
           hint="Saldo operacional (receitas - despesas) no período."
           value={fmt(saldo)}
-          trend="85%"
+          trend={`${saldoStatus} · ${despesasLancamentos} despesas`}
           progress={85}
           accent="violet"
+          href="/financeiro"
+          drilldownLabel="Ver composição"
         />
       </div>
+
+      {actionNow ? (
+        <SectionCard title="Ação Agora" className="p-4 md:p-5">
+          <div className="flex flex-col items-start justify-between gap-3 md:flex-row md:items-center">
+            <div>
+              <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{actionNow.title}</p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{actionNow.description}</p>
+            </div>
+            <Link
+              href={actionNow.href}
+              className="rounded-xl bg-sand-500 px-3 py-2 text-sm font-semibold text-white hover:bg-sand-600"
+            >
+              {actionNow.cta}
+            </Link>
+          </div>
+        </SectionCard>
+      ) : null}
+
+      <SectionCard title="Como Ler os Indicadores" className="p-4 md:p-5">
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-xl border border-gray-200 p-3 dark:border-gray-800">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Obras Ativas</p>
+            <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">Conta obras em andamento da organização.</p>
+          </div>
+          <div className="rounded-xl border border-gray-200 p-3 dark:border-gray-800">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Receita 2026</p>
+            <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">Soma de transações do tipo receita nos dados carregados.</p>
+          </div>
+          <div className="rounded-xl border border-gray-200 p-3 dark:border-gray-800">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Leads Qualificados</p>
+            <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">Leads com status diferente de perdido.</p>
+          </div>
+          <div className="rounded-xl border border-gray-200 p-3 dark:border-gray-800">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Saldo Operacional</p>
+            <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">Diferença entre receitas e despesas no período.</p>
+          </div>
+        </div>
+      </SectionCard>
 
       {showOnboarding ? (
         <div className="grid gap-4 md:grid-cols-2">
