@@ -9,6 +9,12 @@ Ativar analytics externo (PostHog) sem interromper o tracking interno já existe
 - Secrets configurados no Vercel:
   - `NEXT_PUBLIC_POSTHOG_KEY`
   - `NEXT_PUBLIC_POSTHOG_HOST` (ex: `https://app.posthog.com`)
+- Secrets no GitHub Actions (auditoria diária):
+  - `SUPABASE_ACCESS_TOKEN`
+  - `SUPABASE_PROJECT_REF`
+  - `POSTHOG_PROJECT_ID`
+  - `POSTHOG_API_KEY`
+  - `POSTHOG_HOST` (opcional)
 - Flag externa iniciando em `false`:
   - `NEXT_PUBLIC_FF_ANALYTICS_EXTERNAL_V1=false`
 
@@ -37,6 +43,11 @@ Se `NEXT_PUBLIC_POSTHOG_KEY` ou `NEXT_PUBLIC_POSTHOG_HOST` não existir em produ
      - `npm run audit:analytics-drift`
    - validar relatório em `docs/reports/analytics-drift-*.md`.
 6. Se estável, liberar geral.
+
+## Automação diária de drift
+- Workflow: `.github/workflows/analytics-drift-daily.yml`
+- Agendamento: diário (03:15 UTC) + `workflow_dispatch`.
+- Saída: artifact `analytics-drift-report` contendo `docs/reports/analytics-drift-*.md`.
 
 ## Rollback
 1. Setar `NEXT_PUBLIC_FF_ANALYTICS_EXTERNAL_V1=false`.
