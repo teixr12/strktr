@@ -7,7 +7,9 @@ export default async function LeadsPage() {
   const supabase = await createClient()
   const { data: leads } = await supabase
     .from('leads')
-    .select('*')
+    .select(
+      'id, user_id, org_id, nome, email, telefone, empresa, origem, status, temperatura, valor_potencial, tipo_projeto, local, notas, ultimo_contato, created_at, updated_at'
+    )
     .order('created_at', { ascending: false })
     .range(0, 49)
 
