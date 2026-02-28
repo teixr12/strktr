@@ -9,6 +9,7 @@
     "lint": "mkdir -p test-results && eslint",
     "test:e2e": "playwright test",
     "e2e:token": "node scripts/generate-e2e-bearer.mjs",
+    "e2e:prepare": "node scripts/prepare-e2e-role-matrix.mjs",
     "validate:api-contracts": "node scripts/validate-api-contracts.mjs",
     "governance:pr": "node scripts/check-pr-governance.mjs",
     "release:readiness": "./scripts/release-readiness.sh",

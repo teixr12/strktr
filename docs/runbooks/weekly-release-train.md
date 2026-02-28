@@ -22,8 +22,18 @@
 - GitHub Actions secrets required:
   - `E2E_USER_EMAIL`
   - `E2E_USER_PASSWORD`
+  - `E2E_MANAGER_EMAIL`
+  - `E2E_MANAGER_PASSWORD`
+  - `E2E_ROLE_USER_EMAIL`
+  - `E2E_ROLE_USER_PASSWORD`
+  - `E2E_FOREIGN_EMAIL`
+  - `E2E_FOREIGN_PASSWORD`
+- CI generates role/tenant tokens and obra IDs dynamically at runtime (`npm run e2e:prepare`):
+  - `E2E_BEARER_TOKEN`
+  - `E2E_MANAGER_BEARER_TOKEN`
+  - `E2E_USER_BEARER_TOKEN`
   - `E2E_OBRA_ID`
-- CI generates `E2E_BEARER_TOKEN` dynamically at runtime (`npm run e2e:token`).
+  - `E2E_FOREIGN_OBRA_ID`
 
 ## Canary gates
 - Canary window: 60-120 minutes in one pilot organization before general release.
