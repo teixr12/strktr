@@ -5,6 +5,7 @@ import { fail, ok } from '@/lib/api/response'
 import { requireDomainPermission } from '@/lib/auth/domain-permissions'
 import { createOrcamentoSchema } from '@/shared/schemas/business'
 import { ensurePendingApproval } from '@/server/services/portal/approval-service'
+import { buildPaginationMeta, getPaginationFromSearchParams } from '@/lib/api/pagination'
 
 function computeTotal(
   items: Array<{ quantidade: number; valor_unitario: number }>
@@ -36,14 +37,17 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url)
   const status = searchParams.get('status')
-  const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 200)
+  const { page, pageSize, offset } = getPaginationFromSearchParams(searchParams, {
+    defaultPageSize: 50,
+    maxPageSize: 200,
+  })
 
   let query = supabase
     .from('orcamentos')
     .select('*, orcamento_itens(*)')
     .eq('org_id', orgId)
     .order('created_at', { ascending: false })
-    .limit(limit)
+    .range(offset, offset + pageSize - 1)
   if (status) query = query.eq('status', status)
 
   const { data, error: dbError } = await query
@@ -62,7 +66,15 @@ export async function GET(request: Request) {
     )
   }
 
-  return ok(request, data ?? [], { count: data?.length || 0 })
+  let totalQuery = supabase
+    .from('orcamentos')
+    .select('*', { head: true, count: 'exact' })
+    .eq('org_id', orgId)
+  if (status) totalQuery = totalQuery.eq('status', status)
+  const { count } = await totalQuery
+  const total = count ?? data?.length ?? 0
+
+  return ok(request, data ?? [], buildPaginationMeta(data?.length || 0, total, page, pageSize))
 }
 
 export async function POST(request: Request) {
