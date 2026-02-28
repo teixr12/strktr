@@ -13,6 +13,7 @@ import {
   PaginationControls,
   QuickActionBar,
   SectionCard,
+  VirtualizedList,
 } from '@/components/ui/enterprise'
 
 const LazyBarChart = dynamic(
@@ -161,6 +162,8 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
       return true
     })
   }, [transacoes, filtroTipo, busca])
+  const useTableVirtualization =
+    featureFlags.tableVirtualization && usePaginationV1 && filtered.length > 25
 
   // Chart data — last 6 months
   const chartData = useMemo(() => {
@@ -269,6 +272,33 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Erro ao excluir transação', 'error')
     }
+  }
+
+  function renderTransactionRow(t: Transacao) {
+    return (
+      <div className="flex items-center justify-between p-3 rounded-xl bg-white/50 dark:bg-gray-800/50 hover:bg-white dark:hover:bg-gray-800 transition-all group">
+        <div className="flex items-center gap-3">
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${t.tipo === 'Receita' ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
+            <div className={`w-3 h-3 rounded-full ${t.tipo === 'Receita' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{t.descricao}</p>
+            <p className="text-xs text-gray-400">{fmtDate(t.data)} · {t.categoria}{t.obras?.nome ? ` · ${t.obras.nome}` : ''}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`font-semibold text-sm ${t.tipo === 'Receita' ? 'text-emerald-600' : 'text-red-500'}`}>
+            {t.tipo === 'Receita' ? '+' : '-'}{fmt(t.valor)}
+          </span>
+          <button onClick={() => openEditTx(t)} className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-sand-600 transition-all">
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={() => deleteTx(t.id)} className="opacity-0 group-hover:opacity-100 p-1 text-red-400 hover:text-red-600 transition-all">
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -399,29 +429,19 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
           </div>
         ) : filtered.length === 0 ? (
           <p className="text-sm text-gray-500 text-center py-8">Nenhuma transação encontrada</p>
+        ) : useTableVirtualization ? (
+          <VirtualizedList
+            items={filtered}
+            rowHeight={68}
+            containerHeight={420}
+            getKey={(item) => item.id}
+            renderItem={(item) => renderTransactionRow(item)}
+            className="rounded-xl border border-gray-200/70 p-1 dark:border-gray-800"
+          />
         ) : (
           filtered.map((t) => (
-            <div key={t.id} className="flex items-center justify-between p-3 rounded-xl bg-white/50 dark:bg-gray-800/50 hover:bg-white dark:hover:bg-gray-800 transition-all group">
-              <div className="flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${t.tipo === 'Receita' ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
-                  <div className={`w-3 h-3 rounded-full ${t.tipo === 'Receita' ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{t.descricao}</p>
-                  <p className="text-xs text-gray-400">{fmtDate(t.data)} · {t.categoria}{t.obras?.nome ? ` · ${t.obras.nome}` : ''}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className={`font-semibold text-sm ${t.tipo === 'Receita' ? 'text-emerald-600' : 'text-red-500'}`}>
-                  {t.tipo === 'Receita' ? '+' : '-'}{fmt(t.valor)}
-                </span>
-                <button onClick={() => openEditTx(t)} className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-sand-600 transition-all">
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
-                <button onClick={() => deleteTx(t.id)} className="opacity-0 group-hover:opacity-100 p-1 text-red-400 hover:text-red-600 transition-all">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
+            <div key={t.id}>
+              {renderTransactionRow(t)}
             </div>
           ))
         )}
