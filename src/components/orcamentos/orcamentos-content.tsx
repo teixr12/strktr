@@ -6,7 +6,7 @@ import { featureFlags } from '@/lib/feature-flags'
 import { toast } from '@/hooks/use-toast'
 import { fmt, fmtDate } from '@/lib/utils'
 import { ORC_STATUS_COLORS } from '@/lib/constants'
-import { Plus, X, Trash2, Edit2, Printer, FileText, Search } from 'lucide-react'
+import { Plus, X, Trash2, Edit2, FileText, Search } from 'lucide-react'
 import { AiBudgetButton } from './ai-budget-button'
 import {
   EmptyStateAction,
@@ -239,47 +239,6 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
     }
   }
 
-  function printOrcamentoLegacy(o: Orcamento) {
-    const w = window.open('', '_blank')
-    if (!w) return
-    const itensHtml = (o.orcamento_itens || []).map((i, idx) => `
-      <tr style="background:${idx % 2 === 0 ? '#fafaf9' : '#fff'}">
-        <td style="padding:8px 12px;border-bottom:1px solid #eee">${i.descricao}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center">${i.unidade}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center">${i.quantidade}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right">R$ ${(i.valor_unitario).toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;font-weight:600">R$ ${(i.quantidade * i.valor_unitario).toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>
-      </tr>`).join('')
-
-    w.document.write(`<!DOCTYPE html><html><head><title>Orçamento - ${o.titulo}</title>
-      <style>body{font-family:Inter,system-ui,sans-serif;margin:0;padding:40px;color:#1a1a1a}
-      @media print{.no-print{display:none}}</style></head><body>
-      <div style="display:flex;align-items:center;justify-content:between;margin-bottom:24px">
-        <div><h1 style="margin:0;font-size:24px;color:#d4a373">STRKTR</h1><p style="margin:4px 0 0;font-size:12px;color:#888">Gestão de Obras Premium</p></div>
-      </div>
-      <h2 style="margin:0 0 8px">${o.titulo}</h2>
-      <p style="color:#666;font-size:14px">Status: ${o.status}${o.validade ? ` · Válido até: ${new Date(o.validade).toLocaleDateString('pt-BR')}` : ''}</p>
-      <table style="width:100%;border-collapse:collapse;margin:24px 0">
-        <thead><tr style="background:#d4a373;color:#fff">
-          <th style="padding:10px 12px;text-align:left">Descrição</th>
-          <th style="padding:10px 12px;text-align:center">Un.</th>
-          <th style="padding:10px 12px;text-align:center">Qtd.</th>
-          <th style="padding:10px 12px;text-align:right">Valor Un.</th>
-          <th style="padding:10px 12px;text-align:right">Total</th>
-        </tr></thead><tbody>${itensHtml}</tbody>
-      </table>
-      <div style="text-align:right;font-size:20px;font-weight:700;color:#d4a373;margin:16px 0">
-        Total: R$ ${o.valor_total.toLocaleString('pt-BR',{minimumFractionDigits:2})}
-      </div>
-      ${o.observacoes ? `<div style="margin-top:24px;padding:16px;background:#fafaf9;border-radius:8px"><p style="font-size:12px;color:#888;margin:0 0 8px">Observações</p><p style="margin:0;font-size:14px;white-space:pre-line">${o.observacoes}</p></div>` : ''}
-      <div style="margin-top:40px;padding-top:16px;border-top:1px solid #eee;font-size:11px;color:#999;text-align:center">
-        STRKTR · CNPJ: 53.903.617/0001-83
-      </div>
-      <button class="no-print" onclick="window.print()" style="position:fixed;bottom:20px;right:20px;padding:12px 24px;background:#d4a373;color:#fff;border:none;border-radius:12px;cursor:pointer;font-size:14px">Imprimir</button>
-      </body></html>`)
-    w.document.close()
-  }
-
   function triggerBase64Download(fileName: string, base64: string) {
     const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))
     const blob = new Blob([bytes], { type: 'application/pdf' })
@@ -295,7 +254,7 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
 
   async function exportOrcamentoPdf(o: Orcamento) {
     if (!usePdfV2) {
-      printOrcamentoLegacy(o)
+      toast('Exportação PDF está temporariamente indisponível', 'error')
       return
     }
 
@@ -321,7 +280,6 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao gerar PDF'
       toast(message, 'error')
-      printOrcamentoLegacy(o)
     } finally {
       setDownloadingPdfId(null)
     }
@@ -483,11 +441,15 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
               </button>
               <button
                 onClick={() => exportOrcamentoPdf(viewOrc)}
-                disabled={downloadingPdfId === viewOrc.id}
+                disabled={downloadingPdfId === viewOrc.id || !usePdfV2}
                 className="flex items-center justify-center gap-2 py-2.5 px-4 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-2xl transition-all text-sm disabled:opacity-60"
               >
-                <Printer className="w-4 h-4" />
-                {downloadingPdfId === viewOrc.id ? 'Gerando...' : null}
+                <FileText className="w-4 h-4" />
+                {downloadingPdfId === viewOrc.id
+                  ? 'Gerando...'
+                  : usePdfV2
+                    ? 'Gerar PDF'
+                    : 'PDF indisponível'}
               </button>
               <button onClick={() => deleteOrcamento(viewOrc.id)} className="flex items-center justify-center gap-2 py-2.5 px-4 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 text-red-600 rounded-2xl transition-all text-sm">
                 <Trash2 className="w-4 h-4" />

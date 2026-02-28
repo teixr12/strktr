@@ -213,8 +213,18 @@ export function PortalClientView({ token }: Props) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white p-6 text-center text-sm text-slate-500">
-        Carregando portal do cliente...
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white p-4 md:p-8">
+        <div className="mx-auto max-w-5xl space-y-5">
+          <div className="skeleton h-32 w-full rounded-3xl" />
+          <div className="grid gap-5 lg:grid-cols-3">
+            <div className="skeleton h-72 w-full rounded-3xl lg:col-span-2" />
+            <div className="skeleton h-72 w-full rounded-3xl" />
+          </div>
+          <div className="grid gap-5 lg:grid-cols-3">
+            <div className="skeleton h-64 w-full rounded-3xl lg:col-span-2" />
+            <div className="skeleton h-64 w-full rounded-3xl" />
+          </div>
+        </div>
       </div>
     )
   }
@@ -301,6 +311,7 @@ export function PortalClientView({ token }: Props) {
                       <button
                         onClick={() => void decideApproval(approval.id, 'approve')}
                         disabled={busyApprovalId === approval.id}
+                        aria-busy={busyApprovalId === approval.id}
                         className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
                       >
                         Aprovar
@@ -311,6 +322,7 @@ export function PortalClientView({ token }: Props) {
                           setRejectReason('')
                         }}
                         disabled={busyApprovalId === approval.id}
+                        aria-busy={busyApprovalId === approval.id}
                         className="rounded-xl bg-red-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
                       >
                         Reprovar
@@ -369,6 +381,7 @@ export function PortalClientView({ token }: Props) {
             <button
               onClick={sendComment}
               disabled={sendingComment || !comment.trim()}
+              aria-busy={sendingComment}
               className="mt-2 w-full rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
               {sendingComment ? 'Enviando...' : 'Enviar comentário'}
