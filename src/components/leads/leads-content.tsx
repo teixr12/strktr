@@ -2,13 +2,19 @@
 
 import { useState, useRef, useMemo, useEffect } from 'react'
 import { toast } from '@/hooks/use-toast'
-import { apiRequest } from '@/lib/api/client'
+import { apiRequest, apiRequestWithMeta } from '@/lib/api/client'
 import { track } from '@/lib/analytics/client'
 import { fmt, fmtDate } from '@/lib/utils'
 import { KANBAN_COLUMNS, TEMPERATURA_EMOJI, TEMPERATURA_COLORS } from '@/lib/constants'
 import { Plus, X, MessageCircle, Trash2, Edit2, GripVertical, Search } from 'lucide-react'
 import { featureFlags } from '@/lib/feature-flags'
-import { PageHeader, QuickActionBar, SectionCard, StatBadge } from '@/components/ui/enterprise'
+import {
+  PageHeader,
+  PaginationControls,
+  QuickActionBar,
+  SectionCard,
+  StatBadge,
+} from '@/components/ui/enterprise'
 import { LeadLaneColumnV2 } from './lead-lane-column-v2'
 import { LeadInteractionsTableV2 } from './lead-interactions-table-v2'
 import type { Lead, LeadStatus, LeadTemperatura } from '@/types/database'
@@ -21,6 +27,16 @@ interface LeadsSlaSummary {
   slaHours: number
   severity: 'low' | 'medium' | 'high'
 }
+
+interface PaginationMeta {
+  count: number
+  page: number
+  pageSize: number
+  total: number
+  hasMore: boolean
+}
+
+const PAGE_SIZE = 50
 
 const V2_LANES: Array<{
   id: LeadStatus
@@ -35,7 +51,16 @@ const V2_LANES: Array<{
 ]
 
 export function LeadsContent({ initialLeads }: Props) {
+  const usePaginationV1 = featureFlags.uiPaginationV1
   const [leads, setLeads] = useState(initialLeads)
+  const [pagination, setPagination] = useState<PaginationMeta>({
+    count: initialLeads.length,
+    page: 1,
+    pageSize: PAGE_SIZE,
+    total: initialLeads.length,
+    hasMore: false,
+  })
+  const [isPageLoading, setIsPageLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editLead, setEditLead] = useState<Lead | null>(null)
   const [detailLead, setDetailLead] = useState<Lead | null>(null)
@@ -66,6 +91,47 @@ export function LeadsContent({ initialLeads }: Props) {
     const timer = setInterval(loadSla, 60_000)
     return () => clearInterval(timer)
   }, [])
+
+  async function refreshLeads(targetPage = 1) {
+    if (!usePaginationV1) {
+      try {
+        const data = await apiRequest<Lead[]>('/api/v1/leads?limit=200')
+        setLeads(data)
+      } catch {
+        setLeads([])
+      }
+      return
+    }
+
+    setIsPageLoading(true)
+    try {
+      const params = new URLSearchParams({
+        page: String(targetPage),
+        pageSize: String(PAGE_SIZE),
+      })
+      const payload = await apiRequestWithMeta<Lead[], PaginationMeta>(`/api/v1/leads?${params.toString()}`)
+      setLeads(payload.data)
+      setPagination(
+        payload.meta || {
+          count: payload.data.length,
+          page: targetPage,
+          pageSize: PAGE_SIZE,
+          total: payload.data.length,
+          hasMore: false,
+        }
+      )
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao recarregar leads', 'error')
+    } finally {
+      setIsPageLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!usePaginationV1) return
+    void refreshLeads(1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usePaginationV1])
 
   const filteredLeads = useMemo(() => {
     if (!searchQuery) return leads
@@ -119,6 +185,9 @@ export function LeadsContent({ initialLeads }: Props) {
       try {
         const data = await apiRequest<Lead>(`/api/v1/leads/${editLead.id}`, { method: 'PUT', body: payload })
         setLeads((prev) => prev.map((l) => l.id === editLead.id ? data : l))
+        if (usePaginationV1) {
+          await refreshLeads(pagination.page)
+        }
         toast('Lead atualizado!', 'success')
         track('core_edit', {
           source: 'leads',
@@ -135,6 +204,9 @@ export function LeadsContent({ initialLeads }: Props) {
       try {
         const data = await apiRequest<Lead>('/api/v1/leads', { method: 'POST', body: payload })
         setLeads((prev) => [data, ...prev])
+        if (usePaginationV1) {
+          await refreshLeads(1)
+        }
         toast('Lead criado!', 'success')
         track('core_create', {
           source: 'leads',
@@ -156,7 +228,13 @@ export function LeadsContent({ initialLeads }: Props) {
     if (!confirm('Excluir este lead?')) return
     try {
       await apiRequest(`/api/v1/leads/${id}`, { method: 'DELETE' })
+      const nextPage = usePaginationV1 && leads.length === 1 && pagination.page > 1
+        ? pagination.page - 1
+        : pagination.page
       setLeads((prev) => prev.filter((l) => l.id !== id))
+      if (usePaginationV1) {
+        await refreshLeads(nextPage)
+      }
       setDetailLead(null)
       toast('Lead excluído', 'info')
       track('core_delete', {
@@ -175,6 +253,9 @@ export function LeadsContent({ initialLeads }: Props) {
     try {
       const data = await apiRequest<Lead>(`/api/v1/leads/${id}`, { method: 'PUT', body: { status } })
       setLeads((prev) => prev.map((l) => l.id === id ? data : l))
+      if (usePaginationV1) {
+        await refreshLeads(pagination.page)
+      }
       track('core_move', {
         source: 'leads',
         entity_type: 'lead_status',
@@ -229,7 +310,7 @@ export function LeadsContent({ initialLeads }: Props) {
     <div className="tailadmin-page space-y-4">
       <PageHeader
         title="Leads VIP"
-        subtitle={`${leads.length} leads no pipeline`}
+        subtitle={`${pagination.total || leads.length} leads no pipeline`}
         actions={
           <QuickActionBar
             actions={[{
@@ -362,6 +443,25 @@ export function LeadsContent({ initialLeads }: Props) {
           })}
         </div>
       )}
+
+      {usePaginationV1 ? (
+        <SectionCard className="p-3">
+          <PaginationControls
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            total={pagination.total}
+            hasMore={pagination.hasMore}
+            isLoading={isPageLoading}
+            onPrev={() => void refreshLeads(Math.max(1, pagination.page - 1))}
+            onNext={() => void refreshLeads(pagination.page + 1)}
+          />
+          {searchQuery ? (
+            <p className="pt-2 text-xs text-gray-500 dark:text-gray-400">
+              Busca aplicada na página atual.
+            </p>
+          ) : null}
+        </SectionCard>
+      ) : null}
 
       {/* Detail Modal */}
       {detailLead && (

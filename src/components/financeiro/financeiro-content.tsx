@@ -2,13 +2,18 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import dynamic from 'next/dynamic'
-import { apiRequest } from '@/lib/api/client'
+import { apiRequest, apiRequestWithMeta } from '@/lib/api/client'
 import { featureFlags } from '@/lib/feature-flags'
 import { toast } from '@/hooks/use-toast'
 import { fmt, fmtDate } from '@/lib/utils'
 import { Plus, X, Trash2, TrendingUp, TrendingDown, Wallet, Hash, Pencil } from 'lucide-react'
 import type { Transacao, Obra } from '@/types/database'
-import { PageHeader, QuickActionBar, SectionCard } from '@/components/ui/enterprise'
+import {
+  PageHeader,
+  PaginationControls,
+  QuickActionBar,
+  SectionCard,
+} from '@/components/ui/enterprise'
 
 const LazyBarChart = dynamic(
   () =>
@@ -38,9 +43,28 @@ interface OrcadoVsRealizadoSummary {
   }
 }
 
+interface PaginationMeta {
+  count: number
+  page: number
+  pageSize: number
+  total: number
+  hasMore: boolean
+}
+
+const PAGE_SIZE = 50
+
 export function FinanceiroContent({ initialTransacoes }: Props) {
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Financeiro
+  const usePaginationV1 = featureFlags.uiPaginationV1
   const [transacoes, setTransacoes] = useState(initialTransacoes)
+  const [pagination, setPagination] = useState<PaginationMeta>({
+    count: initialTransacoes.length,
+    page: 1,
+    pageSize: PAGE_SIZE,
+    total: initialTransacoes.length,
+    hasMore: false,
+  })
+  const [isPageLoading, setIsPageLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editingTx, setEditingTx] = useState<Transacao | null>(null)
   const [filtroTipo, setFiltroTipo] = useState<'Todos' | 'Receita' | 'Despesa'>('Todos')
@@ -65,6 +89,37 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
     loadObras()
   }, [])
 
+  async function refreshTransacoes(targetPage = 1) {
+    if (!usePaginationV1) {
+      return
+    }
+    setIsPageLoading(true)
+    try {
+      const params = new URLSearchParams({
+        page: String(targetPage),
+        pageSize: String(PAGE_SIZE),
+      })
+      if (filtroTipo !== 'Todos') {
+        params.set('tipo', filtroTipo)
+      }
+      const payload = await apiRequestWithMeta<Transacao[], PaginationMeta>(`/api/v1/transacoes?${params.toString()}`)
+      setTransacoes(payload.data)
+      setPagination(
+        payload.meta || {
+          count: payload.data.length,
+          page: targetPage,
+          pageSize: PAGE_SIZE,
+          total: payload.data.length,
+          hasMore: false,
+        }
+      )
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao recarregar transações', 'error')
+    } finally {
+      setIsPageLoading(false)
+    }
+  }
+
   async function loadDesvio() {
     try {
       const data = await apiRequest<OrcadoVsRealizadoSummary>('/api/v1/transacoes/orcado-vs-realizado?thresholdPct=10')
@@ -87,6 +142,12 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
       active = false
     }
   }, [])
+
+  useEffect(() => {
+    if (!usePaginationV1) return
+    void refreshTransacoes(1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usePaginationV1, filtroTipo])
 
   const receitas = transacoes.filter((t) => t.tipo === 'Receita').reduce((s, t) => s + t.valor, 0)
   const despesas = transacoes.filter((t) => t.tipo === 'Despesa').reduce((s, t) => s + t.valor, 0)
@@ -172,10 +233,16 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
       if (editingTx) {
         const data = await apiRequest<Transacao>(`/api/v1/transacoes/${editingTx.id}`, { method: 'PUT', body: payload })
         setTransacoes((prev) => prev.map((t) => t.id === editingTx.id ? data : t))
+        if (usePaginationV1) {
+          await refreshTransacoes(pagination.page)
+        }
         toast('Transação atualizada!', 'success')
       } else {
         const data = await apiRequest<Transacao>('/api/v1/transacoes', { method: 'POST', body: payload })
         setTransacoes((prev) => [data, ...prev])
+        if (usePaginationV1) {
+          await refreshTransacoes(1)
+        }
         toast('Transação criada!', 'success')
       }
       await loadDesvio()
@@ -189,7 +256,13 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
     if (!confirm('Excluir esta transação?')) return
     try {
       await apiRequest<{ success: boolean }>(`/api/v1/transacoes/${id}`, { method: 'DELETE' })
+      const nextPage = usePaginationV1 && transacoes.length === 1 && pagination.page > 1
+        ? pagination.page - 1
+        : pagination.page
       setTransacoes((prev) => prev.filter((t) => t.id !== id))
+      if (usePaginationV1) {
+        await refreshTransacoes(nextPage)
+      }
       await loadDesvio()
       toast('Transação excluída', 'info')
     } catch (err) {
@@ -201,7 +274,7 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
     <div className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} space-y-5`}>
       <PageHeader
         title="Financeiro"
-        subtitle={`${transacoes.length} transações`}
+        subtitle={`${pagination.total || transacoes.length} transações`}
         actions={
           <QuickActionBar
             actions={[{
@@ -222,22 +295,22 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
         <div className="glass-card rounded-2xl p-4">
           <div className="flex items-center gap-2 mb-2"><div className="p-1.5 bg-emerald-100 dark:bg-emerald-900/20 rounded-lg"><TrendingUp className="w-4 h-4 text-emerald-600" /></div></div>
           <p className="text-lg font-semibold text-emerald-600">{fmt(receitas)}</p>
-          <p className="text-xs text-gray-500">Total Receitas</p>
+          <p className="text-xs text-gray-500">{usePaginationV1 ? 'Receitas (página)' : 'Total Receitas'}</p>
         </div>
         <div className="glass-card rounded-2xl p-4">
           <div className="flex items-center gap-2 mb-2"><div className="p-1.5 bg-red-100 dark:bg-red-900/20 rounded-lg"><TrendingDown className="w-4 h-4 text-red-500" /></div></div>
           <p className="text-lg font-semibold text-red-500">{fmt(despesas)}</p>
-          <p className="text-xs text-gray-500">Total Despesas</p>
+          <p className="text-xs text-gray-500">{usePaginationV1 ? 'Despesas (página)' : 'Total Despesas'}</p>
         </div>
         <div className="glass-card rounded-2xl p-4">
           <div className="flex items-center gap-2 mb-2"><div className="p-1.5 bg-sand-100 dark:bg-sand-900/20 rounded-lg"><Wallet className="w-4 h-4 text-sand-600" /></div></div>
           <p className={`text-lg font-semibold ${saldo >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{fmt(saldo)}</p>
-          <p className="text-xs text-gray-500">Saldo Líquido</p>
+          <p className="text-xs text-gray-500">{usePaginationV1 ? 'Saldo (página)' : 'Saldo Líquido'}</p>
         </div>
         <div className="glass-card rounded-2xl p-4">
           <div className="flex items-center gap-2 mb-2"><div className="p-1.5 bg-purple-100 dark:bg-purple-900/20 rounded-lg"><Hash className="w-4 h-4 text-purple-600" /></div></div>
-          <p className="text-lg font-semibold text-gray-900 dark:text-white">{transacoes.length}</p>
-          <p className="text-xs text-gray-500">Transações</p>
+          <p className="text-lg font-semibold text-gray-900 dark:text-white">{usePaginationV1 ? pagination.total : transacoes.length}</p>
+          <p className="text-xs text-gray-500">{usePaginationV1 ? 'Transações (total)' : 'Transações'}</p>
         </div>
       </div>
 
@@ -319,6 +392,17 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
             </div>
           ))
         )}
+        {usePaginationV1 ? (
+          <PaginationControls
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            total={pagination.total}
+            hasMore={pagination.hasMore}
+            isLoading={isPageLoading}
+            onPrev={() => void refreshTransacoes(Math.max(1, pagination.page - 1))}
+            onNext={() => void refreshTransacoes(pagination.page + 1)}
+          />
+        ) : null}
       </SectionCard>
 
       {/* Form Modal */}

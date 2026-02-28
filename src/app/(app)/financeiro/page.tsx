@@ -9,6 +9,7 @@ export default async function FinanceiroPage() {
     .from('transacoes')
     .select('*, obras(nome)')
     .order('data', { ascending: false })
+    .range(0, 49)
 
   return <FinanceiroContent initialTransacoes={transacoes ?? []} />
 }
