@@ -19,6 +19,7 @@ interface LeadLaneColumnV2Props {
   onDragStart: (leadId: string) => void
   onDragEnd: () => void
   onOpenLead: (lead: Lead) => void
+  onSuggestNextAction: (leadId: string) => void
   nowMs: number
 }
 
@@ -46,6 +47,7 @@ export function LeadLaneColumnV2({
   onDragStart,
   onDragEnd,
   onOpenLead,
+  onSuggestNextAction,
   nowMs,
 }: LeadLaneColumnV2Props) {
   function getProposalProgress(lead: Lead) {
@@ -74,6 +76,9 @@ export function LeadLaneColumnV2({
     return { width, label }
   }
 
+  const firstLead = leads[0] || null
+  const showQuickAction = Boolean(firstLead)
+
   return (
     <section
       className={`min-w-[280px] snap-center rounded-3xl border p-4 transition-all md:min-w-0 ${
@@ -90,9 +95,47 @@ export function LeadLaneColumnV2({
           <span className={`h-2.5 w-2.5 rounded-full ${badgeClassName}`} />
           <h3 className="text-[1.45rem] font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
         </div>
-        <span className={`inline-flex min-w-8 items-center justify-center rounded-full px-2 py-0.5 text-xs font-semibold ${countToneClassName}`}>
-          {leads.length}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className={`inline-flex min-w-8 items-center justify-center rounded-full px-2 py-0.5 text-xs font-semibold ${countToneClassName}`}>
+            {leads.length}
+          </span>
+          {showQuickAction ? (
+            laneId === 'Proposta' ? (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onSuggestNextAction(firstLead.id)
+                }}
+                className="rounded-lg bg-ocean-500 px-2 py-1 text-[10px] font-semibold text-white hover:bg-ocean-600"
+              >
+                Next
+              </button>
+            ) : laneId === 'Qualificado' && firstLead.telefone ? (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  window.open(whatsappUrl(firstLead.telefone as string), '_blank', 'noopener,noreferrer')
+                }}
+                className="rounded-lg bg-emerald-500 px-2 py-1 text-[10px] font-semibold text-white hover:bg-emerald-600"
+              >
+                WhatsApp
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onOpenLead(firstLead)
+                }}
+                className="rounded-lg bg-gray-200 px-2 py-1 text-[10px] font-semibold text-gray-700 hover:bg-gray-300 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+              >
+                Abrir
+              </button>
+            )
+          ) : null}
+        </div>
       </header>
 
       <div className="space-y-2.5">
