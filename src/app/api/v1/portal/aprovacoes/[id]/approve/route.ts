@@ -111,6 +111,7 @@ export async function POST(
     eventType: 'portal_approval_decision',
     entityType: 'portal_approval',
     entityId: approval.id,
+    mirrorExternal: true,
     payload: {
       decision: 'approve',
       approvalType: approval.tipo,
