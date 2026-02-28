@@ -80,3 +80,28 @@ test('portal público exige token válido e retorna envelope de erro', async ({ 
     expect(payload.requestId, entry.endpoint).toBeTruthy()
   }
 })
+
+test('endpoints legados mantêm compatibilidade e requestId', async ({ request }) => {
+  const aiResponse = await request.post('/api/ai/calculate', {
+    data: { tipoProjeto: 'Residencial', areaM2: 120, local: 'SP' },
+  })
+  expect([401, 503], '/api/ai/calculate').toContain(aiResponse.status())
+  const aiPayload = await aiResponse.json()
+  expect(typeof aiPayload.error, '/api/ai/calculate error type').toBe('string')
+  expect(aiPayload.requestId, '/api/ai/calculate requestId').toBeTruthy()
+  expect(aiPayload.errorDetail?.code, '/api/ai/calculate errorDetail').toBeTruthy()
+
+  const webhooksResponse = await request.post('/api/webhooks', { data: {} })
+  expect([400, 403], '/api/webhooks').toContain(webhooksResponse.status())
+  const webhooksPayload = await webhooksResponse.json()
+  expect(typeof webhooksPayload.error, '/api/webhooks error type').toBe('string')
+  expect(webhooksPayload.requestId, '/api/webhooks requestId').toBeTruthy()
+  expect(webhooksPayload.errorDetail?.code, '/api/webhooks errorDetail').toBeTruthy()
+
+  const whatsappVerify = await request.get('/api/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=invalid&hub.challenge=test')
+  expect(whatsappVerify.status(), '/api/whatsapp/webhook verify').toBe(403)
+  const whatsappVerifyPayload = await whatsappVerify.json()
+  expect(typeof whatsappVerifyPayload.error, '/api/whatsapp/webhook verify error type').toBe('string')
+  expect(whatsappVerifyPayload.requestId, '/api/whatsapp/webhook verify requestId').toBeTruthy()
+  expect(whatsappVerifyPayload.errorDetail?.code, '/api/whatsapp/webhook verify errorDetail').toBeTruthy()
+})
