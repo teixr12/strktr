@@ -19,6 +19,8 @@ export const featureFlags = {
   leadsProgressV2: process.env.NEXT_PUBLIC_FF_LEADS_PROGRESS_V2 !== 'false',
   orcamentoPdfV2: process.env.NEXT_PUBLIC_FF_ORCAMENTO_PDF_V2 !== 'false',
   uiPaginationV1: process.env.NEXT_PUBLIC_FF_UI_PAGINATION_V1 !== 'false',
+  tableVirtualization:
+    process.env.NEXT_PUBLIC_FF_TABLE_VIRTUALIZATION === 'true',
   apiObrasV2: process.env.NEXT_PUBLIC_FF_API_OBRAS_V2 === 'true',
   executionRiskEngine:
     process.env.NEXT_PUBLIC_FF_EXECUTION_RISK_ENGINE === 'true',
