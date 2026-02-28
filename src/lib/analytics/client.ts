@@ -1,29 +1,21 @@
 'use client'
 
-import { createClient } from '@/lib/supabase/client'
-import { featureFlags } from '@/lib/feature-flags'
+import { track, identify, group, page } from '@/lib/analytics/adapter'
+import type { AnalyticsEventType, AnalyticsProps } from '@/shared/types/analytics'
 
 interface AnalyticsPayload {
-  eventType: string
+  eventType: AnalyticsEventType
   entityType?: string
   entityId?: string
-  payload?: Record<string, unknown>
+  payload?: AnalyticsProps
 }
 
 export async function trackEvent(input: AnalyticsPayload) {
-  if (!featureFlags.productAnalytics) return
-
-  const supabase = createClient()
-  const { data } = await supabase.auth.getSession()
-  const token = data.session?.access_token
-  if (!token) return
-
-  await fetch('/api/v1/analytics/events', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(input),
-  }).catch(() => undefined)
+  await track(input.eventType, {
+    ...input.payload,
+    entity_type: input.entityType || input.payload?.entity_type || 'unknown',
+    entity_id: input.entityId || input.payload?.entity_id || null,
+  })
 }
+
+export { track, identify, group, page }

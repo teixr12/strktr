@@ -14,7 +14,9 @@
     "release:readiness": "./scripts/release-readiness.sh",
     "baseline:report": "./scripts/generate-baseline-report.sh",
     "audit:production": "./scripts/run-production-audits.sh",
-    "baseline:tag": "./scripts/create-baseline-tag.sh"
+    "baseline:tag": "./scripts/create-baseline-tag.sh",
+    "ops:post-wave2": "./scripts/post-wave2-closure.sh",
+    "ops:post-wave2:full": "./scripts/post-wave2-closure.sh --with-readiness"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

@@ -27,21 +27,27 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false)
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   const unread = notificacoes.filter((n) => !n.lida).length
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const data = await apiRequest<Notificacao[]>('/api/v1/notificacoes?limit=20')
-        setNotificacoes(data)
-      } catch {
-        setNotificacoes([])
-      }
+  async function loadNotifications() {
+    setLoading(true)
+    setLoadError(null)
+    try {
+      const data = await apiRequest<Notificacao[]>('/api/v1/notificacoes?limit=20')
+      setNotificacoes(data)
+    } catch (err) {
+      setNotificacoes([])
+      setLoadError(err instanceof Error ? err.message : 'Falha ao carregar notificações')
+    } finally {
       setLoading(false)
     }
-    load()
+  }
+
+  useEffect(() => {
+    void loadNotifications()
   }, [])
 
   // Close on click outside
@@ -105,7 +111,26 @@ export function NotificationBell() {
           {/* List */}
           <div className="max-h-80 overflow-y-auto">
             {loading ? (
-              <div className="p-8 text-center text-sm text-gray-400">Carregando...</div>
+              <div className="space-y-2 p-4">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div key={index} className="rounded-xl border border-gray-100 p-3 dark:border-gray-800">
+                    <div className="skeleton h-3 w-1/3" />
+                    <div className="mt-2 skeleton h-3 w-full" />
+                    <div className="mt-1.5 skeleton h-3 w-2/3" />
+                  </div>
+                ))}
+              </div>
+            ) : loadError ? (
+              <div className="p-5 text-center">
+                <p className="text-xs text-red-500">{loadError}</p>
+                <button
+                  type="button"
+                  onClick={() => void loadNotifications()}
+                  className="mt-2 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                >
+                  Tentar novamente
+                </button>
+              </div>
             ) : notificacoes.length === 0 ? (
               <div className="p-8 text-center">
                 <Bell className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />

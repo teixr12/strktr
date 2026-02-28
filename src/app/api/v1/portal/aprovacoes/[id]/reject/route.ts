@@ -1,6 +1,7 @@
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { fail, ok } from '@/lib/api/response'
 import { createServiceRoleClient } from '@/lib/supabase/service'
+import { emitProductEvent } from '@/lib/telemetry'
 import { getValidPortalSession } from '@/server/services/portal/session-service'
 import { runAutomation } from '@/server/services/automation/automation-service'
 import { rejectDecisionSchema } from '@/shared/schemas/cronograma-portal'
@@ -147,6 +148,21 @@ export async function POST(
       }
     ).catch(() => undefined)
   }
+
+  await emitProductEvent({
+    supabase: service,
+    orgId: session.org_id,
+    userId: session.portal_cliente_id,
+    eventType: 'portal_approval_decision',
+    entityType: 'portal_approval',
+    entityId: approval.id,
+    payload: {
+      decision: 'reject',
+      approvalType: approval.tipo,
+      approvalVersion: approval.approval_version || 1,
+      requiredNextVersion: Number(approval.approval_version || 1) + 1,
+    },
+  }).catch(() => undefined)
 
   return ok(
     request,

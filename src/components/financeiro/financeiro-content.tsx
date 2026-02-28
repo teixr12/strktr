@@ -1,17 +1,25 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import dynamic from 'next/dynamic'
 import { apiRequest } from '@/lib/api/client'
 import { featureFlags } from '@/lib/feature-flags'
 import { toast } from '@/hooks/use-toast'
 import { fmt, fmtDate } from '@/lib/utils'
 import { Plus, X, Trash2, TrendingUp, TrendingDown, Wallet, Hash, Pencil } from 'lucide-react'
 import type { Transacao, Obra } from '@/types/database'
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js'
-import { Bar } from 'react-chartjs-2'
 import { PageHeader, QuickActionBar, SectionCard } from '@/components/ui/enterprise'
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
+const LazyBarChart = dynamic(
+  () =>
+    import('@/components/ui/enterprise/lazy-bar-chart').then(
+      (module) => module.LazyBarChart
+    ),
+  {
+    ssr: false,
+    loading: () => <div className="skeleton h-[240px] w-full rounded-xl" />,
+  }
+)
 
 interface Props { initialTransacoes: Transacao[] }
 interface OrcadoVsRealizadoSummary {
@@ -237,7 +245,7 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
       <SectionCard className="p-4 md:p-5">
         <h3 className="font-semibold text-sm text-gray-900 dark:text-white mb-3">Receitas vs Despesas (últimos 6 meses)</h3>
         <div className="h-[240px]">
-          <Bar data={chartData} options={chartOpts as never} />
+          <LazyBarChart data={chartData} options={chartOpts as never} />
         </div>
       </SectionCard>
 

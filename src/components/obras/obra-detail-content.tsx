@@ -13,6 +13,7 @@ import { DiarioObraTab } from './diario-obra'
 import { ObraChecklistsTab } from './obra-checklists'
 import { ObraCronogramaTab } from './obra-cronograma'
 import { apiRequest } from '@/lib/api/client'
+import { track } from '@/lib/analytics/client'
 import { featureFlags } from '@/lib/feature-flags'
 import type { Obra, ObraEtapa, Transacao, DiarioObra as DiarioEntry, ObraChecklist } from '@/types/database'
 import { createEtapaSchema, type CreateEtapaDTO } from '@/shared/schemas/execution'
@@ -96,6 +97,12 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
     try {
       await apiRequest(`/api/v1/obras/${obra.id}/risks/recalculate`, { method: 'POST' })
       toast('Risco recalculado', 'success')
+      track('RiskRecalculated', {
+        source: 'obras',
+        entity_type: 'obra',
+        entity_id: obra.id,
+        outcome: 'success',
+      }).catch(() => undefined)
       loadExecutionSummary()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao recalcular risco'
@@ -125,6 +132,13 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
         body: { status },
       })
       toast('Etapa atualizada!', 'success')
+      track('EtapaStatusChanged', {
+        source: 'obras',
+        entity_type: 'obra_etapa',
+        entity_id: id,
+        outcome: 'success',
+        to_status: status,
+      }).catch(() => undefined)
       refreshEtapas()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao atualizar etapa'

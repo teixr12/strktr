@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { Plus, RefreshCw, FileDown, Link2 } from 'lucide-react'
 import { z } from 'zod'
 import { apiRequest } from '@/lib/api/client'
+import { track } from '@/lib/analytics/client'
 import { toast } from '@/hooks/use-toast'
 import {
   createCronogramaItemSchema,
@@ -282,6 +283,13 @@ export function ObraCronogramaTab({ obraId }: Props) {
         body: values,
       })
       setInviteResult(result)
+      track('portal_invite_sent', {
+        source: 'obras',
+        entity_type: 'portal_invite',
+        entity_id: obraId,
+        outcome: 'success',
+        email_sent: result.emailSent,
+      }).catch(() => undefined)
       toast(result.emailSent ? 'Convite enviado por email' : 'Link do portal gerado', 'success')
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Erro ao gerar convite do portal', 'error')

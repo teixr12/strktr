@@ -47,6 +47,8 @@ export async function GET(request: Request) {
         orcamentoPdfV2: process.env.NEXT_PUBLIC_FF_ORCAMENTO_PDF_V2 === 'true',
         checklistDueDate: process.env.NEXT_PUBLIC_FF_CHECKLIST_DUE_DATE === 'true',
         productAnalytics: process.env.NEXT_PUBLIC_FF_PRODUCT_ANALYTICS === 'true',
+        analyticsExternalV1:
+          process.env.NEXT_PUBLIC_FF_ANALYTICS_EXTERNAL_V1 === 'true',
         cronogramaEngine: process.env.NEXT_PUBLIC_FF_CRONOGRAMA_ENGINE === 'true',
         cronogramaPdf: process.env.NEXT_PUBLIC_FF_CRONOGRAMA_PDF === 'true',
         clientPortal: process.env.NEXT_PUBLIC_FF_CLIENT_PORTAL === 'true',
