@@ -40,6 +40,7 @@ vercel_keys.env.codex.txt
 *_keys.env.codex.txt
 .env.codex
 *.env.codex*
+*credentials*.txt
 
 # vercel
 .vercel
