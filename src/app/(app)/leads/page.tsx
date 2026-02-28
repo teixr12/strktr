@@ -9,6 +9,7 @@ export default async function LeadsPage() {
     .from('leads')
     .select('*')
     .order('created_at', { ascending: false })
+    .range(0, 49)
 
   return <LeadsContent initialLeads={leads ?? []} />
 }

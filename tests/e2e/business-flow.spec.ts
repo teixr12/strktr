@@ -2,6 +2,9 @@ import { expect, test } from '@playwright/test'
 
 const E2E_BEARER_TOKEN = process.env.E2E_BEARER_TOKEN || ''
 const E2E_OBRA_ID = process.env.E2E_OBRA_ID || ''
+const E2E_MANAGER_BEARER_TOKEN = process.env.E2E_MANAGER_BEARER_TOKEN || ''
+const E2E_USER_BEARER_TOKEN = process.env.E2E_USER_BEARER_TOKEN || ''
+const E2E_FOREIGN_OBRA_ID = process.env.E2E_FOREIGN_OBRA_ID || ''
 const isCI = process.env.CI === 'true' || process.env.CI === '1'
 const hasRequiredEnv = Boolean(E2E_BEARER_TOKEN && E2E_OBRA_ID)
 
@@ -146,5 +149,63 @@ test.describe('business flow (authenticated)', () => {
         item.orcamento?.id === orcamentoId && item.status === 'pendente' && Number(item.approval_version || 0) >= 2
     )
     expect(pendingApproval?.id).toBeTruthy()
+  })
+
+  test('role matrix enforcement across leads/finance/projects/config/execution', async ({ request }) => {
+    test.skip(!E2E_MANAGER_BEARER_TOKEN || !E2E_USER_BEARER_TOKEN, 'Set E2E_MANAGER_BEARER_TOKEN and E2E_USER_BEARER_TOKEN to run role matrix checks')
+
+    const managerHeaders = {
+      Authorization: `Bearer ${E2E_MANAGER_BEARER_TOKEN}`,
+    }
+    const userHeaders = {
+      Authorization: `Bearer ${E2E_USER_BEARER_TOKEN}`,
+    }
+
+    const managerFinance = await request.get('/api/v1/transacoes?page=1&pageSize=5', { headers: managerHeaders })
+    expect(managerFinance.status()).toBe(200)
+
+    const managerProjects = await request.get('/api/v1/projetos?page=1&pageSize=5', { headers: managerHeaders })
+    expect(managerProjects.status()).toBe(200)
+
+    const managerConfig = await request.get('/api/v1/config/org-members', { headers: managerHeaders })
+    expect(managerConfig.status()).toBe(200)
+
+    const managerRisk = await request.post(`/api/v1/obras/${E2E_OBRA_ID}/risks/recalculate`, {
+      headers: managerHeaders,
+      data: {},
+    })
+    expect(managerRisk.status()).toBe(200)
+
+    const userLeads = await request.get('/api/v1/leads?page=1&pageSize=5', { headers: userHeaders })
+    expect(userLeads.status()).toBe(200)
+
+    const userFinance = await request.get('/api/v1/transacoes?page=1&pageSize=5', { headers: userHeaders })
+    expect(userFinance.status()).toBe(403)
+
+    const userProjects = await request.get('/api/v1/projetos?page=1&pageSize=5', { headers: userHeaders })
+    expect(userProjects.status()).toBe(403)
+
+    const userConfig = await request.get('/api/v1/config/org-members', { headers: userHeaders })
+    expect(userConfig.status()).toBe(403)
+
+    const userRisk = await request.post(`/api/v1/obras/${E2E_OBRA_ID}/risks/recalculate`, {
+      headers: userHeaders,
+      data: {},
+    })
+    expect(userRisk.status()).toBe(403)
+  })
+
+  test('tenant isolation blocks access to foreign obra', async ({ request }) => {
+    test.skip(!E2E_FOREIGN_OBRA_ID, 'Set E2E_FOREIGN_OBRA_ID to validate cross-org isolation checks')
+
+    const headers = {
+      Authorization: `Bearer ${E2E_BEARER_TOKEN}`,
+    }
+
+    const obraResponse = await request.get(`/api/v1/obras/${E2E_FOREIGN_OBRA_ID}`, { headers })
+    expect([403, 404], '/api/v1/obras/:id').toContain(obraResponse.status())
+
+    const summaryResponse = await request.get(`/api/v1/obras/${E2E_FOREIGN_OBRA_ID}/execution-summary`, { headers })
+    expect([403, 404], '/api/v1/obras/:id/execution-summary').toContain(summaryResponse.status())
   })
 })
