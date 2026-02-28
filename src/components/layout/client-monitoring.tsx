@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
-import { trackEvent } from '@/lib/analytics/client'
+import { page, track } from '@/lib/analytics/client'
 
 function sendMonitoringEvent(payload: Record<string, unknown>) {
   fetch('/api/v1/monitoring/events', {
@@ -17,6 +17,14 @@ export function ClientMonitoring() {
 
   useEffect(() => {
     const onError = (event: ErrorEvent) => {
+      track('reliability_client_error', {
+        source: 'web',
+        entity_type: 'window_error',
+        entity_id: window.location.pathname,
+        outcome: 'fail',
+        error_message: event.message || 'Erro desconhecido',
+      }).catch(() => undefined)
+
       sendMonitoringEvent({
         type: 'window_error',
         message: event.message || 'Erro desconhecido',
@@ -31,6 +39,14 @@ export function ClientMonitoring() {
         typeof reason === 'string'
           ? reason
           : reason?.message || 'Promise rejection sem mensagem'
+
+      track('reliability_client_error', {
+        source: 'web',
+        entity_type: 'unhandled_rejection',
+        entity_id: window.location.pathname,
+        outcome: 'fail',
+        error_message: message,
+      }).catch(() => undefined)
 
       sendMonitoringEvent({
         type: 'unhandled_rejection',
@@ -50,15 +66,7 @@ export function ClientMonitoring() {
   }, [])
 
   useEffect(() => {
-    trackEvent({
-      eventType: 'PageViewed',
-      entityType: 'page',
-      entityId: pathname || '/',
-      payload: {
-        path: pathname,
-        referrer: document.referrer || null,
-      },
-    }).catch(() => undefined)
+    page(pathname || '/').catch(() => undefined)
   }, [pathname])
 
   return null

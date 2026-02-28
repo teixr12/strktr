@@ -5,6 +5,7 @@ import { fail, ok } from '@/lib/api/response'
 import { requireDomainPermission } from '@/lib/auth/domain-permissions'
 import { sendNotificationEmail } from '@/lib/email/resend'
 import { generatePortalToken, hashPortalToken } from '@/lib/portal/tokens'
+import { emitProductEvent } from '@/lib/telemetry'
 import { inviteClientPortalSchema } from '@/shared/schemas/cronograma-portal'
 
 export async function POST(
@@ -142,6 +143,21 @@ export async function POST(
       portalUrl
     )
   )
+
+  await emitProductEvent({
+    supabase,
+    orgId,
+    userId: user.id,
+    eventType: 'portal_invite_sent',
+    entityType: 'portal_invite',
+    entityId: session.id,
+    payload: {
+      obraId,
+      portalClienteId,
+      emailSent,
+      expiresAt: session.expires_at,
+    },
+  }).catch(() => undefined)
 
   return ok(
     request,

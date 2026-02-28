@@ -3,6 +3,7 @@
 import { useState, useRef, useMemo, useEffect } from 'react'
 import { toast } from '@/hooks/use-toast'
 import { apiRequest } from '@/lib/api/client'
+import { track } from '@/lib/analytics/client'
 import { fmt, fmtDate } from '@/lib/utils'
 import { KANBAN_COLUMNS, TEMPERATURA_EMOJI, TEMPERATURA_COLORS } from '@/lib/constants'
 import { Plus, X, MessageCircle, Trash2, Edit2, GripVertical, Search } from 'lucide-react'
@@ -119,6 +120,12 @@ export function LeadsContent({ initialLeads }: Props) {
         const data = await apiRequest<Lead>(`/api/v1/leads/${editLead.id}`, { method: 'PUT', body: payload })
         setLeads((prev) => prev.map((l) => l.id === editLead.id ? data : l))
         toast('Lead atualizado!', 'success')
+        track('core_edit', {
+          source: 'leads',
+          entity_type: 'lead',
+          entity_id: editLead.id,
+          outcome: 'success',
+        }).catch(() => undefined)
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Erro ao atualizar lead'
         toast(message, 'error')
@@ -129,6 +136,12 @@ export function LeadsContent({ initialLeads }: Props) {
         const data = await apiRequest<Lead>('/api/v1/leads', { method: 'POST', body: payload })
         setLeads((prev) => [data, ...prev])
         toast('Lead criado!', 'success')
+        track('core_create', {
+          source: 'leads',
+          entity_type: 'lead',
+          entity_id: data.id,
+          outcome: 'success',
+        }).catch(() => undefined)
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Erro ao criar lead'
         toast(message, 'error')
@@ -146,6 +159,12 @@ export function LeadsContent({ initialLeads }: Props) {
       setLeads((prev) => prev.filter((l) => l.id !== id))
       setDetailLead(null)
       toast('Lead excluído', 'info')
+      track('core_delete', {
+        source: 'leads',
+        entity_type: 'lead',
+        entity_id: id,
+        outcome: 'success',
+      }).catch(() => undefined)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao excluir lead'
       toast(message, 'error')
@@ -156,6 +175,13 @@ export function LeadsContent({ initialLeads }: Props) {
     try {
       const data = await apiRequest<Lead>(`/api/v1/leads/${id}`, { method: 'PUT', body: { status } })
       setLeads((prev) => prev.map((l) => l.id === id ? data : l))
+      track('core_move', {
+        source: 'leads',
+        entity_type: 'lead_status',
+        entity_id: id,
+        outcome: 'success',
+        to_status: status,
+      }).catch(() => undefined)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao mover lead'
       toast(message, 'error')
@@ -167,6 +193,12 @@ export function LeadsContent({ initialLeads }: Props) {
       const data = await apiRequest<{ recommendation: string }>(`/api/v1/leads/${id}/next-action`, { method: 'POST' })
       setNextAction((prev) => ({ ...prev, [id]: data.recommendation }))
       toast('Próxima ação gerada', 'success')
+      track('core_complete', {
+        source: 'leads',
+        entity_type: 'lead_next_action',
+        entity_id: id,
+        outcome: 'success',
+      }).catch(() => undefined)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao sugerir próxima ação'
       toast(message, 'error')

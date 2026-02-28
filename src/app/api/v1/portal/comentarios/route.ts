@@ -1,6 +1,7 @@
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { fail, ok } from '@/lib/api/response'
 import { createServiceRoleClient } from '@/lib/supabase/service'
+import { emitProductEvent } from '@/lib/telemetry'
 import { getValidPortalSession } from '@/server/services/portal/session-service'
 import { createPortalCommentSchema } from '@/shared/schemas/cronograma-portal'
 
@@ -60,6 +61,20 @@ export async function POST(request: Request) {
       400
     )
   }
+
+  await emitProductEvent({
+    supabase: service,
+    orgId: session.org_id,
+    userId: session.portal_cliente_id,
+    eventType: 'portal_comment_created',
+    entityType: 'portal_comment',
+    entityId: created.id,
+    payload: {
+      obraId: session.obra_id,
+      aprovacaoId: created.aprovacao_id,
+      source: 'portal',
+    },
+  }).catch(() => undefined)
 
   return ok(request, created, { flag: 'NEXT_PUBLIC_FF_CLIENT_PORTAL' }, 201)
 }

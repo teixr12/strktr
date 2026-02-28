@@ -3,18 +3,12 @@ import { API_ERROR_CODES } from '@/lib/api/errors'
 import { fail, ok } from '@/lib/api/response'
 import { log } from '@/lib/api/logger'
 import { emitProductEvent, type ProductEventType } from '@/lib/telemetry'
+import {
+  ANALYTICS_EVENT_TYPES,
+  type AnalyticsEventType,
+} from '@/shared/types/analytics'
 
-const ALLOWED_EVENTS: ProductEventType[] = [
-  'PageViewed',
-  'OnboardingStepCompleted',
-  'LeadCreated',
-  'LeadNextActionSuggested',
-  'LeadSlaBreached',
-  'BudgetDeviationDetected',
-  'EtapaStatusChanged',
-  'ChecklistItemToggled',
-  'RiskRecalculated',
-]
+const ALLOWED_EVENTS: AnalyticsEventType[] = [...ANALYTICS_EVENT_TYPES]
 
 export async function POST(request: Request) {
   const { user, supabase, error, requestId, orgId } = await getApiUser(request)
@@ -27,7 +21,8 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => null)
-  if (!body?.eventType || !ALLOWED_EVENTS.includes(body.eventType)) {
+  const eventType = body?.eventType as AnalyticsEventType | undefined
+  if (!eventType || !ALLOWED_EVENTS.includes(eventType)) {
     return fail(
       request,
       {
@@ -42,7 +37,7 @@ export async function POST(request: Request) {
     supabase,
     orgId,
     userId: user.id,
-    eventType: body.eventType,
+      eventType: eventType as ProductEventType,
     entityType: body.entityType || 'unknown',
     entityId: body.entityId || crypto.randomUUID(),
     payload: body.payload || {},

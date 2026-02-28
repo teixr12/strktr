@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js'
-import { Bar } from 'react-chartjs-2'
+import dynamic from 'next/dynamic'
 import type { Obra, Lead, Transacao, Visita, Orcamento, Compra, Projeto } from '@/types/database'
 import { apiRequest } from '@/lib/api/client'
+import { track } from '@/lib/analytics/client'
 import { featureFlags } from '@/lib/feature-flags'
 import { fmt, fmtDateTime } from '@/lib/utils'
 import { KANBAN_COLUMNS, TIPO_VISITA_COLORS } from '@/lib/constants'
@@ -22,7 +22,16 @@ import {
 } from '@/components/ui/enterprise'
 import { HardHat, Banknote, Crown, TrendingUp, ArrowRight, Wrench, Flame, CheckCircle2 } from 'lucide-react'
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
+const LazyBarChart = dynamic(
+  () =>
+    import('@/components/ui/enterprise/lazy-bar-chart').then(
+      (module) => module.LazyBarChart
+    ),
+  {
+    ssr: false,
+    loading: () => <div className="skeleton h-[250px] w-full rounded-xl" />,
+  }
+)
 
 interface DashboardContentProps {
   obras: Obra[]
@@ -72,7 +81,11 @@ function toneFromSeverity(severity: TodayAlert['severity']) {
 export function DashboardContent({ obras, leads, transacoes, visitas, compras }: DashboardContentProps) {
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Dashboard
   const [todayAlerts, setTodayAlerts] = useState<TodayAlertsPayload | null>(null)
+  const [todayAlertsLoading, setTodayAlertsLoading] = useState(true)
+  const [todayAlertsError, setTodayAlertsError] = useState<string | null>(null)
   const [roadmap, setRoadmap] = useState<RoadmapPayload | null>(null)
+  const [roadmapLoading, setRoadmapLoading] = useState(false)
+  const [roadmapError, setRoadmapError] = useState<string | null>(null)
   const [completingActionId, setCompletingActionId] = useState<string | null>(null)
 
   const obrasAtivas = obras.filter((o) => o.status === 'Em Andamento').length
@@ -86,35 +99,47 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras }:
   const proximasVisitas = visitas.filter((v) => v.status === 'Agendado').slice(0, 5)
   const showOnboarding = obras.length === 0 || leads.length === 0
 
-  useEffect(() => {
-    async function loadAlerts() {
-      try {
-        const payload = await apiRequest<TodayAlertsPayload>('/api/v1/alerts/today')
-        setTodayAlerts(payload)
-      } catch {
-        setTodayAlerts(null)
-      }
+  const loadAlerts = useCallback(async () => {
+    setTodayAlertsLoading(true)
+    setTodayAlertsError(null)
+    try {
+      const payload = await apiRequest<TodayAlertsPayload>('/api/v1/alerts/today')
+      setTodayAlerts(payload)
+    } catch (err) {
+      setTodayAlerts(null)
+      setTodayAlertsError(err instanceof Error ? err.message : 'Falha ao carregar alertas')
+    } finally {
+      setTodayAlertsLoading(false)
     }
+  }, [])
 
-    loadAlerts()
+  const loadRoadmap = useCallback(async () => {
+    if (!featureFlags.personalRoadmap) {
+      setRoadmap(null)
+      setRoadmapLoading(false)
+      setRoadmapError(null)
+      return
+    }
+    setRoadmapLoading(true)
+    setRoadmapError(null)
+    try {
+      const payload = await apiRequest<RoadmapPayload>('/api/v1/roadmap/me')
+      setRoadmap(payload)
+    } catch (err) {
+      setRoadmap(null)
+      setRoadmapError(err instanceof Error ? err.message : 'Falha ao carregar plano de hoje')
+    } finally {
+      setRoadmapLoading(false)
+    }
   }, [])
 
   useEffect(() => {
-    async function loadRoadmap() {
-      if (!featureFlags.personalRoadmap) {
-        setRoadmap(null)
-        return
-      }
-      try {
-        const payload = await apiRequest<RoadmapPayload>('/api/v1/roadmap/me')
-        setRoadmap(payload)
-      } catch {
-        setRoadmap(null)
-      }
-    }
+    void loadAlerts()
+  }, [loadAlerts])
 
-    loadRoadmap()
-  }, [])
+  useEffect(() => {
+    void loadRoadmap()
+  }, [loadRoadmap])
 
   async function completeRoadmapAction(actionId: string) {
     if (!featureFlags.personalRoadmap) return
@@ -124,8 +149,7 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras }:
         method: 'POST',
         body: { status: 'completed' },
       })
-      const payload = await apiRequest<RoadmapPayload>('/api/v1/roadmap/me')
-      setRoadmap(payload)
+      await loadRoadmap()
     } catch {
       // no-op for dashboard quick action
     } finally {
@@ -135,15 +159,19 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras }:
 
   useEffect(() => {
     if (!showOnboarding || !featureFlags.productAnalytics) return
-    void apiRequest('/api/v1/analytics/events', {
-      method: 'POST',
-      body: {
-        eventType: 'OnboardingStepCompleted',
-        entityType: 'dashboard',
-        entityId: 'onboarding-card-visible',
-        payload: { obrasCount: obras.length, leadsCount: leads.length },
-      },
-    }).catch(() => undefined)
+    const payload = {
+      source: 'dashboard' as const,
+      entity_type: 'dashboard_onboarding',
+      entity_id: 'onboarding-card-visible',
+      outcome: 'success' as const,
+      obras_count: obras.length,
+      leads_count: leads.length,
+    }
+
+    void Promise.allSettled([
+      track('OnboardingStepCompleted', payload),
+      track('activation_first_value_action', payload),
+    ])
   }, [showOnboarding, obras.length, leads.length])
 
   const financeData = useMemo(() => {
@@ -231,7 +259,22 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras }:
         }
       />
 
-      {todayAlerts?.alerts?.[0] ? (
+      {todayAlertsLoading ? (
+        <div className="skeleton h-[88px] w-full rounded-2xl" />
+      ) : todayAlertsError ? (
+        <SectionCard className="p-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-red-600 dark:text-red-400">{todayAlertsError}</p>
+            <button
+              type="button"
+              onClick={() => void loadAlerts()}
+              className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        </SectionCard>
+      ) : todayAlerts?.alerts?.[0] ? (
         <AlertBanner
           title={todayAlerts.alerts[0].title}
           description={`Módulo: ${todayAlerts.alerts[0].module.toUpperCase()} · ${todayAlerts.totals.total} alertas ativos`}
@@ -296,62 +339,79 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras }:
         </div>
       ) : null}
 
-      {featureFlags.personalRoadmap && roadmap ? (
-        <SectionCard
-          title="Seu Plano de Hoje"
-          subtitle={`Perfil: ${roadmap.profileType} · ${roadmap.progress.pending} pendente(s)`}
-          className="p-5"
-          right={(
-            <span className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
-              {roadmap.progress.completedToday} concluída(s) hoje
-            </span>
-          )}
-        >
-          {roadmap.actions.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">Sem ações pendentes no momento.</p>
-          ) : (
-            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-              {roadmap.actions.slice(0, 3).map((action) => (
-                <div
-                  key={action.id}
-                  className="rounded-xl border border-gray-200 p-3 dark:border-gray-800"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{action.title}</p>
-                    <StatBadge
-                      label={action.priority}
-                      tone={
-                        action.priority === 'high'
-                          ? 'danger'
-                          : action.priority === 'medium'
-                            ? 'warning'
-                            : 'info'
-                      }
-                    />
-                  </div>
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{action.whyItMatters}</p>
-                  <div className="mt-3 flex items-center justify-between gap-2">
-                    <Link
-                      href={action.href}
-                      className="text-xs font-semibold text-sand-600 hover:text-sand-700 dark:text-sand-400"
-                    >
-                      Abrir ação
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => completeRoadmapAction(action.id)}
-                      disabled={completingActionId === action.id}
-                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-200 disabled:opacity-60 dark:bg-emerald-900/20 dark:text-emerald-300"
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      {completingActionId === action.id ? '...' : 'Concluir'}
-                    </button>
-                  </div>
-                </div>
-              ))}
+      {featureFlags.personalRoadmap ? (
+        roadmapLoading ? (
+          <div className="skeleton h-[176px] w-full rounded-2xl" />
+        ) : roadmapError ? (
+          <SectionCard title="Seu Plano de Hoje" className="p-5">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-red-600 dark:text-red-400">{roadmapError}</p>
+              <button
+                type="button"
+                onClick={() => void loadRoadmap()}
+                className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+              >
+                Tentar novamente
+              </button>
             </div>
-          )}
-        </SectionCard>
+          </SectionCard>
+        ) : roadmap ? (
+          <SectionCard
+            title="Seu Plano de Hoje"
+            subtitle={`Perfil: ${roadmap.profileType} · ${roadmap.progress.pending} pendente(s)`}
+            className="p-5"
+            right={(
+              <span className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
+                {roadmap.progress.completedToday} concluída(s) hoje
+              </span>
+            )}
+          >
+            {roadmap.actions.length === 0 ? (
+              <p className="text-sm text-gray-500 dark:text-gray-400">Sem ações pendentes no momento.</p>
+            ) : (
+              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                {roadmap.actions.slice(0, 3).map((action) => (
+                  <div
+                    key={action.id}
+                    className="rounded-xl border border-gray-200 p-3 dark:border-gray-800"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{action.title}</p>
+                      <StatBadge
+                        label={action.priority}
+                        tone={
+                          action.priority === 'high'
+                            ? 'danger'
+                            : action.priority === 'medium'
+                              ? 'warning'
+                              : 'info'
+                        }
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{action.whyItMatters}</p>
+                    <div className="mt-3 flex items-center justify-between gap-2">
+                      <Link
+                        href={action.href}
+                        className="text-xs font-semibold text-sand-600 hover:text-sand-700 dark:text-sand-400"
+                      >
+                        Abrir ação
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => completeRoadmapAction(action.id)}
+                        disabled={completingActionId === action.id}
+                        className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-200 disabled:opacity-60 dark:bg-emerald-900/20 dark:text-emerald-300"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        {completingActionId === action.id ? '...' : 'Concluir'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </SectionCard>
+        ) : null
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
@@ -437,7 +497,7 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras }:
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <SectionCard title="Fluxo Financeiro (6 meses)" className="xl:col-span-2 p-5">
           <div className="h-[260px]">
-            <Bar data={financeData} options={financeOptions} />
+            <LazyBarChart data={financeData} options={financeOptions} />
           </div>
         </SectionCard>
 

@@ -14,6 +14,13 @@ export type UiNavCounts = {
   compras_pendentes_aprovacao: number | null
 }
 
+export type UiIntegrationStatus = {
+  code: 'whatsapp_business' | 'google_calendar' | 'sicoob_api'
+  label: string
+  configured: boolean
+  configuredBy: 'environment' | 'unknown'
+}
+
 export type UiQuickAction = {
   label: string
   icon?: ReactNode

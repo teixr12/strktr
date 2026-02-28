@@ -24,7 +24,11 @@ import {
 import type { Profile } from '@/types/database'
 import { featureFlags } from '@/lib/feature-flags'
 import { apiRequest } from '@/lib/api/client'
-import type { UiAvatarSource, UiNavCounts } from '@/shared/types/ui'
+import type {
+  UiAvatarSource,
+  UiIntegrationStatus,
+  UiNavCounts,
+} from '@/shared/types/ui'
 
 const icons = {
   LayoutGrid,
@@ -54,8 +58,6 @@ const NAV_ITEMS = [
   { id: 'configuracoes', label: 'Configurações', icon: 'Building2' as const, href: '/configuracoes' },
 ]
 
-const INTEGRATIONS = ['WhatsApp Business', 'Google Calendar', 'Sicoob API']
-
 interface SidebarProps {
   mobileOpen: boolean
   onClose: () => void
@@ -67,6 +69,7 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const supabase = createClient()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [navCounts, setNavCounts] = useState<UiNavCounts | null>(null)
+  const [integrationStatuses, setIntegrationStatuses] = useState<UiIntegrationStatus[] | null>(null)
   const [failedAvatarSrc, setFailedAvatarSrc] = useState<string | null>(null)
 
   useEffect(() => {
@@ -93,8 +96,20 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
       }
     }
 
+    async function loadIntegrations() {
+      try {
+        const integrations = await apiRequest<UiIntegrationStatus[]>(
+          '/api/v1/integrations/status'
+        )
+        setIntegrationStatuses(integrations)
+      } catch {
+        setIntegrationStatuses(null)
+      }
+    }
+
     loadProfile()
     loadNavCounts()
+    loadIntegrations()
   }, [supabase])
 
   async function handleLogout() {
@@ -226,20 +241,39 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
             })}
           </div>
 
-          <div className="mt-6 border-t border-gray-200/80 pt-5 dark:border-gray-800">
-            <p className="mb-3 px-2 text-xs font-semibold uppercase tracking-wider text-gray-400">Integrações disponíveis</p>
-            <div className="space-y-2 px-2">
-              {INTEGRATIONS.map((integration) => (
-                <div key={integration} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                  <span className="h-2 w-2 rounded-full bg-gray-300 dark:bg-gray-600" />
-                  <span className="flex-1">{integration}</span>
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-                    Conectável
-                  </span>
-                </div>
-              ))}
+          {integrationStatuses && integrationStatuses.length > 0 ? (
+            <div className="mt-6 border-t border-gray-200/80 pt-5 dark:border-gray-800">
+              <p className="mb-3 px-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                Integrações
+              </p>
+              <div className="space-y-2 px-2">
+                {integrationStatuses.map((integration) => (
+                  <div
+                    key={integration.code}
+                    className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300"
+                  >
+                    <span
+                      className={`h-2 w-2 rounded-full ${
+                        integration.configured
+                          ? 'bg-emerald-500'
+                          : 'bg-amber-400 dark:bg-amber-500'
+                      }`}
+                    />
+                    <span className="flex-1">{integration.label}</span>
+                    <span
+                      className={`text-[10px] font-semibold uppercase tracking-wide ${
+                        integration.configured
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : 'text-amber-600 dark:text-amber-400'
+                      }`}
+                    >
+                      {integration.configured ? 'Ativa' : 'Não configurada'}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          ) : null}
         </nav>
 
         <div className="border-t border-gray-200/70 p-4 dark:border-gray-800">

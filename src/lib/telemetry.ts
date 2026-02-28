@@ -1,15 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { AnalyticsEventType } from '@/shared/types/analytics'
 
-export type ProductEventType =
-  | 'LeadCreated'
-  | 'LeadNextActionSuggested'
-  | 'LeadSlaBreached'
-  | 'EtapaStatusChanged'
-  | 'ChecklistItemToggled'
-  | 'RiskRecalculated'
-  | 'BudgetDeviationDetected'
-  | 'PageViewed'
-  | 'OnboardingStepCompleted'
+export type ProductEventType = AnalyticsEventType
 
 interface ProductEventInput {
   supabase: SupabaseClient
