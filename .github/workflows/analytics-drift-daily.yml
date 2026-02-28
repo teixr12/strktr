@@ -1,0 +1,64 @@
+name: Analytics Drift Daily
+
+on:
+  schedule:
+    - cron: '15 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  analytics-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate required secrets
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          POSTHOG_PROJECT_ID: ${{ secrets.POSTHOG_PROJECT_ID }}
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_PROJECT_REF"
+          test -n "$POSTHOG_PROJECT_ID"
+          test -n "$POSTHOG_API_KEY"
+
+      - name: Prepare credentials files
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          POSTHOG_PROJECT_ID: ${{ secrets.POSTHOG_PROJECT_ID }}
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          POSTHOG_HOST: ${{ secrets.POSTHOG_HOST }}
+        run: |
+          set -euo pipefail
+          cat > supabase_keys.env.codex.txt <<EOF
+          SUPABASE_ACCESS_TOKEN=${SUPABASE_ACCESS_TOKEN}
+          SUPABASE_PROJECT_REF=${SUPABASE_PROJECT_REF}
+          EOF
+
+          cat > posthog-credentials.txt <<EOF
+          POSTHOG_PROJECT_ID=${POSTHOG_PROJECT_ID}
+          POSTHOG_API_KEY=${POSTHOG_API_KEY}
+          EOF
+
+          if [[ -n "${POSTHOG_HOST}" ]]; then
+            export POSTHOG_HOST="${POSTHOG_HOST}"
+            echo "POSTHOG_HOST=${POSTHOG_HOST}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Run analytics drift audit
+        run: ./scripts/audit-analytics-drift.sh
+
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: analytics-drift-report
+          path: docs/reports/analytics-drift-*.md
+          if-no-files-found: error
+
+      - name: Cleanup temporary credentials
+        if: always()
+        run: rm -f supabase_keys.env.codex.txt posthog-credentials.txt
