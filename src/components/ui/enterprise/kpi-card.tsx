@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import Link from 'next/link'
 import { Info } from 'lucide-react'
 
 interface KpiCardProps {
@@ -9,6 +10,8 @@ interface KpiCardProps {
   trend?: string
   progress?: number
   accent?: 'sand' | 'ocean' | 'emerald' | 'violet'
+  href?: string
+  drilldownLabel?: string
 }
 
 const ACCENT_CLASS = {
@@ -18,7 +21,17 @@ const ACCENT_CLASS = {
   violet: 'from-violet-500/25 to-violet-500/5',
 }
 
-export function KpiCard({ icon, label, value, hint, trend, progress, accent = 'sand' }: KpiCardProps) {
+export function KpiCard({
+  icon,
+  label,
+  value,
+  hint,
+  trend,
+  progress,
+  accent = 'sand',
+  href,
+  drilldownLabel = 'Ver detalhes',
+}: KpiCardProps) {
   return (
     <article className="enterprise-card p-5">
       <div className="mb-4 flex items-start justify-between">
@@ -39,6 +52,16 @@ export function KpiCard({ icon, label, value, hint, trend, progress, accent = 's
       {typeof progress === 'number' ? (
         <div className="mt-4 h-2 rounded-full bg-gray-200/80 dark:bg-gray-800/80">
           <div className="h-2 rounded-full bg-gradient-to-r from-sand-500 to-ocean-500" style={{ width: `${Math.max(0, Math.min(100, progress))}%` }} />
+        </div>
+      ) : null}
+      {href ? (
+        <div className="mt-3">
+          <Link
+            href={href}
+            className="text-xs font-semibold text-sand-700 underline-offset-2 hover:underline dark:text-sand-300"
+          >
+            {drilldownLabel}
+          </Link>
         </div>
       ) : null}
     </article>
