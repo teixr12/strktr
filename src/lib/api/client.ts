@@ -9,12 +9,21 @@ type ApiErrorPayload = {
   }
 }
 
+type ApiEnvelope<T, M = Record<string, unknown>> = {
+  data: T
+  meta?: M
+  requestId?: string
+}
+
 type ApiRequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   body?: unknown
 }
 
-export async function apiRequest<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
+async function requestApi<T, M = Record<string, unknown>>(
+  path: string,
+  options: ApiRequestOptions = {}
+): Promise<ApiEnvelope<T, M>> {
   const supabase = createClient()
   const { data } = await supabase.auth.getSession()
   const token = data.session?.access_token
@@ -48,7 +57,8 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
     }).catch(() => undefined)
   }
 
-  const payload = (await response.json().catch(() => ({}))) as ApiErrorPayload & { data?: T }
+  const payload = (await response.json().catch(() => ({}))) as ApiErrorPayload &
+    Partial<ApiEnvelope<T, M>>
   if (!response.ok) {
     if (path !== '/api/v1/analytics/events') {
       track('reliability_api_error', {
@@ -64,5 +74,24 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
     throw new Error(payload.error?.message || 'Erro ao executar operação')
   }
 
-  return payload.data as T
+  return {
+    data: payload.data as T,
+    meta: payload.meta,
+    requestId: payload.requestId,
+  }
+}
+
+export async function apiRequest<T>(
+  path: string,
+  options: ApiRequestOptions = {}
+): Promise<T> {
+  const payload = await requestApi<T>(path, options)
+  return payload.data
+}
+
+export async function apiRequestWithMeta<T, M = Record<string, unknown>>(
+  path: string,
+  options: ApiRequestOptions = {}
+): Promise<ApiEnvelope<T, M>> {
+  return requestApi<T, M>(path, options)
 }

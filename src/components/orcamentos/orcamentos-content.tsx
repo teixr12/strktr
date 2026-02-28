@@ -1,14 +1,20 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { apiRequest } from '@/lib/api/client'
+import { apiRequest, apiRequestWithMeta } from '@/lib/api/client'
 import { featureFlags } from '@/lib/feature-flags'
 import { toast } from '@/hooks/use-toast'
 import { fmt, fmtDate } from '@/lib/utils'
 import { ORC_STATUS_COLORS } from '@/lib/constants'
 import { Plus, X, Trash2, Edit2, Printer, FileText, Search } from 'lucide-react'
 import { AiBudgetButton } from './ai-budget-button'
-import { EmptyStateAction, PageHeader, QuickActionBar, SectionCard } from '@/components/ui/enterprise'
+import {
+  EmptyStateAction,
+  PageHeader,
+  PaginationControls,
+  QuickActionBar,
+  SectionCard,
+} from '@/components/ui/enterprise'
 import type { Orcamento, OrcamentoStatus, Lead, Obra } from '@/types/database'
 
 interface Props { initialOrcamentos: Orcamento[] }
@@ -21,10 +27,29 @@ interface OrcamentoPdfPayload {
   fallback: boolean
 }
 
+interface PaginationMeta {
+  count: number
+  page: number
+  pageSize: number
+  total: number
+  hasMore: boolean
+}
+
+const PAGE_SIZE = 50
+
 export function OrcamentosContent({ initialOrcamentos }: Props) {
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Orcamentos
   const usePdfV2 = featureFlags.orcamentoPdfV2
+  const usePaginationV1 = featureFlags.uiPaginationV1
   const [orcamentos, setOrcamentos] = useState(initialOrcamentos)
+  const [pagination, setPagination] = useState<PaginationMeta>({
+    count: initialOrcamentos.length,
+    page: 1,
+    pageSize: PAGE_SIZE,
+    total: initialOrcamentos.length,
+    hasMore: false,
+  })
+  const [isPageLoading, setIsPageLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editOrc, setEditOrc] = useState<Orcamento | null>(null)
   const [viewOrc, setViewOrc] = useState<Orcamento | null>(null)
@@ -56,6 +81,39 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
     }
     loadRelated()
   }, [])
+
+  async function refreshOrcamentos(targetPage = 1) {
+    if (!usePaginationV1) return
+    setIsPageLoading(true)
+    try {
+      const params = new URLSearchParams({
+        page: String(targetPage),
+        pageSize: String(PAGE_SIZE),
+      })
+      if (filtroStatus !== 'Todos') params.set('status', filtroStatus)
+      const payload = await apiRequestWithMeta<Orcamento[], PaginationMeta>(`/api/v1/orcamentos?${params.toString()}`)
+      setOrcamentos(payload.data)
+      setPagination(
+        payload.meta || {
+          count: payload.data.length,
+          page: targetPage,
+          pageSize: PAGE_SIZE,
+          total: payload.data.length,
+          hasMore: false,
+        }
+      )
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao recarregar orçamentos', 'error')
+    } finally {
+      setIsPageLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!usePaginationV1) return
+    void refreshOrcamentos(1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usePaginationV1, filtroStatus])
 
   const total = orcamentos.length
   const aprovados = orcamentos.filter((o) => o.status === 'Aprovado')
@@ -156,6 +214,9 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
         setOrcamentos((prev) => [data, ...prev])
         toast('Orçamento criado!', 'success')
       }
+      if (usePaginationV1) {
+        await refreshOrcamentos(1)
+      }
       setShowForm(false)
       setEditOrc(null)
     } catch (err) {
@@ -170,6 +231,9 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
       setOrcamentos((prev) => prev.filter((o) => o.id !== id))
       setViewOrc(null)
       toast('Orçamento excluído', 'info')
+      if (usePaginationV1) {
+        await refreshOrcamentos(1)
+      }
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Erro ao excluir orçamento', 'error')
     }
@@ -267,7 +331,7 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
     <div className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} space-y-5`}>
       <PageHeader
         title="Orçamentos"
-        subtitle={`${total} orçamentos`}
+        subtitle={`${pagination.total || total} orçamentos`}
         actions={
           <QuickActionBar
             actions={[{
@@ -283,16 +347,16 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         <div className="glass-card rounded-2xl p-4 text-center">
-          <p className="text-lg font-semibold text-gray-900 dark:text-white">{total}</p>
-          <p className="text-xs text-gray-500">Total</p>
+          <p className="text-lg font-semibold text-gray-900 dark:text-white">{usePaginationV1 ? pagination.total : total}</p>
+          <p className="text-xs text-gray-500">{usePaginationV1 ? 'Total geral' : 'Total'}</p>
         </div>
         <div className="glass-card rounded-2xl p-4 text-center">
           <p className="text-lg font-semibold text-emerald-600">{fmt(aprovadoValor)}</p>
-          <p className="text-xs text-gray-500">Aprovados</p>
+          <p className="text-xs text-gray-500">{usePaginationV1 ? 'Aprovados (página)' : 'Aprovados'}</p>
         </div>
         <div className="glass-card rounded-2xl p-4 text-center">
           <p className="text-lg font-semibold text-sand-600 dark:text-sand-400">{taxaAprovacao}%</p>
-          <p className="text-xs text-gray-500">Taxa Aprovação</p>
+          <p className="text-xs text-gray-500">{usePaginationV1 ? 'Taxa (página)' : 'Taxa Aprovação'}</p>
         </div>
       </div>
 
@@ -350,6 +414,17 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
               {o.blocked_reason && <p className="mt-1 text-[11px] text-rose-600">{o.blocked_reason}</p>}
             </div>
           ))}
+          {usePaginationV1 ? (
+            <PaginationControls
+              page={pagination.page}
+              pageSize={pagination.pageSize}
+              total={pagination.total}
+              hasMore={pagination.hasMore}
+              isLoading={isPageLoading}
+              onPrev={() => void refreshOrcamentos(Math.max(1, pagination.page - 1))}
+              onNext={() => void refreshOrcamentos(pagination.page + 1)}
+            />
+          ) : null}
         </SectionCard>
       )}
 

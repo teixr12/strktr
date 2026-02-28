@@ -45,6 +45,7 @@ export async function GET(request: Request) {
         navCountsV2: process.env.NEXT_PUBLIC_FF_NAV_COUNTS_V2 !== 'false',
         leadsProgressV2: process.env.NEXT_PUBLIC_FF_LEADS_PROGRESS_V2 !== 'false',
         orcamentoPdfV2: process.env.NEXT_PUBLIC_FF_ORCAMENTO_PDF_V2 !== 'false',
+        uiPaginationV1: process.env.NEXT_PUBLIC_FF_UI_PAGINATION_V1 !== 'false',
         checklistDueDate: process.env.NEXT_PUBLIC_FF_CHECKLIST_DUE_DATE === 'true',
         productAnalytics: process.env.NEXT_PUBLIC_FF_PRODUCT_ANALYTICS === 'true',
         analyticsExternalV1:

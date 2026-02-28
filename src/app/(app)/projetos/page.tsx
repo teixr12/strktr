@@ -7,7 +7,11 @@ export default async function ProjetosPage() {
   const supabase = await createClient()
 
   const [projetosRes, leadsRes] = await Promise.all([
-    supabase.from('projetos').select('*, leads(nome), obras(nome)').order('created_at', { ascending: false }),
+    supabase
+      .from('projetos')
+      .select('*, leads(nome), obras(nome)')
+      .order('created_at', { ascending: false })
+      .range(0, 49),
     supabase.from('leads').select('id, nome'),
   ])
 
