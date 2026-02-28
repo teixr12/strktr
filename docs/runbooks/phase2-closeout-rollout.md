@@ -56,3 +56,15 @@ Fechar Fase 2 sem regressão, validando paginação segura em módulos densos e 
 2. Paginação funcional em UI com metadados consistentes.
 3. Role/tenant tests passando quando secrets completos estão disponíveis.
 4. Sem aumento anormal de erro 5xx ou erro client-side.
+
+## Fechamento operacional da virtualização (canary + drill)
+1. Ativar `NEXT_PUBLIC_FF_TABLE_VIRTUALIZATION=true` em produção.
+2. Redeploy e validar `health/ops` com `flags.tableVirtualization=true`.
+3. Monitorar 2h:
+   - `/financeiro` p95,
+   - 5xx `/api/v1/*`,
+   - erro JS client.
+4. Executar rollback drill:
+   - setar flag `false` + redeploy + validar fallback,
+   - restaurar `true` + redeploy + validar retorno.
+5. Registrar TTR e evidência no relatório `docs/reports/phase2-closeout-*.md`.

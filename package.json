@@ -15,6 +15,7 @@
     "release:readiness": "./scripts/release-readiness.sh",
     "baseline:report": "./scripts/generate-baseline-report.sh",
     "audit:production": "./scripts/run-production-audits.sh",
+    "audit:analytics-drift": "./scripts/audit-analytics-drift.sh",
     "baseline:tag": "./scripts/create-baseline-tag.sh",
     "ops:post-wave2": "./scripts/post-wave2-closure.sh",
     "ops:post-wave2:full": "./scripts/post-wave2-closure.sh --with-readiness"
