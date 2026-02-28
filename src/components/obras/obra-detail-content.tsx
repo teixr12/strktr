@@ -59,6 +59,7 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
   const [showEtapaForm, setShowEtapaForm] = useState(false)
   const [executionSummary, setExecutionSummary] = useState<ExecutionSummary | null>(null)
   const [loadingSummary, setLoadingSummary] = useState(false)
+  const [summaryError, setSummaryError] = useState<string | null>(null)
   const etapaForm = useForm<CreateEtapaDTO>({
     resolver: zodResolver(createEtapaSchema),
     defaultValues: { nome: '', responsavel: '', status: 'Pendente' },
@@ -83,11 +84,13 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
 
   const loadExecutionSummary = useCallback(async () => {
     setLoadingSummary(true)
+    setSummaryError(null)
     try {
       const data = await apiRequest<ExecutionSummary>(`/api/v1/obras/${obra.id}/execution-summary`)
       setExecutionSummary(data)
-    } catch {
+    } catch (err) {
       setExecutionSummary(null)
+      setSummaryError(err instanceof Error ? err.message : 'Falha ao carregar painel de execução')
     } finally {
       setLoadingSummary(false)
     }
@@ -182,6 +185,16 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
     setTab(action.targetTab)
   }
 
+  const actionNow = executionSummary?.recommendedActions?.[0] || null
+  const actionNowDescriptionByCode: Record<RecommendedAction['code'], string> = {
+    RESOLVE_BLOCKED_STAGE: 'Existem etapas bloqueadas impactando o cronograma.',
+    HANDLE_OVERDUE_CHECKLIST: 'Existem checklists vencidos exigindo ação imediata.',
+    START_STAGE_PROGRESS: 'Existem etapas sem progresso registrado recentemente.',
+    ADD_DAILY_NOTE: 'O diário está desatualizado e pode causar perda de contexto.',
+    RECALCULATE_RISK: 'Recalcule o risco para atualizar decisões operacionais.',
+  }
+  const financeiroSaldo = rec - dep
+
   async function handleDelete() {
     if (!confirm('Excluir esta obra? Esta ação não pode ser desfeita.')) return
     try {
@@ -233,6 +246,86 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
         <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
           <div className="h-full bg-gradient-to-r from-sand-400 to-sand-600 rounded-full transition-all duration-1000" style={{ width: `${obra.progresso || 0}%` }} />
         </div>
+      </div>
+
+      <div className="mb-4 grid gap-3 xl:grid-cols-5">
+        {loadingSummary ? (
+          <>
+            <div className="skeleton h-24 rounded-2xl" />
+            <div className="skeleton h-24 rounded-2xl" />
+            <div className="skeleton h-24 rounded-2xl" />
+            <div className="skeleton h-24 rounded-2xl" />
+            <div className="skeleton h-24 rounded-2xl" />
+          </>
+        ) : summaryError ? (
+          <div className="xl:col-span-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-red-700">{summaryError}</p>
+              <button
+                type="button"
+                onClick={() => void loadExecutionSummary()}
+                className="rounded-lg bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-200"
+              >
+                Tentar novamente
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="glass-card rounded-2xl p-3">
+              <p className="text-[11px] uppercase tracking-wide text-gray-500">Etapas</p>
+              <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                {executionSummary ? `${executionSummary.kpis.etapasConcluidas}/${executionSummary.kpis.etapasTotal}` : `${etapas.filter((e) => e.status === 'Concluída').length}/${etapas.length}`}
+              </p>
+              <p className="text-xs text-gray-500">Concluídas</p>
+            </div>
+            <div className="glass-card rounded-2xl p-3">
+              <p className="text-[11px] uppercase tracking-wide text-gray-500">Risco</p>
+              <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                {executionSummary ? executionSummary.risk.level.toUpperCase() : '—'}
+              </p>
+              <p className="text-xs text-gray-500">Score {executionSummary ? executionSummary.risk.score : '—'}</p>
+            </div>
+            <div className="glass-card rounded-2xl p-3">
+              <p className="text-[11px] uppercase tracking-wide text-gray-500">Checklists</p>
+              <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                {executionSummary ? executionSummary.kpis.checklistPendentes : initialChecklists.length}
+              </p>
+              <p className="text-xs text-gray-500">Pendentes</p>
+            </div>
+            <div className="glass-card rounded-2xl p-3">
+              <p className="text-[11px] uppercase tracking-wide text-gray-500">Financeiro</p>
+              <p className={`mt-1 text-lg font-semibold ${financeiroSaldo >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                {fmt(financeiroSaldo)}
+              </p>
+              <p className="text-xs text-gray-500">Recebido - gasto</p>
+            </div>
+            <div className="glass-card rounded-2xl p-3">
+              <p className="text-[11px] uppercase tracking-wide text-gray-500">Ação Agora</p>
+              {actionNow ? (
+                <>
+                  <p className="mt-1 text-xs font-semibold text-gray-900 dark:text-white">{actionNow.title}</p>
+                  <button
+                    onClick={() => void runRecommendedAction(actionNow)}
+                    className="mt-2 rounded-lg bg-sand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sand-600"
+                  >
+                    {actionNow.cta}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="mt-1 text-xs text-gray-500">Sem ação crítica no momento.</p>
+                  <button
+                    onClick={() => setTab('diario')}
+                    className="mt-2 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200"
+                  >
+                    Registrar atualização
+                  </button>
+                </>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Tabs */}
@@ -320,6 +413,7 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
                 executionSummary.recommendedActions.map((action) => (
                   <div key={action.code} className={`rounded-xl border p-3 ${actionStyles[action.severity]}`}>
                     <p className="text-xs font-semibold text-gray-900 dark:text-white">{action.title}</p>
+                    <p className="mt-1 text-[11px] text-gray-600 dark:text-gray-300">{actionNowDescriptionByCode[action.code]}</p>
                     <button
                       onClick={() => runRecommendedAction(action)}
                       className="mt-2 px-3 py-1.5 bg-gray-900 hover:bg-gray-700 text-white text-xs rounded-lg transition-all"
