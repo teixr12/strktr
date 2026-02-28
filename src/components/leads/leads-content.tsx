@@ -149,6 +149,13 @@ export function LeadsContent({ initialLeads }: Props) {
       (l.tipo_projeto && l.tipo_projeto.toLowerCase().includes(q))
     )
   }, [leads, searchQuery])
+  const overdueLeadsCount = useMemo(() => {
+    return filteredLeads.filter((lead) => {
+      if (!lead.ultimo_contato || lead.status === 'Fechado' || lead.status === 'Perdido') return false
+      const hours = (nowMs - new Date(lead.ultimo_contato).getTime()) / (1000 * 60 * 60)
+      return hours >= 48
+    }).length
+  }, [filteredLeads, nowMs])
 
   const [form, setForm] = useState({
     nome: '', email: '', telefone: '', tipo_projeto: 'Residencial',
@@ -330,11 +337,45 @@ export function LeadsContent({ initialLeads }: Props) {
       />
 
       {sla && sla.totalParados > 0 ? (
-        <div className="flex justify-start">
-          <StatBadge
-            label={`${sla.totalParados} parados (${sla.slaHours}h)`}
-            tone={sla.severity === 'high' ? 'danger' : sla.severity === 'medium' ? 'warning' : 'info'}
-          />
+        <div className="grid gap-3 md:grid-cols-2">
+          <SectionCard className="p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-gray-500">SLA Comercial</p>
+                <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  {sla.totalParados} parados ({sla.slaHours}h)
+                </p>
+              </div>
+              <StatBadge
+                label={sla.severity === 'high' ? 'Crítico' : sla.severity === 'medium' ? 'Atenção' : 'Observação'}
+                tone={sla.severity === 'high' ? 'danger' : sla.severity === 'medium' ? 'warning' : 'info'}
+              />
+            </div>
+          </SectionCard>
+          <SectionCard className="p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-gray-500">Ação Rápida</p>
+                <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  {overdueLeadsCount > 0
+                    ? `${overdueLeadsCount} lead(s) com risco de SLA`
+                    : 'Pipeline sem risco imediato'}
+                </p>
+              </div>
+              {overdueLeadsCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = filteredLeads.find((lead) => isSlaLate(lead))
+                    if (target) setDetailLead(target)
+                  }}
+                  className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600"
+                >
+                  Resolver agora
+                </button>
+              ) : null}
+            </div>
+          </SectionCard>
         </div>
       ) : null}
 
@@ -389,11 +430,12 @@ export function LeadsContent({ initialLeads }: Props) {
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
                   onDragStart={handleDragStart}
-                  onDragEnd={handleDragEnd}
-                  onOpenLead={setDetailLead}
-                  nowMs={nowMs}
-                />
-              ))}
+                onDragEnd={handleDragEnd}
+                onOpenLead={setDetailLead}
+                onSuggestNextAction={suggestNextAction}
+                nowMs={nowMs}
+              />
+            ))}
             </div>
           )}
 
