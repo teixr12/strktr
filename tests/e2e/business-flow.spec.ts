@@ -49,21 +49,26 @@ test.describe('business flow (authenticated)', () => {
     const pdfPayload = await pdf.json()
     expect(Boolean(pdfPayload.data.downloadUrl) || Boolean(pdfPayload.data.base64)).toBeTruthy()
 
-    const compra = await request.post('/api/v1/compras', {
+    const orcamento = await request.post('/api/v1/orcamentos', {
       headers,
       data: {
-        descricao: `Compra E2E ${Date.now()}`,
-        categoria: 'Material',
+        titulo: `Orçamento E2E ${Date.now()}`,
         obra_id: E2E_OBRA_ID,
-        valor_estimado: 1000,
-        urgencia: 'Alta',
-        status: 'Solicitado',
+        status: 'Rascunho',
         exige_aprovacao_cliente: true,
+        items: [
+          {
+            descricao: 'Item E2E',
+            unidade: 'un',
+            quantidade: 1,
+            valor_unitario: 1000,
+          },
+        ],
       },
     })
-    expect(compra.status()).toBe(201)
-    const compraId = (await compra.json()).data?.id as string
-    expect(compraId).toBeTruthy()
+    expect(orcamento.status()).toBe(201)
+    const orcamentoId = (await orcamento.json()).data?.id as string
+    expect(orcamentoId).toBeTruthy()
 
     const invite = await request.post(`/api/v1/obras/${E2E_OBRA_ID}/portal/invite`, {
       headers,
@@ -84,10 +89,10 @@ test.describe('business flow (authenticated)', () => {
     const portalSession = await request.get(`/api/v1/portal/session/${portalToken}`)
     expect(portalSession.status()).toBe(200)
     const portalPayload = await portalSession.json()
-    const compraApproval = (portalPayload.data?.aprovacoes || []).find((item: { compra?: { id: string } | null }) => item.compra?.id === compraId)
-    expect(compraApproval?.id).toBeTruthy()
+    const approval = (portalPayload.data?.aprovacoes || []).find((item: { orcamento?: { id: string } | null }) => item.orcamento?.id === orcamentoId)
+    expect(approval?.id).toBeTruthy()
 
-    const reject = await request.post(`/api/v1/portal/aprovacoes/${compraApproval.id}/reject`, {
+    const reject = await request.post(`/api/v1/portal/aprovacoes/${approval.id}/reject`, {
       data: {
         token: portalToken,
         comentario: 'Ajustar especificação para aprovar',
@@ -97,22 +102,23 @@ test.describe('business flow (authenticated)', () => {
     const rejectPayload = await reject.json()
     expect(rejectPayload.data?.requiredNextVersion).toBeGreaterThan(1)
 
-    const forceFinalize = await request.put(`/api/v1/compras/${compraId}`, {
+    const resubmit = await request.put(`/api/v1/orcamentos/${orcamentoId}`, {
       headers,
       data: {
-        status: 'Aprovado',
-      },
-    })
-    expect(forceFinalize.status()).toBe(409)
-
-    const resubmit = await request.put(`/api/v1/compras/${compraId}`, {
-      headers,
-      data: {
-        notas: 'Versão revisada para reenvio',
+        observacoes: 'Versão revisada para reenvio',
         reenviar_aprovacao_cliente: true,
         exige_aprovacao_cliente: true,
       },
     })
     expect(resubmit.status()).toBe(200)
+
+    const portalSessionAfterResubmit = await request.get(`/api/v1/portal/session/${portalToken}`)
+    expect(portalSessionAfterResubmit.status()).toBe(200)
+    const portalAfterPayload = await portalSessionAfterResubmit.json()
+    const pendingApproval = (portalAfterPayload.data?.aprovacoes || []).find(
+      (item: { orcamento?: { id: string } | null; status: string; approval_version?: number | null }) =>
+        item.orcamento?.id === orcamentoId && item.status === 'pendente' && Number(item.approval_version || 0) >= 2
+    )
+    expect(pendingApproval?.id).toBeTruthy()
   })
 })

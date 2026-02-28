@@ -291,6 +291,7 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras }:
         <KpiCard
           icon={<HardHat className="h-5 w-5 text-sand-700 dark:text-sand-300" />}
           label="Obras Ativas"
+          hint="Quantidade de obras em status Em Andamento."
           value={String(obrasAtivas)}
           trend={obrasAtivas > 0 ? `+${obrasAtivas}` : undefined}
           progress={Math.min(obrasAtivas * 10, 100)}
@@ -299,6 +300,7 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras }:
         <KpiCard
           icon={<Banknote className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />}
           label="Receita 2026"
+          hint="Soma de transações do tipo Receita no ano corrente da visualização."
           value={fmt(receitas)}
           trend="↗ 23%"
           progress={70}
@@ -307,6 +309,7 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras }:
         <KpiCard
           icon={<Crown className="h-5 w-5 text-ocean-700 dark:text-ocean-300" />}
           label="Leads Qualificados"
+          hint="Leads não perdidos no pipeline comercial."
           value={String(leadsAtivos)}
           trend={`${pipelineSummary.find((p) => p.id === 'Qualificado')?.count || 0} novos`}
           progress={50}
@@ -315,6 +318,7 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras }:
         <KpiCard
           icon={<TrendingUp className="h-5 w-5 text-violet-700 dark:text-violet-300" />}
           label="Meta Q4 2026"
+          hint="Saldo operacional (receitas - despesas) no período."
           value={fmt(saldo)}
           trend="85%"
           progress={85}
