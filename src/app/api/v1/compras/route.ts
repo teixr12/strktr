@@ -5,6 +5,7 @@ import { API_ERROR_CODES } from '@/lib/api/errors'
 import { requireDomainPermission } from '@/lib/auth/domain-permissions'
 import { createCompraSchema } from '@/shared/schemas/business'
 import { ensurePendingApproval } from '@/server/services/portal/approval-service'
+import { buildPaginationMeta, getPaginationFromSearchParams } from '@/lib/api/pagination'
 
 export async function GET(request: Request) {
   const { user, supabase, error, requestId, orgId, role } = await getApiUser(request)
@@ -16,9 +17,17 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const status = searchParams.get('status')
   const obra_id = searchParams.get('obra_id')
-  const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100)
+  const { page, pageSize, offset } = getPaginationFromSearchParams(searchParams, {
+    defaultPageSize: 50,
+    maxPageSize: 100,
+  })
 
-  let query = supabase.from('compras').select('*, obras(nome)').eq('org_id', orgId).order('created_at', { ascending: false }).limit(limit)
+  let query = supabase
+    .from('compras')
+    .select('*, obras(nome)')
+    .eq('org_id', orgId)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + pageSize - 1)
   if (status) query = query.eq('status', status)
   if (obra_id) query = query.eq('obra_id', obra_id)
 
@@ -28,7 +37,13 @@ export async function GET(request: Request) {
     return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 500)
   }
 
-  return ok(request, data ?? [], { count: data?.length || 0 })
+  let totalQuery = supabase.from('compras').select('*', { head: true, count: 'exact' }).eq('org_id', orgId)
+  if (status) totalQuery = totalQuery.eq('status', status)
+  if (obra_id) totalQuery = totalQuery.eq('obra_id', obra_id)
+  const { count } = await totalQuery
+  const total = count ?? data?.length ?? 0
+
+  return ok(request, data ?? [], buildPaginationMeta(data?.length || 0, total, page, pageSize))
 }
 
 export async function POST(request: Request) {

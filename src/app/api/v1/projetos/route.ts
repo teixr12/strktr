@@ -4,6 +4,7 @@ import { log } from '@/lib/api/logger'
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { requireDomainPermission } from '@/lib/auth/domain-permissions'
 import { createProjetoSchema } from '@/shared/schemas/business'
+import { buildPaginationMeta, getPaginationFromSearchParams } from '@/lib/api/pagination'
 
 export async function GET(request: Request) {
   const { user, supabase, error, requestId, orgId, role } = await getApiUser(request)
@@ -14,9 +15,17 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url)
   const status = searchParams.get('status')
-  const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100)
+  const { page, pageSize, offset } = getPaginationFromSearchParams(searchParams, {
+    defaultPageSize: 50,
+    maxPageSize: 100,
+  })
 
-  let query = supabase.from('projetos').select('*, leads(nome), obras(nome)').eq('org_id', orgId).order('created_at', { ascending: false }).limit(limit)
+  let query = supabase
+    .from('projetos')
+    .select('*, leads(nome), obras(nome)')
+    .eq('org_id', orgId)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + pageSize - 1)
   if (status) query = query.eq('status', status)
 
   const { data, error: dbError } = await query
@@ -25,7 +34,12 @@ export async function GET(request: Request) {
     return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 500)
   }
 
-  return ok(request, data ?? [], { count: data?.length || 0 })
+  let totalQuery = supabase.from('projetos').select('*', { head: true, count: 'exact' }).eq('org_id', orgId)
+  if (status) totalQuery = totalQuery.eq('status', status)
+  const { count } = await totalQuery
+  const total = count ?? data?.length ?? 0
+
+  return ok(request, data ?? [], buildPaginationMeta(data?.length || 0, total, page, pageSize))
 }
 
 export async function POST(request: Request) {

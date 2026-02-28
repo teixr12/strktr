@@ -14,6 +14,32 @@ test.describe('business flow (authenticated)', () => {
 
   test.skip(!hasRequiredEnv && !isCI, 'Set E2E_BEARER_TOKEN and E2E_OBRA_ID to run authenticated business tests locally')
 
+  test('list endpoints expose stable pagination meta', async ({ request }) => {
+    const headers = {
+      Authorization: `Bearer ${E2E_BEARER_TOKEN}`,
+    }
+
+    const routes = [
+      '/api/v1/leads?page=1&pageSize=5',
+      '/api/v1/compras?page=1&pageSize=5',
+      '/api/v1/transacoes?page=1&pageSize=5',
+      '/api/v1/projetos?page=1&pageSize=5',
+      '/api/v1/orcamentos?page=1&pageSize=5',
+    ]
+
+    for (const route of routes) {
+      const response = await request.get(route, { headers })
+      expect(response.status()).toBe(200)
+      const payload = await response.json()
+      expect(Array.isArray(payload.data)).toBeTruthy()
+      expect(payload.meta.page).toBe(1)
+      expect(payload.meta.pageSize).toBe(5)
+      expect(typeof payload.meta.total).toBe('number')
+      expect(typeof payload.meta.hasMore).toBe('boolean')
+      expect(typeof payload.meta.count).toBe('number')
+    }
+  })
+
   test('cronograma -> pdf -> portal approval rejection/resubmission', async ({ request }) => {
     const headers = {
       Authorization: `Bearer ${E2E_BEARER_TOKEN}`,

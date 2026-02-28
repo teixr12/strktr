@@ -33,14 +33,25 @@ const LazyBarChart = dynamic(
   }
 )
 
+type DashboardObra = Pick<
+  Obra,
+  'id' | 'nome' | 'cliente' | 'local' | 'status' | 'etapa_atual' | 'progresso' | 'valor_contrato' | 'created_at'
+>
+type DashboardLead = Pick<Lead, 'id' | 'nome' | 'origem' | 'status' | 'temperatura' | 'valor_potencial' | 'created_at'>
+type DashboardTransacao = Pick<Transacao, 'id' | 'tipo' | 'valor' | 'data' | 'status'>
+type DashboardVisita = Pick<Visita, 'id' | 'titulo' | 'tipo' | 'status' | 'data_hora'>
+type DashboardOrcamento = Pick<Orcamento, 'id' | 'status' | 'valor_total' | 'created_at'>
+type DashboardCompra = Pick<Compra, 'id' | 'status' | 'created_at'>
+type DashboardProjeto = Pick<Projeto, 'id' | 'status' | 'valor_estimado' | 'created_at'>
+
 interface DashboardContentProps {
-  obras: Obra[]
-  leads: Lead[]
-  transacoes: Transacao[]
-  visitas: Visita[]
-  orcamentos: Orcamento[]
-  compras: Compra[]
-  projetos: Projeto[]
+  obras: DashboardObra[]
+  leads: DashboardLead[]
+  transacoes: DashboardTransacao[]
+  visitas: DashboardVisita[]
+  orcamentos: DashboardOrcamento[]
+  compras: DashboardCompra[]
+  projetos: DashboardProjeto[]
 }
 
 interface TodayAlert {

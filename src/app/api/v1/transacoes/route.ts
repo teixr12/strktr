@@ -4,6 +4,7 @@ import { log } from '@/lib/api/logger'
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { requireDomainPermission } from '@/lib/auth/domain-permissions'
 import { createTransacaoSchema } from '@/shared/schemas/business'
+import { buildPaginationMeta, getPaginationFromSearchParams } from '@/lib/api/pagination'
 
 export async function GET(request: Request) {
   const { user, supabase, error, requestId, orgId, role } = await getApiUser(request)
@@ -15,9 +16,17 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const tipo = searchParams.get('tipo')
   const obra_id = searchParams.get('obra_id')
-  const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100)
+  const { page, pageSize, offset } = getPaginationFromSearchParams(searchParams, {
+    defaultPageSize: 50,
+    maxPageSize: 100,
+  })
 
-  let query = supabase.from('transacoes').select('*, obras(nome)').eq('org_id', orgId).order('data', { ascending: false }).limit(limit)
+  let query = supabase
+    .from('transacoes')
+    .select('*, obras(nome)')
+    .eq('org_id', orgId)
+    .order('data', { ascending: false })
+    .range(offset, offset + pageSize - 1)
   if (tipo) query = query.eq('tipo', tipo)
   if (obra_id) query = query.eq('obra_id', obra_id)
 
@@ -27,7 +36,16 @@ export async function GET(request: Request) {
     return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 500)
   }
 
-  return ok(request, data ?? [], { count: data?.length || 0 })
+  let totalQuery = supabase
+    .from('transacoes')
+    .select('*', { head: true, count: 'exact' })
+    .eq('org_id', orgId)
+  if (tipo) totalQuery = totalQuery.eq('tipo', tipo)
+  if (obra_id) totalQuery = totalQuery.eq('obra_id', obra_id)
+  const { count } = await totalQuery
+  const total = count ?? data?.length ?? 0
+
+  return ok(request, data ?? [], buildPaginationMeta(data?.length || 0, total, page, pageSize))
 }
 
 export async function POST(request: Request) {
