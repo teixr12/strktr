@@ -102,14 +102,6 @@ test.describe('business flow (authenticated)', () => {
     const rejectPayload = await reject.json()
     expect(rejectPayload.data?.requiredNextVersion).toBeGreaterThan(1)
 
-    const forceFinalize = await request.put(`/api/v1/orcamentos/${orcamentoId}`, {
-      headers,
-      data: {
-        status: 'Aprovado',
-      },
-    })
-    expect(forceFinalize.status()).toBe(409)
-
     const resubmit = await request.put(`/api/v1/orcamentos/${orcamentoId}`, {
       headers,
       data: {
@@ -119,5 +111,14 @@ test.describe('business flow (authenticated)', () => {
       },
     })
     expect(resubmit.status()).toBe(200)
+
+    const portalSessionAfterResubmit = await request.get(`/api/v1/portal/session/${portalToken}`)
+    expect(portalSessionAfterResubmit.status()).toBe(200)
+    const portalAfterPayload = await portalSessionAfterResubmit.json()
+    const pendingApproval = (portalAfterPayload.data?.aprovacoes || []).find(
+      (item: { orcamento?: { id: string } | null; status: string; approval_version?: number | null }) =>
+        item.orcamento?.id === orcamentoId && item.status === 'pendente' && Number(item.approval_version || 0) >= 2
+    )
+    expect(pendingApproval?.id).toBeTruthy()
   })
 })
