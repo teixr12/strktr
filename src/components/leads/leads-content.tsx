@@ -61,6 +61,7 @@ export function LeadsContent({ initialLeads }: Props) {
     hasMore: false,
   })
   const [isPageLoading, setIsPageLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editLead, setEditLead] = useState<Lead | null>(null)
   const [detailLead, setDetailLead] = useState<Lead | null>(null)
@@ -97,13 +98,16 @@ export function LeadsContent({ initialLeads }: Props) {
       try {
         const data = await apiRequest<Lead[]>('/api/v1/leads?limit=200')
         setLeads(data)
+        setLoadError(null)
       } catch {
         setLeads([])
+        setLoadError('Erro ao carregar leads')
       }
       return
     }
 
     setIsPageLoading(true)
+    setLoadError(null)
     try {
       const params = new URLSearchParams({
         page: String(targetPage),
@@ -121,7 +125,9 @@ export function LeadsContent({ initialLeads }: Props) {
         }
       )
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Erro ao recarregar leads', 'error')
+      const message = err instanceof Error ? err.message : 'Erro ao recarregar leads'
+      setLoadError(message)
+      toast(message, 'error')
     } finally {
       setIsPageLoading(false)
     }
@@ -345,28 +351,51 @@ export function LeadsContent({ initialLeads }: Props) {
         </div>
       </SectionCard>
 
+      {loadError ? (
+        <SectionCard className="p-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-red-600 dark:text-red-400">{loadError}</p>
+            <button
+              type="button"
+              onClick={() => void refreshLeads(pagination.page || 1)}
+              className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        </SectionCard>
+      ) : null}
+
       {useV2 ? (
         <>
-          <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 md:grid md:grid-cols-2 md:overflow-visible xl:grid-cols-4">
-            {V2_LANES.map((lane) => (
-              <LeadLaneColumnV2
-                key={lane.id}
-                laneId={lane.id}
-                title={lane.title}
-                badgeClassName={lane.dotClass}
-                countToneClassName={lane.countToneClass}
-                leads={filteredLeads.filter((lead) => lead.status === lane.id)}
-                dragOver={dragOverCol === lane.id}
-                onDragOver={(event) => handleDragOver(event, lane.id)}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                onDragStart={handleDragStart}
-                onDragEnd={handleDragEnd}
-                onOpenLead={setDetailLead}
-                nowMs={nowMs}
-              />
-            ))}
-          </div>
+          {isPageLoading && filteredLeads.length === 0 ? (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="skeleton h-[220px] w-full rounded-2xl" />
+              ))}
+            </div>
+          ) : (
+            <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 md:grid md:grid-cols-2 md:overflow-visible xl:grid-cols-4">
+              {V2_LANES.map((lane) => (
+                <LeadLaneColumnV2
+                  key={lane.id}
+                  laneId={lane.id}
+                  title={lane.title}
+                  badgeClassName={lane.dotClass}
+                  countToneClassName={lane.countToneClass}
+                  leads={filteredLeads.filter((lead) => lead.status === lane.id)}
+                  dragOver={dragOverCol === lane.id}
+                  onDragOver={(event) => handleDragOver(event, lane.id)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                  onOpenLead={setDetailLead}
+                  nowMs={nowMs}
+                />
+              ))}
+            </div>
+          )}
 
           <SectionCard title="Histórico de Interações" className="p-4 md:p-5">
             <LeadInteractionsTableV2 leads={filteredLeads} />

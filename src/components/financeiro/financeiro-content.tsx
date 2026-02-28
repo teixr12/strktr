@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import { apiRequest, apiRequestWithMeta } from '@/lib/api/client'
 import { featureFlags } from '@/lib/feature-flags'
@@ -65,12 +65,15 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
     hasMore: false,
   })
   const [isPageLoading, setIsPageLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editingTx, setEditingTx] = useState<Transacao | null>(null)
   const [filtroTipo, setFiltroTipo] = useState<'Todos' | 'Receita' | 'Despesa'>('Todos')
   const [busca, setBusca] = useState('')
   const [obras, setObras] = useState<Pick<Obra, 'id' | 'nome'>[]>([])
   const [desvioResumo, setDesvioResumo] = useState<OrcadoVsRealizadoSummary | null>(null)
+  const [desvioLoading, setDesvioLoading] = useState(true)
+  const [desvioError, setDesvioError] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     descricao: '', tipo: 'Receita' as 'Receita' | 'Despesa',
@@ -94,6 +97,7 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
       return
     }
     setIsPageLoading(true)
+    setLoadError(null)
     try {
       const params = new URLSearchParams({
         page: String(targetPage),
@@ -114,34 +118,31 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
         }
       )
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Erro ao recarregar transações', 'error')
+      const message = err instanceof Error ? err.message : 'Erro ao recarregar transações'
+      setLoadError(message)
+      toast(message, 'error')
     } finally {
       setIsPageLoading(false)
     }
   }
 
-  async function loadDesvio() {
+  const loadDesvio = useCallback(async () => {
+    setDesvioLoading(true)
+    setDesvioError(null)
     try {
       const data = await apiRequest<OrcadoVsRealizadoSummary>('/api/v1/transacoes/orcado-vs-realizado?thresholdPct=10')
       setDesvioResumo(data)
-    } catch {
+    } catch (err) {
       setDesvioResumo(null)
-    }
-  }
-
-  useEffect(() => {
-    let active = true
-    void apiRequest<OrcadoVsRealizadoSummary>('/api/v1/transacoes/orcado-vs-realizado?thresholdPct=10')
-      .then((data) => {
-        if (active) setDesvioResumo(data)
-      })
-      .catch(() => {
-        if (active) setDesvioResumo(null)
-      })
-    return () => {
-      active = false
+      setDesvioError(err instanceof Error ? err.message : 'Erro ao carregar desvio orçado x realizado')
+    } finally {
+      setDesvioLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    void loadDesvio()
+  }, [loadDesvio])
 
   useEffect(() => {
     if (!usePaginationV1) return
@@ -322,7 +323,22 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
         </div>
       </SectionCard>
 
-      {desvioResumo && (
+      {desvioLoading ? (
+        <div className="skeleton h-[140px] w-full rounded-2xl" />
+      ) : desvioError ? (
+        <SectionCard className="p-4 md:p-5">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-red-600 dark:text-red-400">{desvioError}</p>
+            <button
+              type="button"
+              onClick={() => void loadDesvio()}
+              className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        </SectionCard>
+      ) : desvioResumo ? (
         <div className="glass-card rounded-2xl p-4 md:p-5">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold text-sm text-gray-900 dark:text-white">Desvio Orçado x Realizado</h3>
@@ -346,7 +362,7 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
             </div>
           ))}
         </div>
-      )}
+      ) : null}
 
       {/* Filters */}
       <SectionCard className="p-4">
@@ -364,7 +380,24 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
 
       {/* Transaction List */}
       <SectionCard className="space-y-1.5 p-3">
-        {filtered.length === 0 ? (
+        {loadError ? (
+          <div className="py-6 text-center">
+            <p className="text-sm text-red-600 dark:text-red-400">{loadError}</p>
+            <button
+              type="button"
+              onClick={() => void refreshTransacoes(pagination.page || 1)}
+              className="mt-2 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        ) : isPageLoading && filtered.length === 0 ? (
+          <div className="space-y-2 py-1">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="skeleton h-14 w-full rounded-xl" />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
           <p className="text-sm text-gray-500 text-center py-8">Nenhuma transação encontrada</p>
         ) : (
           filtered.map((t) => (

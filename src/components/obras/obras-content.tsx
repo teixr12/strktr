@@ -22,6 +22,8 @@ const STATUS_OPTIONS: ('Todas' | ObraStatus)[] = ['Todas', 'Em Andamento', 'Orç
 
 export function ObrasContent({ initialObras }: { initialObras: Obra[] }) {
   const [obras, setObras] = useState(initialObras)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editingObra, setEditingObra] = useState<Obra | null>(null)
   const [search, setSearch] = useState('')
@@ -29,11 +31,16 @@ export function ObrasContent({ initialObras }: { initialObras: Obra[] }) {
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Obras
 
   async function refresh() {
+    setIsRefreshing(true)
+    setRefreshError(null)
     try {
       const data = await apiRequest<Obra[]>('/api/v1/obras?limit=100')
       setObras(data)
-    } catch {
+    } catch (err) {
       // keep current list if refresh fails
+      setRefreshError(err instanceof Error ? err.message : 'Falha ao atualizar obras')
+    } finally {
+      setIsRefreshing(false)
     }
   }
 
@@ -109,6 +116,22 @@ export function ObrasContent({ initialObras }: { initialObras: Obra[] }) {
           )}
         </div>
       </SectionCard>
+
+      {refreshError ? (
+        <SectionCard className="p-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-red-600 dark:text-red-400">{refreshError}</p>
+            <button
+              type="button"
+              onClick={() => void refresh()}
+              disabled={isRefreshing}
+              className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200 disabled:opacity-60 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+            >
+              {isRefreshing ? 'Atualizando...' : 'Tentar novamente'}
+            </button>
+          </div>
+        </SectionCard>
+      ) : null}
 
       {filtered.length === 0 ? (
         <EmptyStateAction

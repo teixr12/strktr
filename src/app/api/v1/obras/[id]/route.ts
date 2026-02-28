@@ -4,6 +4,10 @@ import { log } from '@/lib/api/logger'
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { obraFormSchema } from '@/shared/schemas/execution'
 
+function isSupabaseNotFound(error: { code?: string } | null | undefined) {
+  return error?.code === 'PGRST116'
+}
+
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { user, supabase, error, requestId, orgId } = await getApiUser(request)
   if (!user || !supabase) return fail(request, { code: API_ERROR_CODES.UNAUTHORIZED, message: error || 'Não autorizado' }, 401)
@@ -12,8 +16,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params
   const { data, error: dbError } = await supabase.from('obras').select('*').eq('id', id).eq('org_id', orgId).single()
   if (dbError) {
+    if (isSupabaseNotFound(dbError)) {
+      log('warn', 'obras.getById.not_found', {
+        requestId,
+        orgId,
+        userId: user.id,
+        route: '/api/v1/obras/[id]',
+        obraId: id,
+      })
+      return fail(request, { code: API_ERROR_CODES.NOT_FOUND, message: 'Obra não encontrada' }, 404)
+    }
     log('error', 'obras.getById.failed', { requestId, orgId, userId: user.id, route: '/api/v1/obras/[id]', error: dbError.message, obraId: id })
-    return fail(request, { code: API_ERROR_CODES.NOT_FOUND, message: dbError.message }, 404)
+    return fail(request, { code: API_ERROR_CODES.NOT_FOUND, message: 'Obra não encontrada' }, 404)
   }
 
   return ok(request, data)
@@ -46,8 +60,18 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     .select()
     .single()
   if (dbError) {
+    if (isSupabaseNotFound(dbError)) {
+      log('warn', 'obras.update.not_found', {
+        requestId,
+        orgId,
+        userId: user.id,
+        route: '/api/v1/obras/[id]',
+        obraId: id,
+      })
+      return fail(request, { code: API_ERROR_CODES.NOT_FOUND, message: 'Obra não encontrada' }, 404)
+    }
     log('error', 'obras.update.failed', { requestId, orgId, userId: user.id, route: '/api/v1/obras/[id]', error: dbError.message, obraId: id })
-    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 400)
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: 'Falha ao atualizar obra' }, 400)
   }
 
   return ok(request, data)
