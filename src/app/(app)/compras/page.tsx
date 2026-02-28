@@ -7,7 +7,11 @@ export default async function ComprasPage() {
   const supabase = await createClient()
 
   const [comprasRes, obrasRes] = await Promise.all([
-    supabase.from('compras').select('*, obras(nome)').order('created_at', { ascending: false }),
+    supabase
+      .from('compras')
+      .select('*, obras(nome)')
+      .order('created_at', { ascending: false })
+      .range(0, 49),
     supabase.from('obras').select('id, nome'),
   ])
 

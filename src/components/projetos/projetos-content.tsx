@@ -1,13 +1,19 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import { apiRequest } from '@/lib/api/client'
+import { useEffect, useMemo, useState } from 'react'
+import { apiRequest, apiRequestWithMeta } from '@/lib/api/client'
 import { featureFlags } from '@/lib/feature-flags'
 import { toast } from '@/hooks/use-toast'
 import { fmt, fmtDate } from '@/lib/utils'
 import { PROJETO_STATUS_COLORS } from '@/lib/constants'
 import { Plus, Search, FolderKanban, ArrowRight, X } from 'lucide-react'
-import { EmptyStateAction, PageHeader, QuickActionBar, SectionCard } from '@/components/ui/enterprise'
+import {
+  EmptyStateAction,
+  PageHeader,
+  PaginationControls,
+  QuickActionBar,
+  SectionCard,
+} from '@/components/ui/enterprise'
 import type { Projeto, ProjetoStatus } from '@/types/database'
 
 const STATUS_OPTIONS: ProjetoStatus[] = ['Planejamento', 'Em Aprovação', 'Aprovado', 'Em Execução', 'Concluído', 'Arquivado']
@@ -18,9 +24,28 @@ interface Props {
   leads: { id: string; nome: string }[]
 }
 
+interface PaginationMeta {
+  count: number
+  page: number
+  pageSize: number
+  total: number
+  hasMore: boolean
+}
+
+const PAGE_SIZE = 50
+
 export function ProjetosContent({ initialProjetos, leads }: Props) {
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Projetos
+  const usePaginationV1 = featureFlags.uiPaginationV1
   const [projetos, setProjetos] = useState(initialProjetos)
+  const [pagination, setPagination] = useState<PaginationMeta>({
+    count: initialProjetos.length,
+    page: 1,
+    pageSize: PAGE_SIZE,
+    total: initialProjetos.length,
+    hasMore: false,
+  })
+  const [isPageLoading, setIsPageLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [showForm, setShowForm] = useState(false)
@@ -41,14 +66,47 @@ export function ProjetosContent({ initialProjetos, leads }: Props) {
     return list
   }, [projetos, search, statusFilter])
 
-  async function refresh() {
+  async function refresh(targetPage = 1) {
+    if (!usePaginationV1) {
+      try {
+        const data = await apiRequest<Projeto[]>('/api/v1/projetos?limit=200')
+        setProjetos(data)
+      } catch (err) {
+        toast(err instanceof Error ? err.message : 'Erro ao recarregar projetos', 'error')
+      }
+      return
+    }
+
+    setIsPageLoading(true)
     try {
-      const data = await apiRequest<Projeto[]>('/api/v1/projetos?limit=200')
-      setProjetos(data)
+      const params = new URLSearchParams({
+        page: String(targetPage),
+        pageSize: String(PAGE_SIZE),
+      })
+      if (statusFilter !== 'all') params.set('status', statusFilter)
+      const payload = await apiRequestWithMeta<Projeto[], PaginationMeta>(`/api/v1/projetos?${params.toString()}`)
+      setProjetos(payload.data)
+      setPagination(
+        payload.meta || {
+          count: payload.data.length,
+          page: targetPage,
+          pageSize: PAGE_SIZE,
+          total: payload.data.length,
+          hasMore: false,
+        }
+      )
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Erro ao recarregar projetos', 'error')
+    } finally {
+      setIsPageLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (!usePaginationV1) return
+    void refresh(1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usePaginationV1, statusFilter])
 
   function openForm(p?: Projeto) {
     if (p) {
@@ -122,7 +180,7 @@ export function ProjetosContent({ initialProjetos, leads }: Props) {
     <div className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} space-y-4`}>
       <PageHeader
         title="Projetos"
-        subtitle={`${projetos.length} projetos no workspace`}
+        subtitle={`${pagination.total || projetos.length} projetos no workspace`}
         actions={
           <QuickActionBar
             actions={[{
@@ -146,11 +204,11 @@ export function ProjetosContent({ initialProjetos, leads }: Props) {
       {/* Status Filters */}
       <SectionCard className="flex flex-wrap gap-2 p-4">
         <button onClick={() => setStatusFilter('all')} className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all ${statusFilter === 'all' ? 'bg-sand-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}>
-          Todos ({projetos.length})
+          {usePaginationV1 ? 'Todos' : `Todos (${projetos.length})`}
         </button>
         {STATUS_OPTIONS.map((s) => (
           <button key={s} onClick={() => setStatusFilter(s)} className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all ${statusFilter === s ? 'bg-sand-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}>
-            {s} ({projetos.filter((p) => p.status === s).length})
+            {usePaginationV1 ? s : `${s} (${projetos.filter((p) => p.status === s).length})`}
           </button>
         ))}
       </SectionCard>
@@ -198,6 +256,17 @@ export function ProjetosContent({ initialProjetos, leads }: Props) {
               </div>
             </div>
           ))}
+          {usePaginationV1 ? (
+            <PaginationControls
+              page={pagination.page}
+              pageSize={pagination.pageSize}
+              total={pagination.total}
+              hasMore={pagination.hasMore}
+              isLoading={isPageLoading}
+              onPrev={() => void refresh(Math.max(1, pagination.page - 1))}
+              onNext={() => void refresh(pagination.page + 1)}
+            />
+          ) : null}
         </SectionCard>
       )}
 

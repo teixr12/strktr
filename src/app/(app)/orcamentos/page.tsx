@@ -9,6 +9,7 @@ export default async function OrcamentosPage() {
     .from('orcamentos')
     .select('*, orcamento_itens(*)')
     .order('created_at', { ascending: false })
+    .range(0, 49)
 
   return <OrcamentosContent initialOrcamentos={orcamentos ?? []} />
 }

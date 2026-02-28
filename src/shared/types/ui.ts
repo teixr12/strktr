@@ -14,6 +14,14 @@ export type UiNavCounts = {
   compras_pendentes_aprovacao: number | null
 }
 
+export type UiPaginationMeta = {
+  count: number
+  page: number
+  pageSize: number
+  total: number
+  hasMore: boolean
+}
+
 export type UiIntegrationStatus = {
   code: 'whatsapp_business' | 'google_calendar' | 'sicoob_api'
   label: string
