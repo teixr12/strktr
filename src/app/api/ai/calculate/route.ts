@@ -1,43 +1,51 @@
-import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { calculateBudget } from '@/lib/ai/budget-calculator'
 import { isGeminiConfigured } from '@/lib/ai/gemini'
+import { legacyFail, legacyOk } from '@/lib/api/legacy-compat-response'
+
+type CalculatePayload = {
+  tipoProjeto?: string
+  areaM2?: number
+  local?: string
+}
 
 export async function POST(request: Request) {
   try {
     if (!isGeminiConfigured()) {
-      return NextResponse.json(
-        { error: 'GOOGLE_GEMINI_API_KEY não configurada. Adicione nas variáveis de ambiente.' },
-        { status: 503 }
+      return legacyFail(
+        request,
+        'GOOGLE_GEMINI_API_KEY não configurada. Adicione nas variáveis de ambiente.',
+        503,
+        'AI_PROVIDER_NOT_CONFIGURED'
       )
     }
 
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+      return legacyFail(request, 'Não autorizado', 401, 'UNAUTHORIZED')
     }
 
-    const body = await request.json()
-    const { tipoProjeto, areaM2, local } = body
-
-    if (!tipoProjeto || !areaM2) {
-      return NextResponse.json(
-        { error: 'Campos obrigatórios: tipoProjeto, areaM2' },
-        { status: 400 }
+    const body = (await request.json().catch(() => null)) as CalculatePayload | null
+    if (!body?.tipoProjeto || !body.areaM2 || Number(body.areaM2) <= 0) {
+      return legacyFail(
+        request,
+        'Campos obrigatórios: tipoProjeto, areaM2 (>0)',
+        400,
+        'VALIDATION_ERROR'
       )
     }
 
     const items = await calculateBudget({
-      tipoProjeto,
-      areaM2: Number(areaM2),
-      local: local || 'Brasil',
+      tipoProjeto: body.tipoProjeto,
+      areaM2: Number(body.areaM2),
+      local: body.local || 'Brasil',
       userId: user.id,
     })
 
-    return NextResponse.json({ success: true, items })
+    return legacyOk(request, { success: true, items }, { items })
   } catch (error) {
     console.error('[API AI] Erro:', error)
-    return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
+    return legacyFail(request, 'Erro interno', 500, 'INTERNAL_ERROR')
   }
 }
