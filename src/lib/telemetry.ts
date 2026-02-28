@@ -11,6 +11,36 @@ interface ProductEventInput {
   entityType: string
   entityId: string
   payload?: Record<string, unknown>
+  mirrorExternal?: boolean
+}
+
+const POSTHOG_DEFAULT_HOST = 'https://app.posthog.com'
+
+async function mirrorToPosthog(input: ProductEventInput) {
+  const externalEnabled = process.env.NEXT_PUBLIC_FF_ANALYTICS_EXTERNAL_V1 !== 'false'
+  const key = process.env.NEXT_PUBLIC_POSTHOG_KEY
+  const host = process.env.NEXT_PUBLIC_POSTHOG_HOST || POSTHOG_DEFAULT_HOST
+  if (!externalEnabled || !key) return
+
+  await fetch(`${host.replace(/\/$/, '')}/capture/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      api_key: key,
+      event: input.eventType,
+      distinct_id: input.userId,
+      properties: {
+        source: 'server',
+        user_id: input.userId,
+        org_id: input.orgId ?? null,
+        entity_type: input.entityType,
+        entity_id: input.entityId,
+        ...input.payload,
+      },
+    }),
+  }).catch(() => undefined)
 }
 
 export async function emitProductEvent(input: ProductEventInput) {
@@ -23,4 +53,8 @@ export async function emitProductEvent(input: ProductEventInput) {
     entity_id: input.entityId,
     payload: input.payload ?? {},
   })
+
+  if (input.mirrorExternal) {
+    await mirrorToPosthog(input)
+  }
 }
