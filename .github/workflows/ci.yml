@@ -16,7 +16,12 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
       E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
-      E2E_OBRA_ID: ${{ secrets.E2E_OBRA_ID }}
+      E2E_MANAGER_EMAIL: ${{ secrets.E2E_MANAGER_EMAIL }}
+      E2E_MANAGER_PASSWORD: ${{ secrets.E2E_MANAGER_PASSWORD }}
+      E2E_ROLE_USER_EMAIL: ${{ secrets.E2E_ROLE_USER_EMAIL }}
+      E2E_ROLE_USER_PASSWORD: ${{ secrets.E2E_ROLE_USER_PASSWORD }}
+      E2E_FOREIGN_EMAIL: ${{ secrets.E2E_FOREIGN_EMAIL }}
+      E2E_FOREIGN_PASSWORD: ${{ secrets.E2E_FOREIGN_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -52,15 +57,19 @@ jobs:
           test -n "$SUPABASE_SERVICE_ROLE_KEY"
           test -n "$E2E_USER_EMAIL"
           test -n "$E2E_USER_PASSWORD"
-          test -n "$E2E_OBRA_ID"
+          test -n "$E2E_MANAGER_EMAIL"
+          test -n "$E2E_MANAGER_PASSWORD"
+          test -n "$E2E_ROLE_USER_EMAIL"
+          test -n "$E2E_ROLE_USER_PASSWORD"
+          test -n "$E2E_FOREIGN_EMAIL"
+          test -n "$E2E_FOREIGN_PASSWORD"
 
-      - name: Generate authenticated E2E bearer token
-        run: npm run e2e:token
+      - name: Prepare authenticated E2E matrix data
+        run: npm run e2e:prepare
 
       - name: E2E (smoke + business)
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          E2E_OBRA_ID: ${{ secrets.E2E_OBRA_ID }}
         run: npm run test:e2e

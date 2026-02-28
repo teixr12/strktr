@@ -12,6 +12,11 @@ Ativar analytics externo (PostHog) sem interromper o tracking interno já existe
 - Flag externa iniciando em `false`:
   - `NEXT_PUBLIC_FF_ANALYTICS_EXTERNAL_V1=false`
 
+Se `NEXT_PUBLIC_POSTHOG_KEY` ou `NEXT_PUBLIC_POSTHOG_HOST` não existir em produção:
+1. manter `NEXT_PUBLIC_FF_ANALYTICS_EXTERNAL_V1=false`;
+2. registrar issue operacional bloqueante;
+3. manter analytics interno como source of truth até regularização.
+
 ## Rollout seguro
 1. Confirmar health:
    - `GET /api/v1/health/ops`

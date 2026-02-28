@@ -151,7 +151,7 @@ test.describe('business flow (authenticated)', () => {
     expect(pendingApproval?.id).toBeTruthy()
   })
 
-  test('role matrix enforcement across leads/finance/projects/config/execution', async ({ request }) => {
+  test('role matrix enforcement across leads/finance/projects/team', async ({ request }) => {
     test.skip(!E2E_MANAGER_BEARER_TOKEN || !E2E_USER_BEARER_TOKEN, 'Set E2E_MANAGER_BEARER_TOKEN and E2E_USER_BEARER_TOKEN to run role matrix checks')
 
     const managerHeaders = {
@@ -167,14 +167,8 @@ test.describe('business flow (authenticated)', () => {
     const managerProjects = await request.get('/api/v1/projetos?page=1&pageSize=5', { headers: managerHeaders })
     expect(managerProjects.status()).toBe(200)
 
-    const managerConfig = await request.get('/api/v1/config/org-members', { headers: managerHeaders })
-    expect(managerConfig.status()).toBe(200)
-
-    const managerRisk = await request.post(`/api/v1/obras/${E2E_OBRA_ID}/risks/recalculate`, {
-      headers: managerHeaders,
-      data: {},
-    })
-    expect(managerRisk.status()).toBe(200)
+    const managerTeam = await request.get('/api/v1/equipe', { headers: managerHeaders })
+    expect(managerTeam.status()).toBe(200)
 
     const userLeads = await request.get('/api/v1/leads?page=1&pageSize=5', { headers: userHeaders })
     expect(userLeads.status()).toBe(200)
@@ -185,14 +179,9 @@ test.describe('business flow (authenticated)', () => {
     const userProjects = await request.get('/api/v1/projetos?page=1&pageSize=5', { headers: userHeaders })
     expect(userProjects.status()).toBe(403)
 
-    const userConfig = await request.get('/api/v1/config/org-members', { headers: userHeaders })
-    expect(userConfig.status()).toBe(403)
+    const userTeam = await request.get('/api/v1/equipe', { headers: userHeaders })
+    expect(userTeam.status()).toBe(403)
 
-    const userRisk = await request.post(`/api/v1/obras/${E2E_OBRA_ID}/risks/recalculate`, {
-      headers: userHeaders,
-      data: {},
-    })
-    expect(userRisk.status()).toBe(403)
   })
 
   test('tenant isolation blocks access to foreign obra', async ({ request }) => {

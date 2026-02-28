@@ -10,12 +10,22 @@ Fechar Fase 2 sem regressão, validando paginação segura em módulos densos e 
 
 ## Pré-requisitos
 - Build atual em produção com `/api/v1/health/ops` retornando `status=ok`.
-- Secrets de E2E autenticado (opcional para matriz completa):
+- Secrets de E2E autenticado (obrigatório para matriz completa):
   - `E2E_BEARER_TOKEN`
-  - `E2E_OBRA_ID`
   - `E2E_MANAGER_BEARER_TOKEN`
   - `E2E_USER_BEARER_TOKEN`
+  - `E2E_OBRA_ID`
   - `E2E_FOREIGN_OBRA_ID`
+  - gerados automaticamente por `npm run e2e:prepare` no CI.
+  - segredos base necessários para geração:
+    - `E2E_USER_EMAIL`
+    - `E2E_USER_PASSWORD`
+    - `E2E_MANAGER_EMAIL`
+    - `E2E_MANAGER_PASSWORD`
+    - `E2E_ROLE_USER_EMAIL`
+    - `E2E_ROLE_USER_PASSWORD`
+    - `E2E_FOREIGN_EMAIL`
+    - `E2E_FOREIGN_PASSWORD`
 
 ## Passo-a-passo de rollout
 1. Confirmar flag de paginação:
