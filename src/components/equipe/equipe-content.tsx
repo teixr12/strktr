@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import Image from 'next/image'
+import { useConfirm } from '@/hooks/use-confirm'
 import { apiRequest } from '@/lib/api/client'
 import { featureFlags } from '@/lib/feature-flags'
 import { toast } from '@/hooks/use-toast'
@@ -14,6 +15,7 @@ import type { Membro, MembroStatus } from '@/types/database'
 interface Props { initialMembros: Membro[] }
 
 export function EquipeContent({ initialMembros }: Props) {
+  const { confirm, dialog: confirmDialog } = useConfirm()
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Equipe
   const [membros, setMembros] = useState(initialMembros)
   const [showForm, setShowForm] = useState(false)
@@ -85,7 +87,8 @@ export function EquipeContent({ initialMembros }: Props) {
   }
 
   async function deleteMembro(id: string) {
-    if (!confirm('Excluir este membro da equipe?')) return
+    const ok = await confirm({ title: 'Excluir membro?', description: 'Essa ação não pode ser desfeita.', confirmLabel: 'Excluir', variant: 'danger' })
+    if (!ok) return
     try {
       await apiRequest<{ success: boolean }>(`/api/v1/equipe/${id}`, { method: 'DELETE' })
       setMembros((prev) => prev.filter((m) => m.id !== id))
@@ -218,6 +221,8 @@ export function EquipeContent({ initialMembros }: Props) {
           </div>
         </div>
       )}
+
+      {confirmDialog}
     </div>
   )
 }

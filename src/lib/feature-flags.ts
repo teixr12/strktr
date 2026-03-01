@@ -38,6 +38,7 @@ export const featureFlags = {
   personalRoadmap: process.env.NEXT_PUBLIC_FF_PERSONAL_ROADMAP !== 'false',
   semiAutomation: process.env.NEXT_PUBLIC_FF_SEMI_AUTOMATION !== 'false',
   behaviorPrompts: process.env.NEXT_PUBLIC_FF_BEHAVIOR_PROMPTS !== 'false',
+  cmdPalette: process.env.NEXT_PUBLIC_FF_CMD_PALETTE !== 'false',
 }
 
 export type FeatureFlagKey = keyof typeof featureFlags

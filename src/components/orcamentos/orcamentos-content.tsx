@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { useConfirm } from '@/hooks/use-confirm'
 import { apiRequest, apiRequestWithMeta } from '@/lib/api/client'
 import { featureFlags } from '@/lib/feature-flags'
 import { toast } from '@/hooks/use-toast'
@@ -38,6 +39,7 @@ interface PaginationMeta {
 const PAGE_SIZE = 50
 
 export function OrcamentosContent({ initialOrcamentos }: Props) {
+  const { confirm, dialog: confirmDialog } = useConfirm()
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Orcamentos
   const usePdfV2 = featureFlags.orcamentoPdfV2
   const usePaginationV1 = featureFlags.uiPaginationV1
@@ -225,7 +227,8 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
   }
 
   async function deleteOrcamento(id: string) {
-    if (!confirm('Excluir este orçamento?')) return
+    const ok = await confirm({ title: 'Excluir orçamento?', description: 'Essa ação não pode ser desfeita.', confirmLabel: 'Excluir', variant: 'danger' })
+    if (!ok) return
     try {
       await apiRequest<{ success: boolean }>(`/api/v1/orcamentos/${id}`, { method: 'DELETE' })
       setOrcamentos((prev) => prev.filter((o) => o.id !== id))
@@ -562,6 +565,8 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
           </div>
         </div>
       )}
+
+      {confirmDialog}
     </div>
   )
 }

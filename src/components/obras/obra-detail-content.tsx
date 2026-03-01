@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
 import { toast } from '@/hooks/use-toast'
+import { useConfirm } from '@/hooks/use-confirm'
 import { fmt, fmtDate } from '@/lib/utils'
 import { OBRA_STATUS_COLORS } from '@/lib/constants'
 import { ArrowLeft, Edit2, Trash2, Plus, CheckCircle, Loader, Circle, XCircle, AlertTriangle } from 'lucide-react'
@@ -51,6 +52,7 @@ type ExecutionSummary = {
 }
 
 export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, initialDiario = [], initialChecklists = [] }: Props) {
+  const { confirm, dialog: confirmDialog } = useConfirm()
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2ObraTabs
   const router = useRouter()
   const [tab, setTab] = useState<'resumo' | 'etapas' | 'cronograma' | 'financeiro' | 'diario' | 'checklists'>('resumo')
@@ -150,7 +152,8 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
   }
 
   async function deleteEtapa(id: string) {
-    if (!confirm('Excluir esta etapa?')) return
+    const ok = await confirm({ title: 'Excluir etapa?', description: 'Essa ação não pode ser desfeita.', confirmLabel: 'Excluir', variant: 'danger' })
+    if (!ok) return
     try {
       await apiRequest(`/api/v1/obras/${obra.id}/etapas/${id}`, { method: 'DELETE' })
       toast('Etapa excluída', 'info')
@@ -196,7 +199,8 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
   const financeiroSaldo = rec - dep
 
   async function handleDelete() {
-    if (!confirm('Excluir esta obra? Esta ação não pode ser desfeita.')) return
+    const ok = await confirm({ title: 'Excluir obra?', description: 'Essa ação não pode ser desfeita. Todos os dados da obra serão perdidos.', confirmLabel: 'Excluir', variant: 'danger' })
+    if (!ok) return
     try {
       await apiRequest(`/api/v1/obras/${obra.id}`, { method: 'DELETE' })
       toast('Obra excluída', 'info')
@@ -579,6 +583,7 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
           onSaved={() => { setShowEditForm(false); router.refresh() }}
         />
       )}
+      {confirmDialog}
     </div>
   )
 }

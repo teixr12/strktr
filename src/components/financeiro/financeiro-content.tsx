@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import dynamic from 'next/dynamic'
+import { useConfirm } from '@/hooks/use-confirm'
 import { apiRequest, apiRequestWithMeta } from '@/lib/api/client'
 import { featureFlags } from '@/lib/feature-flags'
 import { toast } from '@/hooks/use-toast'
@@ -55,6 +56,7 @@ interface PaginationMeta {
 const PAGE_SIZE = 50
 
 export function FinanceiroContent({ initialTransacoes }: Props) {
+  const { confirm, dialog: confirmDialog } = useConfirm()
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Financeiro
   const usePaginationV1 = featureFlags.uiPaginationV1
   const [transacoes, setTransacoes] = useState(initialTransacoes)
@@ -257,7 +259,8 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
   }
 
   async function deleteTx(id: string) {
-    if (!confirm('Excluir esta transação?')) return
+    const ok = await confirm({ title: 'Excluir transação?', description: 'Essa ação não pode ser desfeita.', confirmLabel: 'Excluir', variant: 'danger' })
+    if (!ok) return
     try {
       await apiRequest<{ success: boolean }>(`/api/v1/transacoes/${id}`, { method: 'DELETE' })
       const nextPage = usePaginationV1 && transacoes.length === 1 && pagination.page > 1
@@ -491,6 +494,8 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
           </div>
         </div>
       )}
+
+      {confirmDialog}
     </div>
   )
 }

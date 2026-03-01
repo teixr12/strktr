@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { useConfirm } from '@/hooks/use-confirm'
 import { apiRequest } from '@/lib/api/client'
 import { featureFlags } from '@/lib/feature-flags'
 import { toast } from '@/hooks/use-toast'
@@ -28,6 +29,7 @@ const KB_CATEGORIA_LABELS: Record<string, string> = {
 interface Props { initialItems: KnowledgebaseItem[] }
 
 export function KnowledgebaseContent({ initialItems }: Props) {
+  const { confirm, dialog: confirmDialog } = useConfirm()
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Knowledgebase
   const [items, setItems] = useState(initialItems)
   const [showForm, setShowForm] = useState(false)
@@ -106,7 +108,8 @@ export function KnowledgebaseContent({ initialItems }: Props) {
   }
 
   async function deleteItem(id: string) {
-    if (!confirm('Excluir este item?')) return
+    const ok = await confirm({ title: 'Excluir item?', description: 'Essa ação não pode ser desfeita.', confirmLabel: 'Excluir', variant: 'danger' })
+    if (!ok) return
     try {
       await apiRequest<{ success: boolean }>(`/api/v1/knowledgebase/${id}`, { method: 'DELETE' })
       setItems((prev) => prev.filter((i) => i.id !== id))
@@ -222,6 +225,8 @@ export function KnowledgebaseContent({ initialItems }: Props) {
           </div>
         </div>
       )}
+
+      {confirmDialog}
     </div>
   )
 }
