@@ -75,7 +75,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return fail(
       request,
       { code: API_ERROR_CODES.DB_ERROR, message: obraError?.message || 'Erro ao criar obra' },
-      400
+      500
     )
   }
 
@@ -97,7 +97,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       obraId: obra.id,
       error: updateError.message,
     })
-    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: updateError.message }, 400)
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: updateError.message }, 500)
   }
 
   return ok(request, { projeto: updatedProjeto, obra }, undefined, 201)

@@ -79,7 +79,7 @@ export async function PATCH(
       itemId,
       error: updateError?.message || 'unknown',
     })
-    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: updateError?.message || 'Erro ao atualizar item' }, 400)
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: updateError?.message || 'Erro ao atualizar item' }, 500)
   }
 
   if (predecessorItemIds) {
@@ -90,7 +90,7 @@ export async function PATCH(
       .eq('org_id', orgId)
 
     if (deleteDepsError) {
-      return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: deleteDepsError.message }, 400)
+      return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: deleteDepsError.message }, 500)
     }
 
     if (predecessorItemIds.length > 0) {
@@ -110,7 +110,7 @@ export async function PATCH(
           .from('cronograma_dependencias')
           .insert(depsPayload)
         if (insertDepsError) {
-          return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: insertDepsError.message }, 400)
+          return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: insertDepsError.message }, 500)
         }
       }
     }

@@ -71,7 +71,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       return fail(request, { code: API_ERROR_CODES.NOT_FOUND, message: 'Obra não encontrada' }, 404)
     }
     log('error', 'obras.update.failed', { requestId, orgId, userId: user.id, route: '/api/v1/obras/[id]', error: dbError.message, obraId: id })
-    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: 'Falha ao atualizar obra' }, 400)
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: 'Falha ao atualizar obra' }, 500)
   }
 
   return ok(request, data)
@@ -86,7 +86,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const { error: dbError } = await supabase.from('obras').delete().eq('id', id).eq('org_id', orgId)
   if (dbError) {
     log('error', 'obras.delete.failed', { requestId, orgId, userId: user.id, route: '/api/v1/obras/[id]', error: dbError.message, obraId: id })
-    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 400)
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 500)
   }
 
   return ok(request, { success: true })

@@ -114,7 +114,7 @@ export async function POST(request: Request) {
     return fail(
       request,
       { code: API_ERROR_CODES.DB_ERROR, message: dbError.message },
-      400
+      500
     )
   }
 

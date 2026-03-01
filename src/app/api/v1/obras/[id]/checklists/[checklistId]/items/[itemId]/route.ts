@@ -98,7 +98,7 @@ export async function PATCH(
         error: dbError?.message,
       })
     }
-    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError?.message || 'Erro ao atualizar item' }, 400)
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError?.message || 'Erro ao atualizar item' }, 500)
   }
   const meta = missingColumn ? { warning: 'MISSING_COLUMN:data_limite' } : undefined
   return ok(request, data, meta)
@@ -138,7 +138,7 @@ export async function DELETE(
     .eq('org_id', orgId)
 
   if (dbError) {
-    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 400)
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 500)
   }
   return ok(request, { deleted: true })
 }

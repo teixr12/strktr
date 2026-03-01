@@ -30,6 +30,11 @@ const POSTHOG_DEFAULT_HOST = 'https://app.posthog.com'
 
 let cachedAnonymousId: string | null = null
 
+// Cache session context to avoid redundant Supabase calls per analytics event
+const SESSION_CACHE_TTL_MS = 60_000 // 1 minute
+let cachedSession: SessionContext | null = null
+let sessionCacheTimestamp = 0
+
 function getAnonymousId() {
   if (cachedAnonymousId) return cachedAnonymousId
   if (typeof window === 'undefined') return 'server-anon'
@@ -59,13 +64,19 @@ function externalAnalyticsEnabled() {
 }
 
 async function getSessionContext(): Promise<SessionContext> {
+  const now = Date.now()
+  if (cachedSession && now - sessionCacheTimestamp < SESSION_CACHE_TTL_MS) {
+    return cachedSession
+  }
   try {
     const supabase = createClient()
     const { data } = await supabase.auth.getSession()
-    return {
+    cachedSession = {
       token: data.session?.access_token || null,
       userId: data.session?.user?.id || null,
     }
+    sessionCacheTimestamp = now
+    return cachedSession
   } catch {
     return { token: null, userId: null }
   }
@@ -166,10 +177,12 @@ export async function track(eventType: AnalyticsEventType, props?: AnalyticsProp
     payload,
   }
 
-  await sendInternal(input, session.token)
+  // Send internal and external analytics in parallel instead of sequentially
+  const promises: Promise<void>[] = [sendInternal(input, session.token)]
   if (externalAnalyticsEnabled()) {
-    await sendPosthogCapture(eventType, payload, session)
+    promises.push(sendPosthogCapture(eventType, payload, session))
   }
+  await Promise.allSettled(promises)
 }
 
 export async function identify(identity: AnalyticsIdentity) {

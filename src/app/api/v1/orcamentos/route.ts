@@ -42,15 +42,15 @@ export async function GET(request: Request) {
     maxPageSize: 200,
   })
 
+  // Single query: fetch data + count in one round-trip (eliminates duplicate DB call)
   let query = supabase
     .from('orcamentos')
-    .select('*, orcamento_itens(*)')
+    .select('*, orcamento_itens(*)', { count: 'exact' })
     .eq('org_id', orgId)
-    .order('created_at', { ascending: false })
-    .range(offset, offset + pageSize - 1)
   if (status) query = query.eq('status', status)
+  query = query.order('created_at', { ascending: false }).range(offset, offset + pageSize - 1)
 
-  const { data, error: dbError } = await query
+  const { data, count, error: dbError } = await query
   if (dbError) {
     log('error', 'orcamentos.get.failed', {
       requestId,
@@ -66,12 +66,6 @@ export async function GET(request: Request) {
     )
   }
 
-  let totalQuery = supabase
-    .from('orcamentos')
-    .select('*', { head: true, count: 'exact' })
-    .eq('org_id', orgId)
-  if (status) totalQuery = totalQuery.eq('status', status)
-  const { count } = await totalQuery
   const total = count ?? data?.length ?? 0
 
   return ok(request, data ?? [], buildPaginationMeta(data?.length || 0, total, page, pageSize))
@@ -159,7 +153,7 @@ export async function POST(request: Request) {
         code: API_ERROR_CODES.DB_ERROR,
         message: createError?.message || 'Erro ao criar orçamento',
       },
-      400
+      500
     )
   }
 
@@ -185,7 +179,7 @@ export async function POST(request: Request) {
     return fail(
       request,
       { code: API_ERROR_CODES.DB_ERROR, message: itemsError.message },
-      400
+      500
     )
   }
 
@@ -207,7 +201,7 @@ export async function POST(request: Request) {
           code: API_ERROR_CODES.DB_ERROR,
           message: ensuredApproval.error?.message || 'Erro ao criar aprovação do cliente',
         },
-        400
+        500
       )
     }
 

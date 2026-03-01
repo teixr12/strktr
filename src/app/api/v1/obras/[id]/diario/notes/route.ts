@@ -67,7 +67,7 @@ export async function POST(
       obraId: id,
       error: insertError.message,
     })
-    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: insertError.message }, 400)
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: insertError.message }, 500)
   }
 
   return ok(request, data, undefined, 201)

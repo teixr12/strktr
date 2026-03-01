@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     .maybeSingle()
 
   if (profileError) {
-    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: profileError.message }, 400)
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: profileError.message }, 500)
   }
   if (!profile) {
     return fail(request, { code: API_ERROR_CODES.NOT_FOUND, message: 'Usuário não encontrado. Ele precisa se registrar primeiro.' }, 404)
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
       .eq('org_id', orgId)
 
     if (reactivationError) {
-      return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: reactivationError.message }, 400)
+      return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: reactivationError.message }, 500)
     }
   } else {
     const { data: inserted, error: insertError } = await supabase
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
         route: '/api/v1/config/org-members',
         error: insertError?.message || 'unknown',
       })
-      return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: insertError?.message || 'Erro ao convidar membro' }, 400)
+      return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: insertError?.message || 'Erro ao convidar membro' }, 500)
     }
     memberId = inserted.id
   }
@@ -119,7 +119,7 @@ export async function POST(request: Request) {
     .single()
 
   if (memberError) {
-    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: memberError.message }, 400)
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: memberError.message }, 500)
   }
 
   return ok(

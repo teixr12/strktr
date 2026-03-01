@@ -37,7 +37,7 @@ export async function GET(
 
   const { data, error: dbError } = await query
   if (dbError) {
-    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 400)
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 500)
   }
 
   return ok(request, data ?? [])

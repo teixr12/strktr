@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { memo, type ReactNode } from 'react'
 import Link from 'next/link'
 import { Info } from 'lucide-react'
 
@@ -21,7 +21,7 @@ const ACCENT_CLASS = {
   violet: 'from-violet-500/25 to-violet-500/5',
 }
 
-export function KpiCard({
+export const KpiCard = memo(function KpiCard({
   icon,
   label,
   value,
@@ -66,4 +66,4 @@ export function KpiCard({
       ) : null}
     </article>
   )
-}
+})

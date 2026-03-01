@@ -95,7 +95,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
 
   if (approvalStatus.error) {
-    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: approvalStatus.error.message }, 400)
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: approvalStatus.error.message }, 500)
   }
 
   if (targetExigeAprovacao && finalStatuses.has(targetStatus) && approvalStatus.status !== 'aprovado') {
@@ -146,7 +146,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       compraId: id,
       error: dbError.message,
     })
-    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 400)
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 500)
   }
 
   if (targetExigeAprovacao && targetObraId) {
@@ -171,7 +171,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
             code: API_ERROR_CODES.DB_ERROR,
             message: ensuredApproval.error?.message || 'Erro ao preparar aprovação do cliente',
           },
-          400
+          500
         )
       }
 
@@ -204,7 +204,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
             code: API_ERROR_CODES.DB_ERROR,
             message: ensuredApproval.error?.message || 'Erro ao preparar aprovação do cliente',
           },
-          400
+          500
         )
       }
 
@@ -249,7 +249,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       compraId: id,
       error: dbError.message,
     })
-    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 400)
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 500)
   }
 
   return ok(request, { success: true })

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { memo, type ReactNode } from 'react'
 import type { UiCardVariant, UiDensity, UiSurfaceVariant } from '@/shared/types/ui'
 
 interface SectionCardProps {
@@ -29,7 +29,7 @@ const SURFACE_CLASS: Record<UiSurfaceVariant, string> = {
   outline: 'bg-transparent shadow-none',
 }
 
-export function SectionCard({
+export const SectionCard = memo(function SectionCard({
   title,
   subtitle,
   right,
@@ -53,4 +53,4 @@ export function SectionCard({
       {children}
     </section>
   )
-}
+})

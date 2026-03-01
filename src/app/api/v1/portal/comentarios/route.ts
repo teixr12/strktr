@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     return fail(
       request,
       { code: API_ERROR_CODES.DB_ERROR, message: createError?.message || 'Erro ao registrar comentário' },
-      400
+      500
     )
   }
 
