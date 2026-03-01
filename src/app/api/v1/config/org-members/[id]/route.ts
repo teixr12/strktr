@@ -54,7 +54,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       memberId: id,
       error: deleteError.message,
     })
-    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: deleteError.message }, 400)
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: deleteError.message }, 500)
   }
 
   const { data: remainingMemberships } = await supabase

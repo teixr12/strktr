@@ -107,7 +107,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     return fail(
       request,
       { code: API_ERROR_CODES.DB_ERROR, message: dbError.message },
-      400
+      500
     )
   }
 
@@ -152,7 +152,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     return fail(
       request,
       { code: API_ERROR_CODES.DB_ERROR, message: dbError.message },
-      400
+      500
     )
   }
 

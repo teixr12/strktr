@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     return fail(
       request,
       { code: API_ERROR_CODES.DB_ERROR, message: orgError?.message || 'Erro ao criar organização' },
-      400
+      500
     )
   }
 
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
       orgId: organizacao.id,
       error: membershipError.message,
     })
-    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: membershipError.message }, 400)
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: membershipError.message }, 500)
   }
 
   const { error: profileError } = await adminSupabase
@@ -133,7 +133,7 @@ export async function PATCH(request: Request) {
       route: '/api/v1/config/org',
       error: dbError.message,
     })
-    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 400)
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 500)
   }
 
   return ok(request, data)

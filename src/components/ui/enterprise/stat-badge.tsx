@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { UiStatusTone } from '@/shared/types/ui'
 
 const TONE_CLASS: Record<UiStatusTone, string> = {
@@ -13,10 +14,10 @@ interface StatBadgeProps {
   tone?: UiStatusTone
 }
 
-export function StatBadge({ label, tone = 'neutral' }: StatBadgeProps) {
+export const StatBadge = memo(function StatBadge({ label, tone = 'neutral' }: StatBadgeProps) {
   return (
     <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${TONE_CLASS[tone]}`}>
       {label}
     </span>
   )
-}
+})

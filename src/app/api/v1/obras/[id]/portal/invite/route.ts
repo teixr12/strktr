@@ -55,7 +55,7 @@ export async function POST(
     .maybeSingle()
 
   if (existingClient.error) {
-    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: existingClient.error.message }, 400)
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: existingClient.error.message }, 500)
   }
 
   let portalClienteId = existingClient.data?.id || null
@@ -79,7 +79,7 @@ export async function POST(
       return fail(
         request,
         { code: API_ERROR_CODES.DB_ERROR, message: createClienteError?.message || 'Erro ao criar cliente portal' },
-        400
+        500
       )
     }
 
@@ -126,7 +126,7 @@ export async function POST(
     return fail(
       request,
       { code: API_ERROR_CODES.DB_ERROR, message: sessionError?.message || 'Erro ao criar sessão do portal' },
-      400
+      500
     )
   }
 

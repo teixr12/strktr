@@ -22,23 +22,20 @@ export async function GET(request: Request) {
     maxPageSize: 100,
   })
 
+  // Single query: fetch data + count in one round-trip (eliminates duplicate DB call)
   let query = supabase
     .from('leads')
-    .select('*')
+    .select('id, nome, email, telefone, empresa, origem, status, temperatura, valor_potencial, tipo_projeto, local, notas, ultimo_contato, created_at, updated_at', { count: 'exact' })
     .eq('org_id', orgId)
-    .order('created_at', { ascending: false })
-    .range(offset, offset + pageSize - 1)
   if (status) query = query.eq('status', status)
+  query = query.order('created_at', { ascending: false }).range(offset, offset + pageSize - 1)
 
-  const { data, error: dbError } = await query
+  const { data, count, error: dbError } = await query
   if (dbError) {
     log('error', 'leads.get.failed', { requestId, orgId, userId: user.id, route: '/api/v1/leads', error: dbError.message })
     return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 500)
   }
 
-  let totalQuery = supabase.from('leads').select('*', { head: true, count: 'exact' }).eq('org_id', orgId)
-  if (status) totalQuery = totalQuery.eq('status', status)
-  const { count } = await totalQuery
   const total = count ?? data?.length ?? 0
 
   return ok(request, data ?? [], buildPaginationMeta(data?.length || 0, total, page, pageSize))
@@ -69,7 +66,7 @@ export async function POST(request: Request) {
 
   if (dbError) {
     log('error', 'leads.create.failed', { requestId, orgId, userId: user.id, route: '/api/v1/leads', error: dbError.message })
-    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 400)
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 500)
   }
   await emitProductEvent({
     supabase,

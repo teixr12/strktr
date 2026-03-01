@@ -151,7 +151,7 @@ export async function PATCH(
     .single()
 
   if (updateError || !updated) {
-    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: updateError?.message || 'Erro ao atualizar cronograma' }, 400)
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: updateError?.message || 'Erro ao atualizar cronograma' }, 500)
   }
 
   return ok(request, updated, { flag: 'NEXT_PUBLIC_FF_CRONOGRAMA_ENGINE' })

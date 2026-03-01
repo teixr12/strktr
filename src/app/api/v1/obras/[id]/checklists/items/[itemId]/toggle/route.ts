@@ -66,7 +66,7 @@ export async function POST(
       itemId,
       error: updateError.message,
     })
-    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: updateError.message }, 400)
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: updateError.message }, 500)
   }
 
   await supabase.from('diario_obra').insert({

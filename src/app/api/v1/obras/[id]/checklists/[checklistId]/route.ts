@@ -42,7 +42,7 @@ export async function PATCH(
     .single()
 
   if (dbError || !data) {
-    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError?.message || 'Erro ao atualizar checklist' }, 400)
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError?.message || 'Erro ao atualizar checklist' }, 500)
   }
   return ok(request, data)
 }
@@ -89,7 +89,7 @@ export async function DELETE(
     .eq('org_id', orgId)
 
   if (dbError) {
-    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 400)
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 500)
   }
 
   await supabase.from('diario_obra').insert({

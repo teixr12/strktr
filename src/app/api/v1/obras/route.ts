@@ -71,7 +71,7 @@ export async function POST(request: Request) {
 
   if (dbError) {
     log('error', 'obras.create.failed', { requestId, orgId, userId: user.id, route: '/api/v1/obras', error: dbError.message })
-    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 400)
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 500)
   }
 
   if (process.env.NEXT_PUBLIC_FF_SEMI_AUTOMATION !== 'false') {

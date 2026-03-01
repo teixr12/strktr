@@ -63,7 +63,7 @@ export async function POST(
     .single()
 
   if (updateError || !updated) {
-    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: updateError?.message || 'Erro ao aprovar' }, 400)
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: updateError?.message || 'Erro ao aprovar' }, 500)
   }
 
   if (approval.tipo === 'compra' && approval.compra_id) {
