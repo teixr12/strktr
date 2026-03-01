@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useMemo, useEffect } from 'react'
+import { useConfirm } from '@/hooks/use-confirm'
 import { toast } from '@/hooks/use-toast'
 import { apiRequest, apiRequestWithMeta } from '@/lib/api/client'
 import { track } from '@/lib/analytics/client'
@@ -51,6 +52,7 @@ const V2_LANES: Array<{
 ]
 
 export function LeadsContent({ initialLeads }: Props) {
+  const { confirm, dialog: confirmDialog } = useConfirm()
   const usePaginationV1 = featureFlags.uiPaginationV1
   const [leads, setLeads] = useState(initialLeads)
   const [pagination, setPagination] = useState<PaginationMeta>({
@@ -238,7 +240,8 @@ export function LeadsContent({ initialLeads }: Props) {
   }
 
   async function deleteLead(id: string) {
-    if (!confirm('Excluir este lead?')) return
+    const ok = await confirm({ title: 'Excluir lead?', description: 'Essa ação não pode ser desfeita.', confirmLabel: 'Excluir', variant: 'danger' })
+    if (!ok) return
     try {
       await apiRequest(`/api/v1/leads/${id}`, { method: 'DELETE' })
       const nextPage = usePaginationV1 && leads.length === 1 && pagination.page > 1
@@ -631,6 +634,8 @@ export function LeadsContent({ initialLeads }: Props) {
           </div>
         </div>
       )}
+
+      {confirmDialog}
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { apiRequest } from '@/lib/api/client'
 import { featureFlags } from '@/lib/feature-flags'
 import { toast } from '@/hooks/use-toast'
+import { useConfirm } from '@/hooks/use-confirm'
 import { getRoleLabel, getRoleBadgeColor, canAccess } from '@/lib/auth/roles'
 import { Building2, UserPlus, Shield, Crown, Users, Trash2, Mail } from 'lucide-react'
 import { PageHeader, QuickActionBar, SectionCard } from '@/components/ui/enterprise'
@@ -17,6 +18,7 @@ interface Props {
 }
 
 export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembros, organizacao: initialOrg }: Props) {
+  const { confirm, dialog: confirmDialog } = useConfirm()
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Configuracoes
   const [org, setOrg] = useState(initialOrg)
   const [membros, setMembros] = useState(initialMembros)
@@ -82,7 +84,8 @@ export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembr
 
   async function removeMember(membroId: string, membroUserId: string) {
     if (membroUserId === userId) { toast('Você não pode se remover da organização', 'error'); return }
-    if (!confirm('Remover este membro da organização?')) return
+    const ok = await confirm({ title: 'Remover membro?', description: 'Este membro perderá acesso à organização.', confirmLabel: 'Remover', variant: 'danger' })
+    if (!ok) return
     try {
       await apiRequest<{ success: boolean }>(`/api/v1/config/org-members/${membroId}`, { method: 'DELETE' })
       setMembros((prev) => prev.filter((m) => m.id !== membroId))
@@ -355,6 +358,7 @@ export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembr
           </div>
         </div>
       )}
+      {confirmDialog}
     </div>
   )
 }

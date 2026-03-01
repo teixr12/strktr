@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { apiRequest, apiRequestWithMeta } from '@/lib/api/client'
 import { featureFlags } from '@/lib/feature-flags'
 import { toast } from '@/hooks/use-toast'
+import { useConfirm } from '@/hooks/use-confirm'
 import { fmt, fmtDate } from '@/lib/utils'
 import { PROJETO_STATUS_COLORS } from '@/lib/constants'
 import { Plus, Search, FolderKanban, ArrowRight, X } from 'lucide-react'
@@ -35,6 +36,7 @@ interface PaginationMeta {
 const PAGE_SIZE = 50
 
 export function ProjetosContent({ initialProjetos, leads }: Props) {
+  const { confirm, dialog: confirmDialog } = useConfirm()
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Projetos
   const usePaginationV1 = featureFlags.uiPaginationV1
   const [projetos, setProjetos] = useState(initialProjetos)
@@ -155,7 +157,8 @@ export function ProjetosContent({ initialProjetos, leads }: Props) {
   }
 
   async function convertToObra(p: Projeto) {
-    if (!confirm(`Converter "${p.nome}" em Obra?`)) return
+    const ok = await confirm({ title: `Converter "${p.nome}" em Obra?`, description: 'O projeto será convertido em uma obra ativa.', confirmLabel: 'Converter' })
+    if (!ok) return
     try {
       await apiRequest<{ obra: { id: string } }>(`/api/v1/projetos/${p.id}/convert-to-obra`, { method: 'POST' })
       toast('Obra criada a partir do projeto!', 'success')
@@ -166,7 +169,8 @@ export function ProjetosContent({ initialProjetos, leads }: Props) {
   }
 
   async function deleteProjeto(id: string) {
-    if (!confirm('Excluir este projeto?')) return
+    const ok = await confirm({ title: 'Excluir projeto?', description: 'Essa ação não pode ser desfeita.', confirmLabel: 'Excluir', variant: 'danger' })
+    if (!ok) return
     try {
       await apiRequest<{ success: boolean }>(`/api/v1/projetos/${id}`, { method: 'DELETE' })
       toast('Projeto excluido', 'info')
@@ -320,6 +324,7 @@ export function ProjetosContent({ initialProjetos, leads }: Props) {
           </div>
         </div>
       )}
+      {confirmDialog}
     </div>
   )
 }

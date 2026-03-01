@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { apiRequest } from '@/lib/api/client'
 import { toast } from '@/hooks/use-toast'
+import { useConfirm } from '@/hooks/use-confirm'
 import { fmtDateTime } from '@/lib/utils'
 import { TIPO_VISITA_COLORS, VISITA_STATUS_COLORS } from '@/lib/constants'
 import { Plus, X, Trash2, CalendarDays, Clock, MapPin, Pencil } from 'lucide-react'
@@ -14,6 +15,7 @@ import type { AgendaTask } from '@/shared/types/cronograma'
 interface Props { initialVisitas: Visita[] }
 
 export function CalendarioContent({ initialVisitas }: Props) {
+  const { confirm, dialog: confirmDialog } = useConfirm()
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Agenda
   const [visitas, setVisitas] = useState(initialVisitas)
   const [showForm, setShowForm] = useState(false)
@@ -138,7 +140,8 @@ export function CalendarioContent({ initialVisitas }: Props) {
   }
 
   async function deleteVisita(id: string) {
-    if (!confirm('Excluir esta visita?')) return
+    const ok = await confirm({ title: 'Excluir visita?', description: 'Essa ação não pode ser desfeita.', confirmLabel: 'Excluir', variant: 'danger' })
+    if (!ok) return
     try {
       await apiRequest<{ success: boolean }>(`/api/v1/visitas/${id}`, { method: 'DELETE' })
       setVisitas((prev) => prev.filter((v) => v.id !== id))
@@ -307,6 +310,7 @@ export function CalendarioContent({ initialVisitas }: Props) {
           </div>
         </div>
       )}
+      {confirmDialog}
     </div>
   )
 }

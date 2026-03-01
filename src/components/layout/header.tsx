@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useTheme } from 'next-themes'
-import { Menu, Sun, Moon, Plus } from 'lucide-react'
+import { Menu, Sun, Moon, Plus, Search } from 'lucide-react'
 import { NotificationBell } from './notification-bell'
 import { featureFlags } from '@/lib/feature-flags'
 
@@ -89,6 +89,18 @@ export function Header({ onMenuToggle }: HeaderProps) {
           <Sun className="w-4 h-4 hidden dark:block" />
           <Moon className="w-4 h-4 block dark:hidden" />
         </button>
+        {featureFlags.cmdPalette && (
+          <button
+            onClick={() => {
+              window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))
+            }}
+            className="hidden md:inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white/50 px-3 py-2 text-sm text-gray-400 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900/50 dark:text-gray-500 dark:hover:bg-gray-800"
+          >
+            <Search className="w-4 h-4" />
+            <span>Buscar...</span>
+            <kbd className="ml-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500 dark:bg-gray-800 dark:text-gray-400">&#x2318;K</kbd>
+          </button>
+        )}
         <Link
           href="/leads"
           className="hidden sm:inline-flex items-center gap-1.5 rounded-2xl bg-sand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sand-600"

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useConfirm } from '@/hooks/use-confirm'
 import { apiRequest, apiRequestWithMeta } from '@/lib/api/client'
 import { featureFlags } from '@/lib/feature-flags'
 import { toast } from '@/hooks/use-toast'
@@ -44,6 +45,7 @@ interface PaginationMeta {
 const PAGE_SIZE = 50
 
 export function ComprasContent({ initialCompras, obras }: Props) {
+  const { confirm, dialog: confirmDialog } = useConfirm()
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Compras
   const usePaginationV1 = featureFlags.uiPaginationV1
   const [compras, setCompras] = useState(initialCompras)
@@ -187,7 +189,8 @@ export function ComprasContent({ initialCompras, obras }: Props) {
   }
 
   async function deleteCompra(id: string) {
-    if (!confirm('Excluir esta compra?')) return
+    const ok = await confirm({ title: 'Excluir compra?', description: 'Essa ação não pode ser desfeita.', confirmLabel: 'Excluir', variant: 'danger' })
+    if (!ok) return
     try {
       await apiRequest<{ success: boolean }>(`/api/v1/compras/${id}`, { method: 'DELETE' })
       toast('Compra excluida', 'info')
@@ -371,6 +374,8 @@ export function ComprasContent({ initialCompras, obras }: Props) {
           </div>
         </div>
       )}
+
+      {confirmDialog}
     </div>
   )
 }

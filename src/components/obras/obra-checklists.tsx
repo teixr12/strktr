@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from '@/hooks/use-toast'
+import { useConfirm } from '@/hooks/use-confirm'
 import { apiRequest } from '@/lib/api/client'
 import { track } from '@/lib/analytics/client'
 import { fmtDate } from '@/lib/utils'
@@ -46,6 +47,7 @@ interface Props {
 type ChecklistItemForm = CreateChecklistItemDTO & { checklistId: string }
 
 export function ObraChecklistsTab({ obraId, initialChecklists, onChecklistChanged }: Props) {
+  const { confirm, dialog: confirmDialog } = useConfirm()
   const dueDateEnabled = process.env.NEXT_PUBLIC_FF_CHECKLIST_DUE_DATE === 'true'
   const [checklists, setChecklists] = useState(initialChecklists)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -108,7 +110,8 @@ export function ObraChecklistsTab({ obraId, initialChecklists, onChecklistChange
   }
 
   async function deleteChecklist(id: string, nome: string) {
-    if (!confirm(`Excluir checklist "${nome}"?`)) return
+    const ok = await confirm({ title: `Excluir "${nome}"?`, description: 'Essa ação não pode ser desfeita.', confirmLabel: 'Excluir', variant: 'danger' })
+    if (!ok) return
     try {
       await apiRequest(`/api/v1/obras/${obraId}/checklists/${id}`, { method: 'DELETE' })
       toast('Checklist excluído', 'info')
@@ -457,6 +460,7 @@ export function ObraChecklistsTab({ obraId, initialChecklists, onChecklistChange
           </div>
         </div>
       )}
+      {confirmDialog}
     </div>
   )
 }
