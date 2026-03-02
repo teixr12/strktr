@@ -1,7 +1,11 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { useConfirm } from '@/hooks/use-confirm'
+import { useMutation } from '@/hooks/use-mutation'
 import { apiRequest, apiRequestWithMeta } from '@/lib/api/client'
 import { featureFlags } from '@/lib/feature-flags'
 import { toast } from '@/hooks/use-toast'
@@ -9,6 +13,8 @@ import { fmt, fmtDate } from '@/lib/utils'
 import { ORC_STATUS_COLORS } from '@/lib/constants'
 import { Plus, X, Trash2, Edit2, FileText, Search } from 'lucide-react'
 import { AiBudgetButton } from './ai-budget-button'
+import { ModalSheet } from '@/components/ui/modal-sheet'
+import { FormField, FormInput, FormTextarea, FormSelect } from '@/components/ui/form-field'
 import {
   EmptyStateAction,
   PageHeader,
@@ -16,7 +22,7 @@ import {
   QuickActionBar,
   SectionCard,
 } from '@/components/ui/enterprise'
-import type { Orcamento, OrcamentoStatus, Lead, Obra } from '@/types/database'
+import type { Orcamento, Lead, Obra } from '@/types/database'
 
 interface Props { initialOrcamentos: Orcamento[] }
 
@@ -37,6 +43,18 @@ interface PaginationMeta {
 }
 
 const PAGE_SIZE = 50
+
+const orcFormSchema = z.object({
+  titulo: z.string().trim().min(2, 'Título é obrigatório'),
+  lead_id: z.string().optional(),
+  obra_id: z.string().optional(),
+  validade: z.string().optional(),
+  observacoes: z.string().optional(),
+  status: z.enum(['Rascunho', 'Enviado', 'Pendente Aprovação Cliente', 'Revisão Cliente', 'Aprovado', 'Recusado']).default('Rascunho'),
+  exige_aprovacao_cliente: z.boolean().default(false),
+  reenviar_aprovacao_cliente: z.boolean().default(false),
+})
+type OrcFormValues = z.infer<typeof orcFormSchema>
 
 export function OrcamentosContent({ initialOrcamentos }: Props) {
   const { confirm, dialog: confirmDialog } = useConfirm()
@@ -60,12 +78,28 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
   const [leads, setLeads] = useState<Pick<Lead, 'id' | 'nome'>[]>([])
   const [obras, setObras] = useState<Pick<Obra, 'id' | 'nome'>[]>([])
   const [downloadingPdfId, setDownloadingPdfId] = useState<string | null>(null)
-
-  const [form, setForm] = useState({
-    titulo: '', lead_id: '', obra_id: '', validade: '',
-    observacoes: '', status: 'Rascunho' as OrcamentoStatus, exige_aprovacao_cliente: false, reenviar_aprovacao_cliente: false,
-  })
   const [items, setItems] = useState<ItemForm[]>([{ descricao: '', unidade: 'm²', quantidade: '1', valor_unitario: '0' }])
+
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<OrcFormValues>({
+    resolver: zodResolver(orcFormSchema) as never,
+    defaultValues: {
+      titulo: '', lead_id: '', obra_id: '', validade: '',
+      observacoes: '', status: 'Rascunho', exige_aprovacao_cliente: false, reenviar_aprovacao_cliente: false,
+    },
+  })
+  const exigeAprovacao = watch('exige_aprovacao_cliente')
+
+  const deleteOrcMutation = useMutation<Orcamento>(setOrcamentos, {
+    method: 'DELETE',
+    path: (id) => `/api/v1/orcamentos/${id}`,
+    optimisticUpdate: (prev, _payload, id) => prev.filter((o) => o.id !== id),
+    successMessage: 'Orçamento excluído',
+    errorMessage: 'Erro ao excluir orçamento',
+    trackEvent: 'core_delete',
+    trackSource: 'web',
+    trackEntityType: 'orcamento',
+    onSettled: usePaginationV1 ? () => refreshOrcamentos(1) : undefined,
+  })
 
   useEffect(() => {
     async function loadRelated() {
@@ -130,24 +164,18 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
     })
   }, [orcamentos, filtroStatus, busca])
 
-  function resetForm() {
-    setForm({
-      titulo: '',
-      lead_id: '',
-      obra_id: '',
-      validade: '',
-      observacoes: '',
-      status: 'Rascunho',
-      exige_aprovacao_cliente: false,
-      reenviar_aprovacao_cliente: false,
+  function openNew() {
+    reset({
+      titulo: '', lead_id: '', obra_id: '', validade: '',
+      observacoes: '', status: 'Rascunho', exige_aprovacao_cliente: false, reenviar_aprovacao_cliente: false,
     })
     setItems([{ descricao: '', unidade: 'm²', quantidade: '1', valor_unitario: '0' }])
+    setEditOrc(null)
+    setShowForm(true)
   }
 
-  function openNew() { resetForm(); setEditOrc(null); setShowForm(true) }
-
   function openEdit(o: Orcamento) {
-    setForm({
+    reset({
       titulo: o.titulo, lead_id: o.lead_id || '', obra_id: o.obra_id || '',
       validade: o.validade || '',
       observacoes: o.observacoes || '',
@@ -177,8 +205,7 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
     return items.reduce((s, it) => s + (parseFloat(it.quantidade) || 0) * (parseFloat(it.valor_unitario) || 0), 0)
   }
 
-  async function saveOrcamento() {
-    if (!form.titulo.trim()) { toast('Título é obrigatório', 'error'); return }
+  async function onSubmit(values: OrcFormValues) {
     if (items.length === 0 || !items[0].descricao.trim()) { toast('Adicione pelo menos um item', 'error'); return }
     const normalizedItems = items
       .filter((i) => i.descricao.trim())
@@ -192,26 +219,24 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
     const valor_total = calcTotal()
 
     const payload = {
-      titulo: form.titulo.trim(), status: form.status, valor_total,
-      lead_id: form.lead_id || null, obra_id: form.obra_id || null,
-      validade: form.validade || null, observacoes: form.observacoes || null,
-      exige_aprovacao_cliente: form.exige_aprovacao_cliente,
-      reenviar_aprovacao_cliente: form.reenviar_aprovacao_cliente,
+      titulo: values.titulo.trim(), status: values.status, valor_total,
+      lead_id: values.lead_id || null, obra_id: values.obra_id || null,
+      validade: values.validade || null, observacoes: values.observacoes || null,
+      exige_aprovacao_cliente: values.exige_aprovacao_cliente,
+      reenviar_aprovacao_cliente: values.reenviar_aprovacao_cliente,
       items: normalizedItems,
     }
 
     try {
       if (editOrc) {
         const data = await apiRequest<Orcamento>(`/api/v1/orcamentos/${editOrc.id}`, {
-          method: 'PUT',
-          body: payload,
+          method: 'PUT', body: payload,
         })
         setOrcamentos((prev) => prev.map((o) => o.id === editOrc.id ? data : o))
         toast('Orçamento atualizado!', 'success')
       } else {
         const data = await apiRequest<Orcamento>('/api/v1/orcamentos', {
-          method: 'POST',
-          body: payload,
+          method: 'POST', body: payload,
         })
         setOrcamentos((prev) => [data, ...prev])
         toast('Orçamento criado!', 'success')
@@ -229,17 +254,8 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
   async function deleteOrcamento(id: string) {
     const ok = await confirm({ title: 'Excluir orçamento?', description: 'Essa ação não pode ser desfeita.', confirmLabel: 'Excluir', variant: 'danger' })
     if (!ok) return
-    try {
-      await apiRequest<{ success: boolean }>(`/api/v1/orcamentos/${id}`, { method: 'DELETE' })
-      setOrcamentos((prev) => prev.filter((o) => o.id !== id))
-      setViewOrc(null)
-      toast('Orçamento excluído', 'info')
-      if (usePaginationV1) {
-        await refreshOrcamentos(1)
-      }
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Erro ao excluir orçamento', 'error')
-    }
+    const success = await deleteOrcMutation.mutate(undefined, id)
+    if (success) setViewOrc(null)
   }
 
   function triggerBase64Download(fileName: string, base64: string) {
@@ -463,108 +479,110 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
       )}
 
       {/* Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="modal-glass modal-animate w-full max-w-lg rounded-3xl shadow-2xl dark:bg-gray-900 p-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{editOrc ? 'Editar Orçamento' : 'Novo Orçamento'}</h3>
-              <button onClick={() => { setShowForm(false); setEditOrc(null) }} className="p-1 text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+      <ModalSheet open={showForm} onClose={() => { setShowForm(false); setEditOrc(null) }} title={editOrc ? 'Editar Orçamento' : 'Novo Orçamento'} maxWidth="lg">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+          <FormField label="Título" error={errors.titulo} required>
+            <FormInput registration={register('titulo')} hasError={!!errors.titulo} placeholder="Título do orçamento" />
+          </FormField>
+
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Lead">
+              <FormSelect registration={register('lead_id')}>
+                <option value="">Lead (opcional)</option>
+                {leads.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
+              </FormSelect>
+            </FormField>
+            <FormField label="Obra">
+              <FormSelect registration={register('obra_id')}>
+                <option value="">Obra (opcional)</option>
+                {obras.map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}
+              </FormSelect>
+            </FormField>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Validade">
+              <FormInput registration={register('validade')} type="date" />
+            </FormField>
+            <FormField label="Status">
+              <FormSelect registration={register('status')}>
+                <option value="Rascunho">Rascunho</option>
+                <option value="Enviado">Enviado</option>
+                <option value="Pendente Aprovação Cliente">Pendente Aprovação Cliente</option>
+                <option value="Revisão Cliente">Revisão Cliente</option>
+                <option value="Aprovado">Aprovado</option>
+                <option value="Recusado">Recusado</option>
+              </FormSelect>
+            </FormField>
+          </div>
+
+          <FormField label="Observações">
+            <FormTextarea registration={register('observacoes')} placeholder="Observações" rows={2} />
+          </FormField>
+
+          <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+            <input
+              type="checkbox"
+              {...register('exige_aprovacao_cliente')}
+              className="rounded border-gray-300"
+            />
+            Exigir aprovação do cliente no portal
+          </label>
+          {exigeAprovacao && (
+            <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+              <input
+                type="checkbox"
+                {...register('reenviar_aprovacao_cliente')}
+                className="rounded border-gray-300"
+              />
+              Reenviar como nova versão para aprovação
+            </label>
+          )}
+
+          {/* Line Items */}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-semibold text-gray-900 dark:text-white">Itens</span>
+              <div className="flex items-center gap-2">
+                <AiBudgetButton onItemsGenerated={(generated) => setItems(generated)} />
+                <button type="button" onClick={addItem} className="text-xs text-sand-600 hover:text-sand-700 font-medium">+ Adicionar Item</button>
+              </div>
             </div>
 
-            <div className="space-y-3">
-              <input value={form.titulo} onChange={(e) => setForm((f) => ({ ...f, titulo: e.target.value }))} placeholder="Título *" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white" />
-
-              <div className="grid grid-cols-2 gap-3">
-                <select value={form.lead_id} onChange={(e) => setForm((f) => ({ ...f, lead_id: e.target.value }))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white">
-                  <option value="">Lead (opcional)</option>
-                  {leads.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
-                </select>
-                <select value={form.obra_id} onChange={(e) => setForm((f) => ({ ...f, obra_id: e.target.value }))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white">
-                  <option value="">Obra (opcional)</option>
-                  {obras.map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <input value={form.validade} onChange={(e) => setForm((f) => ({ ...f, validade: e.target.value }))} type="date" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white" />
-                <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as OrcamentoStatus }))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white">
-                  <option value="Rascunho">Rascunho</option>
-                  <option value="Enviado">Enviado</option>
-                  <option value="Pendente Aprovação Cliente">Pendente Aprovação Cliente</option>
-                  <option value="Revisão Cliente">Revisão Cliente</option>
-                  <option value="Aprovado">Aprovado</option>
-                  <option value="Recusado">Recusado</option>
-                </select>
-              </div>
-
-              <textarea value={form.observacoes} onChange={(e) => setForm((f) => ({ ...f, observacoes: e.target.value }))} placeholder="Observações" rows={2} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white resize-none" />
-              <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
-                <input
-                  type="checkbox"
-                  checked={form.exige_aprovacao_cliente}
-                  onChange={(e) => setForm((f) => ({ ...f, exige_aprovacao_cliente: e.target.checked }))}
-                  className="rounded border-gray-300"
-                />
-                Exigir aprovação do cliente no portal
-              </label>
-              {form.exige_aprovacao_cliente && (
-                <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
-                  <input
-                    type="checkbox"
-                    checked={form.reenviar_aprovacao_cliente}
-                    onChange={(e) => setForm((f) => ({ ...f, reenviar_aprovacao_cliente: e.target.checked }))}
-                    className="rounded border-gray-300"
-                  />
-                  Reenviar como nova versão para aprovação
-                </label>
-              )}
-
-              {/* Line Items */}
-              <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-semibold text-gray-900 dark:text-white">Itens</span>
+            <div className="space-y-2">
+              {items.map((item, idx) => (
+                <div key={idx} className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl space-y-2">
                   <div className="flex items-center gap-2">
-                    <AiBudgetButton onItemsGenerated={(generated) => setItems(generated)} />
-                    <button onClick={addItem} className="text-xs text-sand-600 hover:text-sand-700 font-medium">+ Adicionar Item</button>
+                    <input value={item.descricao} onChange={(e) => updateItem(idx, 'descricao', e.target.value)} placeholder="Descrição *" className="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none dark:text-white" />
+                    {items.length > 1 && (
+                      <button type="button" onClick={() => removeItem(idx)} className="p-1 text-red-400 hover:text-red-600"><X className="w-4 h-4" /></button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <input value={item.unidade} onChange={(e) => updateItem(idx, 'unidade', e.target.value)} placeholder="Un." className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none dark:text-white" />
+                    <input value={item.quantidade} onChange={(e) => updateItem(idx, 'quantidade', e.target.value)} placeholder="Qtd." type="number" step="0.01" className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none dark:text-white" />
+                    <input value={item.valor_unitario} onChange={(e) => updateItem(idx, 'valor_unitario', e.target.value)} placeholder="Valor Un." type="number" step="0.01" className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none dark:text-white" />
+                  </div>
+                  <div className="text-right text-xs font-medium text-gray-500">
+                    Subtotal: {fmt((parseFloat(item.quantidade) || 0) * (parseFloat(item.valor_unitario) || 0))}
                   </div>
                 </div>
+              ))}
+            </div>
 
-                <div className="space-y-2">
-                  {items.map((item, idx) => (
-                    <div key={idx} className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl space-y-2">
-                      <div className="flex items-center gap-2">
-                        <input value={item.descricao} onChange={(e) => updateItem(idx, 'descricao', e.target.value)} placeholder="Descrição *" className="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none dark:text-white" />
-                        {items.length > 1 && (
-                          <button onClick={() => removeItem(idx)} className="p-1 text-red-400 hover:text-red-600"><X className="w-4 h-4" /></button>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <input value={item.unidade} onChange={(e) => updateItem(idx, 'unidade', e.target.value)} placeholder="Un." className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none dark:text-white" />
-                        <input value={item.quantidade} onChange={(e) => updateItem(idx, 'quantidade', e.target.value)} placeholder="Qtd." type="number" step="0.01" className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none dark:text-white" />
-                        <input value={item.valor_unitario} onChange={(e) => updateItem(idx, 'valor_unitario', e.target.value)} placeholder="Valor Un." type="number" step="0.01" className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none dark:text-white" />
-                      </div>
-                      <div className="text-right text-xs font-medium text-gray-500">
-                        Subtotal: {fmt((parseFloat(item.quantidade) || 0) * (parseFloat(item.valor_unitario) || 0))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="text-right font-bold text-sand-600 dark:text-sand-400 mt-3">
-                  Total: {fmt(calcTotal())}
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <button onClick={() => { setShowForm(false); setEditOrc(null) }} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">Cancelar</button>
-                <button onClick={saveOrcamento} className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all text-sm">
-                  {editOrc ? 'Salvar' : 'Criar'}
-                </button>
-              </div>
+            <div className="text-right font-bold text-sand-600 dark:text-sand-400 mt-3">
+              Total: {fmt(calcTotal())}
             </div>
           </div>
-        </div>
-      )}
+
+          <div className="flex gap-2 pt-2">
+            <button type="button" onClick={() => { setShowForm(false); setEditOrc(null) }} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">Cancelar</button>
+            <button type="submit" className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all text-sm">
+              {editOrc ? 'Salvar' : 'Criar'}
+            </button>
+          </div>
+        </form>
+      </ModalSheet>
 
       {confirmDialog}
     </div>

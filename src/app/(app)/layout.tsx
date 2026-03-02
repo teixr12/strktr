@@ -8,6 +8,7 @@ import { AppShell } from '@/components/ui/enterprise'
 import { featureFlags } from '@/lib/feature-flags'
 import { ToastProvider } from '@/components/ui/toast-provider'
 import { CommandPalette } from '@/components/ui/command-palette'
+import { PageTransition } from '@/components/ui/page-transition'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -24,7 +25,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <main className="flex-1 flex flex-col min-w-0 bg-gray-50/50 dark:bg-black relative overflow-hidden">
             <Header onMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)} />
             <div className="flex-1 overflow-y-auto">
-              {children}
+              <PageTransition>{children}</PageTransition>
               <Footer />
             </div>
           </main>
@@ -47,7 +48,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         header={<Header onMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)} />}
         footer={<Footer />}
       >
-        {children}
+        <PageTransition>{children}</PageTransition>
       </AppShell>
       <ToastProvider />
       <CommandPalette />

@@ -1,12 +1,17 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useConfirm } from '@/hooks/use-confirm'
+import { useCrudMutations } from '@/hooks/use-crud-mutations'
 import { apiRequest, apiRequestWithMeta } from '@/lib/api/client'
 import { featureFlags } from '@/lib/feature-flags'
 import { toast } from '@/hooks/use-toast'
 import { fmt, fmtDate } from '@/lib/utils'
 import { COMPRA_STATUS_COLORS, COMPRA_URGENCIA_COLORS } from '@/lib/constants'
+import { createCompraSchema, type CreateCompraDTO } from '@/shared/schemas/business'
+import { FormField, FormInput, FormSelect, FormTextarea } from '@/components/ui/form-field'
 import { Plus, Search, ShoppingCart, X } from 'lucide-react'
 import {
   EmptyStateAction,
@@ -61,10 +66,40 @@ export function ComprasContent({ initialCompras, obras }: Props) {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<Compra | null>(null)
-  const [form, setForm] = useState({
-    descricao: '', categoria: 'Material', fornecedor: '', obra_id: '',
-    valor_estimado: '', valor_real: '', status: 'Solicitado' as CompraStatus,
-    urgencia: 'Normal' as CompraUrgencia, notas: '', exige_aprovacao_cliente: false, reenviar_aprovacao_cliente: false,
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+    watch,
+  } = useForm<CreateCompraDTO>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Zod v4 input/output type mismatch with @hookform/resolvers
+    resolver: zodResolver(createCompraSchema) as any,
+    defaultValues: {
+      descricao: '',
+      categoria: 'Material',
+      fornecedor: '',
+      obra_id: '',
+      valor_estimado: 0,
+      valor_real: undefined,
+      status: 'Solicitado',
+      urgencia: 'Normal',
+      notas: '',
+      exige_aprovacao_cliente: false,
+      reenviar_aprovacao_cliente: false,
+    },
+  })
+
+  const exigeAprovacao = watch('exige_aprovacao_cliente')
+
+  const { createMutation, updateMutation, deleteMutation } = useCrudMutations<Compra>({
+    setItems: setCompras,
+    basePath: '/api/v1/compras',
+    entityName: 'Compra',
+    trackSource: 'web',
+    trackEntityType: 'compra',
+    onSettled: () => refresh(),
   })
 
   const filtered = useMemo(() => {
@@ -122,10 +157,14 @@ export function ComprasContent({ initialCompras, obras }: Props) {
   function openForm(c?: Compra) {
     if (c) {
       setEditing(c)
-      setForm({
-        descricao: c.descricao, categoria: c.categoria, fornecedor: c.fornecedor || '',
-        obra_id: c.obra_id || '', valor_estimado: String(c.valor_estimado || ''),
-        valor_real: String(c.valor_real || ''), status: c.status,
+      reset({
+        descricao: c.descricao,
+        categoria: c.categoria,
+        fornecedor: c.fornecedor || '',
+        obra_id: c.obra_id || '',
+        valor_estimado: c.valor_estimado || 0,
+        valor_real: c.valor_real ?? undefined,
+        status: c.status,
         urgencia: c.urgencia,
         notas: c.notas || '',
         exige_aprovacao_cliente: Boolean(c.exige_aprovacao_cliente),
@@ -133,13 +172,13 @@ export function ComprasContent({ initialCompras, obras }: Props) {
       })
     } else {
       setEditing(null)
-      setForm({
+      reset({
         descricao: '',
         categoria: 'Material',
         fornecedor: '',
         obra_id: '',
-        valor_estimado: '',
-        valor_real: '',
+        valor_estimado: 0,
+        valor_real: undefined,
         status: 'Solicitado',
         urgencia: 'Normal',
         notas: '',
@@ -150,54 +189,42 @@ export function ComprasContent({ initialCompras, obras }: Props) {
     setShowForm(true)
   }
 
-  async function save() {
-    if (!form.descricao.trim()) { toast('Descricao e obrigatoria', 'error'); return }
+  async function onSubmit(data: CreateCompraDTO) {
     const payload = {
-      descricao: form.descricao.trim(), categoria: form.categoria,
-      fornecedor: form.fornecedor || null, obra_id: form.obra_id || null,
-      valor_estimado: parseFloat(form.valor_estimado) || 0,
-      valor_real: form.valor_real ? parseFloat(form.valor_real) : null,
-      status: form.status, urgencia: form.urgencia,
-      notas: form.notas || null,
-      exige_aprovacao_cliente: form.exige_aprovacao_cliente,
-      reenviar_aprovacao_cliente: form.reenviar_aprovacao_cliente,
+      descricao: data.descricao,
+      categoria: data.categoria,
+      fornecedor: data.fornecedor || null,
+      obra_id: data.obra_id || null,
+      valor_estimado: data.valor_estimado ?? 0,
+      valor_real: data.valor_real ?? null,
+      status: data.status,
+      urgencia: data.urgencia,
+      notas: data.notas || null,
+      exige_aprovacao_cliente: data.exige_aprovacao_cliente,
+      reenviar_aprovacao_cliente: data.reenviar_aprovacao_cliente,
     }
 
-    try {
-      if (editing) {
-        await apiRequest<Compra>(`/api/v1/compras/${editing.id}`, { method: 'PUT', body: payload })
-        toast('Compra atualizada!', 'success')
-      } else {
-        await apiRequest<Compra>('/api/v1/compras', { method: 'POST', body: payload })
-        toast('Compra registrada!', 'success')
-      }
+    let ok: boolean
+    if (editing) {
+      ok = await updateMutation.mutate(payload, editing.id)
+    } else {
+      ok = await createMutation.mutate(payload)
+    }
+
+    if (ok) {
       setShowForm(false)
-      await refresh()
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Erro ao salvar compra', 'error')
+      setEditing(null)
     }
   }
 
   async function updateStatus(id: string, status: CompraStatus) {
-    try {
-      await apiRequest<Compra>(`/api/v1/compras/${id}`, { method: 'PUT', body: { status } })
-      toast('Status atualizado!', 'success')
-      await refresh()
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Erro ao atualizar status', 'error')
-    }
+    await updateMutation.mutate({ status }, id)
   }
 
   async function deleteCompra(id: string) {
-    const ok = await confirm({ title: 'Excluir compra?', description: 'Essa ação não pode ser desfeita.', confirmLabel: 'Excluir', variant: 'danger' })
+    const ok = await confirm({ title: 'Excluir compra?', description: 'Essa acao nao pode ser desfeita.', confirmLabel: 'Excluir', variant: 'danger' })
     if (!ok) return
-    try {
-      await apiRequest<{ success: boolean }>(`/api/v1/compras/${id}`, { method: 'DELETE' })
-      toast('Compra excluida', 'info')
-      await refresh()
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Erro ao excluir compra', 'error')
-    }
+    await deleteMutation.mutate(undefined, id)
   }
 
   return (
@@ -242,7 +269,7 @@ export function ComprasContent({ initialCompras, obras }: Props) {
         <EmptyStateAction
           icon={<ShoppingCart className="h-6 w-6 text-sand-600 dark:text-sand-300" />}
           title="Nenhuma compra encontrada"
-          description="Crie compras para controlar materiais, aprovações do cliente e urgências."
+          description="Crie compras para controlar materiais, aprovacoes do cliente e urgencias."
           actionLabel="Nova compra"
           onAction={() => openForm()}
         />
@@ -259,7 +286,7 @@ export function ComprasContent({ initialCompras, obras }: Props) {
                     </span>
                     {c.exige_aprovacao_cliente && (
                       <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-100 text-blue-700">
-                        Aprovação cliente
+                        Aprovacao cliente
                       </span>
                     )}
                     {c.blocked_reason && (
@@ -287,11 +314,11 @@ export function ComprasContent({ initialCompras, obras }: Props) {
                   <select
                     value={c.status}
                     onChange={(e) => updateStatus(c.id, e.target.value as CompraStatus)}
-                    className="text-xs border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1 bg-white dark:bg-gray-800 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="text-xs border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1 bg-white dark:bg-gray-800 cursor-pointer md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                   >
                     {STATUS_OPTIONS.map((s) => <option key={s}>{s}</option>)}
                   </select>
-                  <button onClick={() => deleteCompra(c.id)} className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-400 transition-all">
+                  <button onClick={() => deleteCompra(c.id)} className="p-1.5 md:opacity-0 md:group-hover:opacity-100 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-400 transition-all">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
@@ -314,63 +341,84 @@ export function ComprasContent({ initialCompras, obras }: Props) {
 
       {/* Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="modal-glass modal-animate w-full max-w-lg rounded-3xl shadow-2xl dark:bg-gray-900 p-6 max-h-[85vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              {editing ? 'Editar Compra' : 'Nova Compra'}
-            </h3>
-            <div className="space-y-3">
-              <input value={form.descricao} onChange={(e) => setForm((f) => ({ ...f, descricao: e.target.value }))} placeholder="Descricao da compra *" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none dark:text-white" />
+        <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm">
+          <div className="modal-glass modal-animate w-full md:max-w-md rounded-t-3xl md:rounded-3xl shadow-2xl dark:bg-gray-900 p-6 max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {editing ? 'Editar Compra' : 'Nova Compra'}
+              </h3>
+              <button onClick={() => { setShowForm(false); setEditing(null) }} className="p-1 text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+            </div>
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+              <FormField error={errors.descricao} required>
+                <FormInput registration={register('descricao')} hasError={!!errors.descricao} placeholder="Descricao da compra *" />
+              </FormField>
               <div className="grid grid-cols-2 gap-3">
-                <select value={form.categoria} onChange={(e) => setForm((f) => ({ ...f, categoria: e.target.value }))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white">
-                  {CATEGORIA_OPTIONS.map((c) => <option key={c}>{c}</option>)}
-                </select>
-                <input value={form.fornecedor} onChange={(e) => setForm((f) => ({ ...f, fornecedor: e.target.value }))} placeholder="Fornecedor" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none dark:text-white" />
+                <FormField error={errors.categoria}>
+                  <FormSelect registration={register('categoria')} hasError={!!errors.categoria}>
+                    {CATEGORIA_OPTIONS.map((c) => <option key={c}>{c}</option>)}
+                  </FormSelect>
+                </FormField>
+                <FormField error={errors.fornecedor}>
+                  <FormInput registration={register('fornecedor')} hasError={!!errors.fornecedor} placeholder="Fornecedor" />
+                </FormField>
               </div>
               {obras.length > 0 && (
-                <select value={form.obra_id} onChange={(e) => setForm((f) => ({ ...f, obra_id: e.target.value }))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white">
-                  <option value="">Vincular a obra (opcional)</option>
-                  {obras.map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}
-                </select>
+                <FormField error={errors.obra_id}>
+                  <FormSelect registration={register('obra_id')} hasError={!!errors.obra_id}>
+                    <option value="">Vincular a obra (opcional)</option>
+                    {obras.map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}
+                  </FormSelect>
+                </FormField>
               )}
               <div className="grid grid-cols-2 gap-3">
-                <input type="number" value={form.valor_estimado} onChange={(e) => setForm((f) => ({ ...f, valor_estimado: e.target.value }))} placeholder="Valor estimado (R$)" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none dark:text-white" />
-                <input type="number" value={form.valor_real} onChange={(e) => setForm((f) => ({ ...f, valor_real: e.target.value }))} placeholder="Valor real (R$)" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none dark:text-white" />
+                <FormField error={errors.valor_estimado}>
+                  <FormInput registration={register('valor_estimado', { valueAsNumber: true })} hasError={!!errors.valor_estimado} placeholder="Valor estimado (R$)" type="number" />
+                </FormField>
+                <FormField error={errors.valor_real}>
+                  <FormInput registration={register('valor_real', { valueAsNumber: true })} hasError={!!errors.valor_real} placeholder="Valor real (R$)" type="number" />
+                </FormField>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as CompraStatus }))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white">
-                  {STATUS_OPTIONS.map((s) => <option key={s}>{s}</option>)}
-                </select>
-                <select value={form.urgencia} onChange={(e) => setForm((f) => ({ ...f, urgencia: e.target.value as CompraUrgencia }))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white">
-                  {URGENCIA_OPTIONS.map((u) => <option key={u}>{u}</option>)}
-                </select>
+                <FormField error={errors.status}>
+                  <FormSelect registration={register('status')} hasError={!!errors.status}>
+                    {STATUS_OPTIONS.map((s) => <option key={s}>{s}</option>)}
+                  </FormSelect>
+                </FormField>
+                <FormField error={errors.urgencia}>
+                  <FormSelect registration={register('urgencia')} hasError={!!errors.urgencia}>
+                    {URGENCIA_OPTIONS.map((u) => <option key={u}>{u}</option>)}
+                  </FormSelect>
+                </FormField>
               </div>
-              <textarea value={form.notas} onChange={(e) => setForm((f) => ({ ...f, notas: e.target.value }))} placeholder="Notas" rows={2} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none dark:text-white resize-none" />
+              <FormField error={errors.notas}>
+                <FormTextarea registration={register('notas')} hasError={!!errors.notas} placeholder="Notas" rows={2} />
+              </FormField>
               <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
                 <input
                   type="checkbox"
-                  checked={form.exige_aprovacao_cliente}
-                  onChange={(e) => setForm((f) => ({ ...f, exige_aprovacao_cliente: e.target.checked }))}
+                  {...register('exige_aprovacao_cliente')}
                   className="rounded border-gray-300"
                 />
-                Exigir aprovação do cliente no portal
+                Exigir aprovacao do cliente no portal
               </label>
-              {form.exige_aprovacao_cliente && (
+              {exigeAprovacao && (
                 <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
                   <input
                     type="checkbox"
-                    checked={form.reenviar_aprovacao_cliente}
-                    onChange={(e) => setForm((f) => ({ ...f, reenviar_aprovacao_cliente: e.target.checked }))}
+                    {...register('reenviar_aprovacao_cliente')}
                     className="rounded border-gray-300"
                   />
-                  Reenviar como nova versão para aprovação
+                  Reenviar como nova versao para aprovacao
                 </label>
               )}
-              <div className="flex gap-2">
-                <button onClick={() => setShowForm(false)} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">Cancelar</button>
-                <button onClick={save} className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all">{editing ? 'Salvar' : 'Registrar'}</button>
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => { setShowForm(false); setEditing(null) }} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">Cancelar</button>
+                <button type="submit" disabled={createMutation.isMutating || updateMutation.isMutating} className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all text-sm disabled:opacity-50">
+                  {editing ? 'Salvar' : 'Registrar'}
+                </button>
               </div>
-            </div>
+            </form>
           </div>
         </div>
       )}

@@ -1,12 +1,16 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { apiRequest, apiRequestWithMeta } from '@/lib/api/client'
 import { featureFlags } from '@/lib/feature-flags'
 import { toast } from '@/hooks/use-toast'
 import { useConfirm } from '@/hooks/use-confirm'
+import { useCrudMutations } from '@/hooks/use-crud-mutations'
 import { fmt, fmtDate } from '@/lib/utils'
 import { PROJETO_STATUS_COLORS } from '@/lib/constants'
+import { createProjetoSchema, type CreateProjetoDTO } from '@/shared/schemas/business'
 import { Plus, Search, FolderKanban, ArrowRight, X } from 'lucide-react'
 import {
   EmptyStateAction,
@@ -15,6 +19,7 @@ import {
   QuickActionBar,
   SectionCard,
 } from '@/components/ui/enterprise'
+import { FormField, FormInput, FormSelect, FormTextarea } from '@/components/ui/form-field'
 import type { Projeto, ProjetoStatus } from '@/types/database'
 
 const STATUS_OPTIONS: ProjetoStatus[] = ['Planejamento', 'Em Aprovação', 'Aprovado', 'Em Execução', 'Concluído', 'Arquivado']
@@ -52,10 +57,40 @@ export function ProjetosContent({ initialProjetos, leads }: Props) {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<Projeto | null>(null)
-  const [form, setForm] = useState({
-    nome: '', descricao: '', cliente: '', local: '', tipo: 'Residencial',
-    status: 'Planejamento' as ProjetoStatus, valor_estimado: '',
-    area_m2: '', lead_id: '', data_inicio_prev: '', data_fim_prev: '', notas: '',
+
+  const defaultValues: CreateProjetoDTO = {
+    nome: '',
+    descricao: null,
+    cliente: null,
+    local: null,
+    tipo: 'Residencial',
+    status: 'Planejamento',
+    valor_estimado: 0,
+    area_m2: null,
+    lead_id: null,
+    obra_id: null,
+    data_inicio_prev: null,
+    data_fim_prev: null,
+    notas: null,
+  }
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<CreateProjetoDTO>({
+    resolver: zodResolver(createProjetoSchema) as never,
+    defaultValues,
+  })
+
+  const { createMutation, updateMutation, deleteMutation } = useCrudMutations<Projeto>({
+    setItems: setProjetos,
+    basePath: '/api/v1/projetos',
+    entityName: 'Projeto',
+    trackSource: 'web',
+    trackEntityType: 'projeto',
+    onSettled: () => refresh?.(pagination.page),
   })
 
   const filtered = useMemo(() => {
@@ -113,46 +148,50 @@ export function ProjetosContent({ initialProjetos, leads }: Props) {
   function openForm(p?: Projeto) {
     if (p) {
       setEditing(p)
-      setForm({
-        nome: p.nome, descricao: p.descricao || '', cliente: p.cliente || '',
-        local: p.local || '', tipo: p.tipo, status: p.status,
-        valor_estimado: String(p.valor_estimado || ''), area_m2: String(p.area_m2 || ''),
-        lead_id: p.lead_id || '', data_inicio_prev: p.data_inicio_prev || '',
-        data_fim_prev: p.data_fim_prev || '', notas: p.notas || '',
+      reset({
+        nome: p.nome,
+        descricao: p.descricao || null,
+        cliente: p.cliente || null,
+        local: p.local || null,
+        tipo: p.tipo,
+        status: p.status,
+        valor_estimado: p.valor_estimado || 0,
+        area_m2: p.area_m2 || null,
+        lead_id: p.lead_id || null,
+        obra_id: p.obra_id || null,
+        data_inicio_prev: p.data_inicio_prev || null,
+        data_fim_prev: p.data_fim_prev || null,
+        notas: p.notas || null,
       })
     } else {
       setEditing(null)
-      setForm({ nome: '', descricao: '', cliente: '', local: '', tipo: 'Residencial', status: 'Planejamento', valor_estimado: '', area_m2: '', lead_id: '', data_inicio_prev: '', data_fim_prev: '', notas: '' })
+      reset(defaultValues)
     }
     setShowForm(true)
   }
 
-  async function save() {
-    if (!form.nome.trim()) { toast('Nome e obrigatorio', 'error'); return }
+  function closeForm() {
+    setShowForm(false)
+    setEditing(null)
+    reset(defaultValues)
+  }
+
+  async function onSubmit(data: CreateProjetoDTO) {
     const payload = {
-      nome: form.nome.trim(), descricao: form.descricao || null,
-      cliente: form.cliente || null, local: form.local || null,
-      tipo: form.tipo, status: form.status,
-      valor_estimado: parseFloat(form.valor_estimado) || 0,
-      area_m2: parseFloat(form.area_m2) || null,
-      lead_id: form.lead_id || null,
-      data_inicio_prev: form.data_inicio_prev || null,
-      data_fim_prev: form.data_fim_prev || null,
-      notas: form.notas || null,
+      ...data,
+      lead_id: data.lead_id || null,
+      obra_id: data.obra_id || null,
     }
 
-    try {
-      if (editing) {
-        await apiRequest<Projeto>(`/api/v1/projetos/${editing.id}`, { method: 'PUT', body: payload })
-        toast('Projeto atualizado!', 'success')
-      } else {
-        await apiRequest<Projeto>('/api/v1/projetos', { method: 'POST', body: payload })
-        toast('Projeto criado!', 'success')
-      }
-      setShowForm(false)
-      await refresh()
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Erro ao salvar projeto', 'error')
+    let ok: boolean
+    if (editing) {
+      ok = await updateMutation.mutate(payload, editing.id)
+    } else {
+      ok = await createMutation.mutate(payload)
+    }
+
+    if (ok) {
+      closeForm()
     }
   }
 
@@ -171,13 +210,7 @@ export function ProjetosContent({ initialProjetos, leads }: Props) {
   async function deleteProjeto(id: string) {
     const ok = await confirm({ title: 'Excluir projeto?', description: 'Essa ação não pode ser desfeita.', confirmLabel: 'Excluir', variant: 'danger' })
     if (!ok) return
-    try {
-      await apiRequest<{ success: boolean }>(`/api/v1/projetos/${id}`, { method: 'DELETE' })
-      toast('Projeto excluido', 'info')
-      await refresh()
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Erro ao excluir projeto', 'error')
-    }
+    await deleteMutation.mutate(undefined, id)
   }
 
   return (
@@ -247,7 +280,7 @@ export function ProjetosContent({ initialProjetos, leads }: Props) {
                     {p.obras?.nome && <span>Obra: {p.obras.nome}</span>}
                   </div>
                 </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                   {!p.obra_id && (
                     <button onClick={() => convertToObra(p)} title="Converter em Obra" className="p-1.5 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg text-emerald-500 transition-colors">
                       <ArrowRight className="w-4 h-4" />
@@ -276,51 +309,121 @@ export function ProjetosContent({ initialProjetos, leads }: Props) {
 
       {/* Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="modal-glass modal-animate w-full max-w-lg rounded-3xl shadow-2xl dark:bg-gray-900 p-6 max-h-[85vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              {editing ? 'Editar Projeto' : 'Novo Projeto'}
-            </h3>
-            <div className="space-y-3">
-              <input value={form.nome} onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))} placeholder="Nome do projeto *" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none dark:text-white" />
+        <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm">
+          <div className="modal-glass modal-animate w-full md:max-w-lg rounded-t-3xl md:rounded-3xl shadow-2xl dark:bg-gray-900 p-6 max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {editing ? 'Editar Projeto' : 'Novo Projeto'}
+              </h3>
+              <button onClick={closeForm} className="p-1 text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+            </div>
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+              <FormField label="Nome" error={errors.nome} required>
+                <FormInput
+                  registration={register('nome')}
+                  hasError={!!errors.nome}
+                  placeholder="Nome do projeto *"
+                />
+              </FormField>
               <div className="grid grid-cols-2 gap-3">
-                <input value={form.cliente} onChange={(e) => setForm((f) => ({ ...f, cliente: e.target.value }))} placeholder="Cliente" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none dark:text-white" />
-                <input value={form.local} onChange={(e) => setForm((f) => ({ ...f, local: e.target.value }))} placeholder="Local" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none dark:text-white" />
+                <FormField label="Cliente" error={errors.cliente}>
+                  <FormInput
+                    registration={register('cliente')}
+                    hasError={!!errors.cliente}
+                    placeholder="Cliente"
+                  />
+                </FormField>
+                <FormField label="Local" error={errors.local}>
+                  <FormInput
+                    registration={register('local')}
+                    hasError={!!errors.local}
+                    placeholder="Local"
+                  />
+                </FormField>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <select value={form.tipo} onChange={(e) => setForm((f) => ({ ...f, tipo: e.target.value }))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white">
-                  {TIPO_OPTIONS.map((t) => <option key={t}>{t}</option>)}
-                </select>
-                <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as ProjetoStatus }))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white">
-                  {STATUS_OPTIONS.map((s) => <option key={s}>{s}</option>)}
-                </select>
+                <FormField label="Tipo" error={errors.tipo} required>
+                  <FormSelect registration={register('tipo')} hasError={!!errors.tipo}>
+                    {TIPO_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </FormSelect>
+                </FormField>
+                <FormField label="Status" error={errors.status}>
+                  <FormSelect registration={register('status')} hasError={!!errors.status}>
+                    {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </FormSelect>
+                </FormField>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <input type="number" value={form.valor_estimado} onChange={(e) => setForm((f) => ({ ...f, valor_estimado: e.target.value }))} placeholder="Valor estimado (R$)" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none dark:text-white" />
-                <input type="number" value={form.area_m2} onChange={(e) => setForm((f) => ({ ...f, area_m2: e.target.value }))} placeholder="Area (m2)" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none dark:text-white" />
+                <FormField label="Valor estimado (R$)" error={errors.valor_estimado}>
+                  <FormInput
+                    registration={register('valor_estimado', { valueAsNumber: true })}
+                    hasError={!!errors.valor_estimado}
+                    placeholder="Valor estimado (R$)"
+                    type="number"
+                    step="0.01"
+                  />
+                </FormField>
+                <FormField label="Area (m2)" error={errors.area_m2}>
+                  <FormInput
+                    registration={register('area_m2', { valueAsNumber: true })}
+                    hasError={!!errors.area_m2}
+                    placeholder="Area (m2)"
+                    type="number"
+                    step="0.01"
+                  />
+                </FormField>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Inicio previsto</label>
-                  <input type="date" value={form.data_inicio_prev} onChange={(e) => setForm((f) => ({ ...f, data_inicio_prev: e.target.value }))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white" />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Fim previsto</label>
-                  <input type="date" value={form.data_fim_prev} onChange={(e) => setForm((f) => ({ ...f, data_fim_prev: e.target.value }))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white" />
-                </div>
+                <FormField label="Inicio previsto" error={errors.data_inicio_prev}>
+                  <FormInput
+                    registration={register('data_inicio_prev')}
+                    hasError={!!errors.data_inicio_prev}
+                    type="date"
+                  />
+                </FormField>
+                <FormField label="Fim previsto" error={errors.data_fim_prev}>
+                  <FormInput
+                    registration={register('data_fim_prev')}
+                    hasError={!!errors.data_fim_prev}
+                    type="date"
+                  />
+                </FormField>
               </div>
               {leads.length > 0 && (
-                <select value={form.lead_id} onChange={(e) => setForm((f) => ({ ...f, lead_id: e.target.value }))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white">
-                  <option value="">Vincular a lead (opcional)</option>
-                  {leads.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
-                </select>
+                <FormField label="Lead" error={errors.lead_id}>
+                  <FormSelect registration={register('lead_id')} hasError={!!errors.lead_id}>
+                    <option value="">Vincular a lead (opcional)</option>
+                    {leads.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
+                  </FormSelect>
+                </FormField>
               )}
-              <textarea value={form.notas} onChange={(e) => setForm((f) => ({ ...f, notas: e.target.value }))} placeholder="Notas" rows={2} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none dark:text-white resize-none" />
-              <div className="flex gap-2">
-                <button onClick={() => setShowForm(false)} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">Cancelar</button>
-                <button onClick={save} className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all">{editing ? 'Salvar' : 'Criar'}</button>
+              <FormField label="Notas" error={errors.notas}>
+                <FormTextarea
+                  registration={register('notas')}
+                  hasError={!!errors.notas}
+                  placeholder="Notas"
+                  rows={2}
+                />
+              </FormField>
+              <FormField label="Descricao" error={errors.descricao}>
+                <FormTextarea
+                  registration={register('descricao')}
+                  hasError={!!errors.descricao}
+                  placeholder="Descricao"
+                  rows={2}
+                />
+              </FormField>
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={closeForm} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">Cancelar</button>
+                <button
+                  type="submit"
+                  disabled={createMutation.isMutating || updateMutation.isMutating}
+                  className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all text-sm disabled:opacity-50"
+                >
+                  {(createMutation.isMutating || updateMutation.isMutating) ? 'Salvando...' : editing ? 'Salvar' : 'Criar'}
+                </button>
               </div>
-            </div>
+            </form>
           </div>
         </div>
       )}

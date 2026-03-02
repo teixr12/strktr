@@ -1,10 +1,49 @@
 import { createClient } from '@/lib/supabase/server'
 import { DashboardContent } from '@/components/dashboard/dashboard-content'
+import { featureFlags } from '@/lib/feature-flags'
 
 export const dynamic = 'force-dynamic'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
+
+  // V2: Use pre-computed summary endpoint (3-5KB vs ~200KB)
+  if (featureFlags.dashboardSsrV2) {
+    const { data: session } = await supabase.auth.getSession()
+    const token = session?.session?.access_token
+    if (token) {
+      let summaryData = null
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+        const res = await fetch(`${baseUrl}/api/v1/dashboard/summary`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        })
+        if (res.ok) {
+          const envelope = await res.json()
+          summaryData = envelope.data
+        }
+      } catch {
+        // Fall through to legacy path on any error
+      }
+      if (summaryData) {
+        return (
+          <DashboardContent
+            obras={[]}
+            leads={[]}
+            transacoes={[]}
+            visitas={[]}
+            orcamentos={[]}
+            compras={[]}
+            projetos={[]}
+            summary={summaryData}
+          />
+        )
+      }
+    }
+  }
+
+  // Legacy: 7 raw entity queries
   const dashboardLimit = 120
 
   const [obrasRes, leadsRes, transacoesRes, visitasRes, orcamentosRes, comprasRes, projetosRes] = await Promise.all([
