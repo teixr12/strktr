@@ -39,6 +39,8 @@ export const featureFlags = {
   semiAutomation: process.env.NEXT_PUBLIC_FF_SEMI_AUTOMATION !== 'false',
   behaviorPrompts: process.env.NEXT_PUBLIC_FF_BEHAVIOR_PROMPTS !== 'false',
   cmdPalette: process.env.NEXT_PUBLIC_FF_CMD_PALETTE !== 'false',
+  dashboardSsrV2:
+    process.env.NEXT_PUBLIC_FF_DASHBOARD_SSR_V2 === 'true',
 }
 
 export type FeatureFlagKey = keyof typeof featureFlags

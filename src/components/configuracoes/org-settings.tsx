@@ -1,6 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { apiRequest } from '@/lib/api/client'
 import { featureFlags } from '@/lib/feature-flags'
 import { toast } from '@/hooks/use-toast'
@@ -8,6 +11,8 @@ import { useConfirm } from '@/hooks/use-confirm'
 import { getRoleLabel, getRoleBadgeColor, canAccess } from '@/lib/auth/roles'
 import { Building2, UserPlus, Shield, Crown, Users, Trash2, Mail } from 'lucide-react'
 import { PageHeader, QuickActionBar, SectionCard } from '@/components/ui/enterprise'
+import { ModalSheet } from '@/components/ui/modal-sheet'
+import { FormField, FormInput, FormSelect } from '@/components/ui/form-field'
 import type { UserRole, OrgMembro, Organizacao } from '@/types/database'
 
 interface Props {
@@ -17,6 +22,18 @@ interface Props {
   organizacao: Organizacao | null
 }
 
+const inviteFormSchema = z.object({
+  email: z.string().email('Email inválido').min(1, 'Email é obrigatório'),
+  role: z.enum(['admin', 'manager', 'user']).default('user'),
+})
+type InviteFormValues = z.infer<typeof inviteFormSchema>
+
+const orgFormSchema = z.object({
+  nome: z.string().trim().min(2, 'Nome da organização é obrigatório'),
+  cnpj: z.string().trim().optional(),
+})
+type OrgFormValues = z.infer<typeof orgFormSchema>
+
 export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembros, organizacao: initialOrg }: Props) {
   const { confirm, dialog: confirmDialog } = useConfirm()
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Configuracoes
@@ -24,20 +41,26 @@ export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembr
   const [membros, setMembros] = useState(initialMembros)
   const [showCreateOrg, setShowCreateOrg] = useState(false)
   const [showInvite, setShowInvite] = useState(false)
-  const [orgForm, setOrgForm] = useState({ nome: '', cnpj: '' })
-  const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteRole, setInviteRole] = useState<UserRole>('user')
+
+  const { register: registerOrg, handleSubmit: handleOrgSubmit, formState: { errors: orgErrors } } = useForm<OrgFormValues>({
+    resolver: zodResolver(orgFormSchema) as never,
+    defaultValues: { nome: '', cnpj: '' },
+  })
+
+  const { register: registerInvite, handleSubmit: handleInviteSubmit, reset: resetInvite, formState: { errors: inviteErrors } } = useForm<InviteFormValues>({
+    resolver: zodResolver(inviteFormSchema) as never,
+    defaultValues: { email: '', role: 'user' },
+  })
 
   const userRole = orgMembro?.role || 'admin'
   const isAdmin = userRole === 'admin'
   const isManagerOrAbove = canAccess(userRole, 'manager')
 
-  async function createOrg() {
-    if (!orgForm.nome.trim()) { toast('Nome da organização é obrigatório', 'error'); return }
+  async function onOrgSubmit(values: OrgFormValues) {
     try {
       const created = await apiRequest<{ organizacao: Organizacao; membership: OrgMembro }>(
         '/api/v1/config/org',
-        { method: 'POST', body: { nome: orgForm.nome.trim(), cnpj: orgForm.cnpj || null } }
+        { method: 'POST', body: { nome: values.nome.trim(), cnpj: values.cnpj || null } }
       )
       setOrg(created.organizacao)
       setMembros([created.membership])
@@ -49,13 +72,12 @@ export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembr
     }
   }
 
-  async function inviteMember() {
-    if (!inviteEmail.trim()) { toast('Email é obrigatório', 'error'); return }
+  async function onInviteSubmit(values: InviteFormValues) {
     if (!org) return
     try {
       const member = await apiRequest<OrgMembro>('/api/v1/config/org-members', {
         method: 'POST',
-        body: { email: inviteEmail.trim(), role: inviteRole },
+        body: { email: values.email.trim(), role: values.role },
       })
       setMembros((prev) => {
         const withoutDuplicated = prev.filter((item) => item.id !== member.id)
@@ -63,7 +85,7 @@ export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembr
       })
       toast('Membro adicionado!', 'success')
       setShowInvite(false)
-      setInviteEmail('')
+      resetInvite()
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Erro ao adicionar membro', 'error')
     }
@@ -84,7 +106,7 @@ export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembr
 
   async function removeMember(membroId: string, membroUserId: string) {
     if (membroUserId === userId) { toast('Você não pode se remover da organização', 'error'); return }
-    const ok = await confirm({ title: 'Remover membro?', description: 'Este membro perderá acesso à organização.', confirmLabel: 'Remover', variant: 'danger' })
+    const ok = await confirm({ title: 'Remover membro?', description: 'O membro será removido da organização.', confirmLabel: 'Remover', variant: 'danger' })
     if (!ok) return
     try {
       await apiRequest<{ success: boolean }>(`/api/v1/config/org-members/${membroId}`, { method: 'DELETE' })
@@ -133,28 +155,22 @@ export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembr
               Criar Organização
             </button>
           ) : (
-            <div className="space-y-3 text-left">
-              <input
-                value={orgForm.nome}
-                onChange={(e) => setOrgForm((f) => ({ ...f, nome: e.target.value }))}
-                placeholder="Nome da empresa *"
-                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none dark:text-white"
-              />
-              <input
-                value={orgForm.cnpj}
-                onChange={(e) => setOrgForm((f) => ({ ...f, cnpj: e.target.value }))}
-                placeholder="CNPJ (opcional)"
-                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none dark:text-white"
-              />
+            <form onSubmit={handleOrgSubmit(onOrgSubmit)} className="space-y-3 text-left">
+              <FormField label="Nome da empresa" error={orgErrors.nome} required>
+                <FormInput registration={registerOrg('nome')} hasError={!!orgErrors.nome} placeholder="Nome da empresa" />
+              </FormField>
+              <FormField label="CNPJ">
+                <FormInput registration={registerOrg('cnpj')} placeholder="CNPJ (opcional)" />
+              </FormField>
               <div className="flex gap-2">
-                <button onClick={() => setShowCreateOrg(false)} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">
+                <button type="button" onClick={() => setShowCreateOrg(false)} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">
                   Cancelar
                 </button>
-                <button onClick={createOrg} className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all">
+                <button type="submit" className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all">
                   Criar
                 </button>
               </div>
-            </div>
+            </form>
           )}
         </SectionCard>
       </div>
@@ -313,51 +329,42 @@ export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembr
       </div>
 
       {/* Invite Modal */}
-      {showInvite && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="modal-glass modal-animate w-full max-w-md rounded-3xl shadow-2xl dark:bg-gray-900 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-              <UserPlus className="w-5 h-5" /> Convidar Membro
-            </h3>
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Email do usuário</label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                    placeholder="email@exemplo.com"
-                    type="email"
-                    className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none dark:text-white"
-                  />
-                </div>
-                <p className="text-[10px] text-gray-400 mt-1">O usuário precisa ter uma conta no STRKTR</p>
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Papel</label>
-                <select
-                  value={inviteRole}
-                  onChange={(e) => setInviteRole(e.target.value as UserRole)}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white"
-                >
-                  <option value="user">Usuário</option>
-                  <option value="manager">Gerente</option>
-                  <option value="admin">Administrador</option>
-                </select>
-              </div>
-              <div className="flex gap-2 pt-1">
-                <button onClick={() => { setShowInvite(false); setInviteEmail('') }} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">
-                  Cancelar
-                </button>
-                <button onClick={inviteMember} className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all">
-                  Convidar
-                </button>
-              </div>
+      <ModalSheet open={showInvite} onClose={() => { setShowInvite(false); resetInvite() }} title="Convidar Membro">
+        <form onSubmit={handleInviteSubmit(onInviteSubmit)} className="space-y-3">
+          <FormField label="Email do usuário" error={inviteErrors.email}>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 z-10" />
+              <input
+                {...registerInvite('email')}
+                placeholder="email@exemplo.com"
+                type="email"
+                className={`w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-800 border rounded-xl text-sm focus:outline-none focus:ring-2 dark:text-white transition-colors ${
+                  inviteErrors.email
+                    ? 'border-red-300 focus:ring-red-400/50 dark:border-red-700'
+                    : 'border-gray-200 focus:ring-sand-400 dark:border-gray-700'
+                }`}
+              />
             </div>
+            <p className="text-[10px] text-gray-400 mt-1">O usuário precisa ter uma conta no STRKTR</p>
+          </FormField>
+          <FormField label="Papel">
+            <FormSelect registration={registerInvite('role')}>
+              <option value="user">Usuário</option>
+              <option value="manager">Gerente</option>
+              <option value="admin">Administrador</option>
+            </FormSelect>
+          </FormField>
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={() => { setShowInvite(false); resetInvite() }} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">
+              Cancelar
+            </button>
+            <button type="submit" className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all">
+              Convidar
+            </button>
           </div>
-        </div>
-      )}
+        </form>
+      </ModalSheet>
+
       {confirmDialog}
     </div>
   )

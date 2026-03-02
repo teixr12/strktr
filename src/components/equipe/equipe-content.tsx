@@ -2,15 +2,18 @@
 
 import { useState, useMemo } from 'react'
 import Image from 'next/image'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useConfirm } from '@/hooks/use-confirm'
-import { apiRequest } from '@/lib/api/client'
+import { useCrudMutations } from '@/hooks/use-crud-mutations'
 import { featureFlags } from '@/lib/feature-flags'
-import { toast } from '@/hooks/use-toast'
 import { fmt } from '@/lib/utils'
 import { MEMBRO_STATUS_COLORS } from '@/lib/constants'
+import { createMembroSchema, type CreateMembroDTO } from '@/shared/schemas/business'
+import { FormField, FormInput, FormSelect } from '@/components/ui/form-field'
 import { Plus, X, Trash2, Edit2, Search, Star, Phone, Mail } from 'lucide-react'
 import { EmptyStateAction, PageHeader, QuickActionBar, SectionCard } from '@/components/ui/enterprise'
-import type { Membro, MembroStatus } from '@/types/database'
+import type { Membro } from '@/types/database'
 
 interface Props { initialMembros: Membro[] }
 
@@ -22,10 +25,32 @@ export function EquipeContent({ initialMembros }: Props) {
   const [editMembro, setEditMembro] = useState<Membro | null>(null)
   const [busca, setBusca] = useState('')
 
-  const [form, setForm] = useState({
-    nome: '', cargo: '', telefone: '', email: '',
-    especialidade: '', status: 'Ativo' as MembroStatus,
-    avaliacao: '5', valor_hora: '',
+  const { createMutation, updateMutation, deleteMutation } = useCrudMutations<Membro>({
+    setItems: setMembros,
+    basePath: '/api/v1/equipe',
+    entityName: 'Membro',
+    trackSource: 'web',
+    trackEntityType: 'membro',
+  })
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+  } = useForm<CreateMembroDTO>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Zod v4 input/output type mismatch with @hookform/resolvers
+    resolver: zodResolver(createMembroSchema) as any,
+    defaultValues: {
+      nome: '',
+      cargo: '',
+      telefone: '',
+      email: '',
+      especialidade: '',
+      status: 'Ativo',
+      avaliacao: 5,
+      valor_hora: undefined,
+    },
   })
 
   const ativos = membros.filter((m) => m.status === 'Ativo').length
@@ -36,66 +61,65 @@ export function EquipeContent({ initialMembros }: Props) {
     return membros.filter((m) => m.nome.toLowerCase().includes(q) || m.cargo.toLowerCase().includes(q))
   }, [membros, busca])
 
-  function resetForm() {
-    setForm({ nome: '', cargo: '', telefone: '', email: '', especialidade: '', status: 'Ativo', avaliacao: '5', valor_hora: '' })
+  function openNew() {
+    reset({
+      nome: '',
+      cargo: '',
+      telefone: '',
+      email: '',
+      especialidade: '',
+      status: 'Ativo',
+      avaliacao: 5,
+      valor_hora: undefined,
+    })
+    setEditMembro(null)
+    setShowForm(true)
   }
 
-  function openNew() { resetForm(); setEditMembro(null); setShowForm(true) }
-
   function openEdit(m: Membro) {
-    setForm({
-      nome: m.nome, cargo: m.cargo, telefone: m.telefone || '', email: m.email || '',
-      especialidade: m.especialidade || '', status: m.status,
-      avaliacao: String(m.avaliacao), valor_hora: m.valor_hora ? String(m.valor_hora) : '',
+    reset({
+      nome: m.nome,
+      cargo: m.cargo,
+      telefone: m.telefone || '',
+      email: m.email || '',
+      especialidade: m.especialidade || '',
+      status: m.status,
+      avaliacao: m.avaliacao,
+      valor_hora: m.valor_hora ?? undefined,
     })
     setEditMembro(m)
     setShowForm(true)
   }
 
-  async function saveMembro() {
-    if (!form.nome.trim()) { toast('Nome é obrigatório', 'error'); return }
-    if (!form.cargo.trim()) { toast('Cargo é obrigatório', 'error'); return }
+  async function onSubmit(data: CreateMembroDTO) {
     const payload = {
-      nome: form.nome.trim(), cargo: form.cargo.trim(),
-      telefone: form.telefone || null, email: form.email || null,
-      especialidade: form.especialidade || null, status: form.status,
-      avaliacao: parseFloat(form.avaliacao) || 5,
-      valor_hora: form.valor_hora ? parseFloat(form.valor_hora) : null,
+      nome: data.nome,
+      cargo: data.cargo,
+      telefone: data.telefone || null,
+      email: data.email || null,
+      especialidade: data.especialidade || null,
+      status: data.status,
+      avaliacao: data.avaliacao ?? 5,
+      valor_hora: data.valor_hora ?? null,
     }
 
-    try {
-      if (editMembro) {
-        const data = await apiRequest<Membro>(`/api/v1/equipe/${editMembro.id}`, {
-          method: 'PUT',
-          body: payload,
-        })
-        setMembros((prev) => prev.map((m) => m.id === editMembro.id ? data : m))
-        toast('Membro atualizado!', 'success')
-      } else {
-        const data = await apiRequest<Membro>('/api/v1/equipe', {
-          method: 'POST',
-          body: payload,
-        })
-        setMembros((prev) => [...prev, data])
-        toast('Membro adicionado!', 'success')
-      }
+    let ok: boolean
+    if (editMembro) {
+      ok = await updateMutation.mutate(payload, editMembro.id)
+    } else {
+      ok = await createMutation.mutate(payload)
+    }
+
+    if (ok) {
       setShowForm(false)
       setEditMembro(null)
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Erro ao salvar membro', 'error')
     }
   }
 
   async function deleteMembro(id: string) {
     const ok = await confirm({ title: 'Excluir membro?', description: 'Essa ação não pode ser desfeita.', confirmLabel: 'Excluir', variant: 'danger' })
     if (!ok) return
-    try {
-      await apiRequest<{ success: boolean }>(`/api/v1/equipe/${id}`, { method: 'DELETE' })
-      setMembros((prev) => prev.filter((m) => m.id !== id))
-      toast('Membro excluído', 'info')
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Erro ao excluir membro', 'error')
-    }
+    await deleteMutation.mutate(undefined, id)
   }
 
   function renderStars(rating: number) {
@@ -188,36 +212,52 @@ export function EquipeContent({ initialMembros }: Props) {
 
       {/* Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="modal-glass modal-animate w-full max-w-md rounded-3xl shadow-2xl dark:bg-gray-900 p-6 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm">
+          <div className="modal-glass modal-animate w-full md:max-w-md rounded-t-3xl md:rounded-3xl shadow-2xl dark:bg-gray-900 p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{editMembro ? 'Editar Membro' : 'Novo Membro'}</h3>
               <button onClick={() => { setShowForm(false); setEditMembro(null) }} className="p-1 text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
-            <div className="space-y-3">
-              <input value={form.nome} onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))} placeholder="Nome *" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white" />
-              <input value={form.cargo} onChange={(e) => setForm((f) => ({ ...f, cargo: e.target.value }))} placeholder="Cargo *" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white" />
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+              <FormField error={errors.nome} required>
+                <FormInput registration={register('nome')} hasError={!!errors.nome} placeholder="Nome *" />
+              </FormField>
+              <FormField error={errors.cargo} required>
+                <FormInput registration={register('cargo')} hasError={!!errors.cargo} placeholder="Cargo *" />
+              </FormField>
               <div className="grid grid-cols-2 gap-3">
-                <input value={form.telefone} onChange={(e) => setForm((f) => ({ ...f, telefone: e.target.value }))} placeholder="Telefone" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white" />
-                <input value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="Email" type="email" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white" />
+                <FormField error={errors.telefone}>
+                  <FormInput registration={register('telefone')} hasError={!!errors.telefone} placeholder="Telefone" />
+                </FormField>
+                <FormField error={errors.email}>
+                  <FormInput registration={register('email')} hasError={!!errors.email} placeholder="Email" type="email" />
+                </FormField>
               </div>
-              <input value={form.especialidade} onChange={(e) => setForm((f) => ({ ...f, especialidade: e.target.value }))} placeholder="Especialidade" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white" />
+              <FormField error={errors.especialidade}>
+                <FormInput registration={register('especialidade')} hasError={!!errors.especialidade} placeholder="Especialidade" />
+              </FormField>
               <div className="grid grid-cols-3 gap-3">
-                <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as MembroStatus }))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white">
-                  <option value="Ativo">Ativo</option>
-                  <option value="Inativo">Inativo</option>
-                  <option value="Férias">Férias</option>
-                </select>
-                <input value={form.avaliacao} onChange={(e) => setForm((f) => ({ ...f, avaliacao: e.target.value }))} placeholder="Avaliação" type="number" min="1" max="5" step="0.5" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none dark:text-white" />
-                <input value={form.valor_hora} onChange={(e) => setForm((f) => ({ ...f, valor_hora: e.target.value }))} placeholder="R$/h" type="number" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none dark:text-white" />
+                <FormField error={errors.status}>
+                  <FormSelect registration={register('status')} hasError={!!errors.status}>
+                    <option value="Ativo">Ativo</option>
+                    <option value="Inativo">Inativo</option>
+                    <option value="Férias">Férias</option>
+                  </FormSelect>
+                </FormField>
+                <FormField error={errors.avaliacao}>
+                  <FormInput registration={register('avaliacao', { valueAsNumber: true })} hasError={!!errors.avaliacao} placeholder="Avaliação" type="number" min={1} max={5} step={0.5} />
+                </FormField>
+                <FormField error={errors.valor_hora}>
+                  <FormInput registration={register('valor_hora', { valueAsNumber: true })} hasError={!!errors.valor_hora} placeholder="R$/h" type="number" />
+                </FormField>
               </div>
               <div className="flex gap-2 pt-2">
-                <button onClick={() => { setShowForm(false); setEditMembro(null) }} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">Cancelar</button>
-                <button onClick={saveMembro} className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all text-sm">
+                <button type="button" onClick={() => { setShowForm(false); setEditMembro(null) }} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">Cancelar</button>
+                <button type="submit" disabled={createMutation.isMutating || updateMutation.isMutating} className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all text-sm disabled:opacity-50">
                   {editMembro ? 'Salvar' : 'Adicionar'}
                 </button>
               </div>
-            </div>
+            </form>
           </div>
         </div>
       )}

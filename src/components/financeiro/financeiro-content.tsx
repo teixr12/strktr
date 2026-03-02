@@ -2,11 +2,15 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import dynamic from 'next/dynamic'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useConfirm } from '@/hooks/use-confirm'
+import { useCrudMutations } from '@/hooks/use-crud-mutations'
 import { apiRequest, apiRequestWithMeta } from '@/lib/api/client'
 import { featureFlags } from '@/lib/feature-flags'
 import { toast } from '@/hooks/use-toast'
 import { fmt, fmtDate } from '@/lib/utils'
+import { createTransacaoSchema, type CreateTransacaoDTO } from '@/shared/schemas/business'
 import { Plus, X, Trash2, TrendingUp, TrendingDown, Wallet, Hash, Pencil } from 'lucide-react'
 import type { Transacao, Obra } from '@/types/database'
 import {
@@ -16,6 +20,7 @@ import {
   SectionCard,
   VirtualizedList,
 } from '@/components/ui/enterprise'
+import { FormField, FormInput, FormSelect, FormTextarea } from '@/components/ui/form-field'
 
 const LazyBarChart = dynamic(
   () =>
@@ -78,9 +83,35 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
   const [desvioLoading, setDesvioLoading] = useState(true)
   const [desvioError, setDesvioError] = useState<string | null>(null)
 
-  const [form, setForm] = useState({
-    descricao: '', tipo: 'Receita' as 'Receita' | 'Despesa',
-    categoria: '', valor: '', data: new Date().toISOString().slice(0, 10), obra_id: '',
+  const defaultValues: CreateTransacaoDTO = {
+    descricao: '',
+    tipo: 'Receita',
+    categoria: '',
+    valor: 0,
+    data: new Date().toISOString().slice(0, 10),
+    status: 'Confirmado',
+    forma_pagto: null,
+    notas: null,
+    obra_id: null,
+  }
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<CreateTransacaoDTO>({
+    resolver: zodResolver(createTransacaoSchema) as never,
+    defaultValues,
+  })
+
+  const { createMutation, updateMutation, deleteMutation } = useCrudMutations<Transacao>({
+    setItems: setTransacoes,
+    basePath: '/api/v1/transacoes',
+    entityName: 'Transação',
+    trackSource: 'web',
+    trackEntityType: 'transacao',
+    onSettled: () => refreshTransacoes?.(pagination.page),
   })
 
   useEffect(() => {
@@ -209,9 +240,16 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
 
   function openEditTx(tx: Transacao) {
     setEditingTx(tx)
-    setForm({
-      descricao: tx.descricao, tipo: tx.tipo, categoria: tx.categoria,
-      valor: String(tx.valor), data: tx.data, obra_id: tx.obra_id || '',
+    reset({
+      descricao: tx.descricao,
+      tipo: tx.tipo,
+      categoria: tx.categoria,
+      valor: tx.valor,
+      data: tx.data,
+      status: tx.status,
+      forma_pagto: tx.forma_pagto || null,
+      notas: tx.notas || null,
+      obra_id: tx.obra_id || null,
     })
     setShowForm(true)
   }
@@ -219,61 +257,35 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
   function closeForm() {
     setShowForm(false)
     setEditingTx(null)
-    setForm({ descricao: '', tipo: 'Receita', categoria: '', valor: '', data: new Date().toISOString().slice(0, 10), obra_id: '' })
+    reset(defaultValues)
   }
 
-  async function saveTx() {
-    if (!form.descricao.trim()) { toast('Descrição é obrigatória', 'error'); return }
-    if (!form.valor || parseFloat(form.valor) <= 0) { toast('Valor inválido', 'error'); return }
-    if (!form.categoria.trim()) { toast('Categoria é obrigatória', 'error'); return }
+  async function onSubmit(data: CreateTransacaoDTO) {
     const payload = {
-      descricao: form.descricao.trim(),
-      tipo: form.tipo,
-      categoria: form.categoria.trim(),
-      valor: parseFloat(form.valor),
-      data: form.data,
-      obra_id: form.obra_id || null,
+      ...data,
+      obra_id: data.obra_id || null,
     }
 
-    try {
-      if (editingTx) {
-        const data = await apiRequest<Transacao>(`/api/v1/transacoes/${editingTx.id}`, { method: 'PUT', body: payload })
-        setTransacoes((prev) => prev.map((t) => t.id === editingTx.id ? data : t))
-        if (usePaginationV1) {
-          await refreshTransacoes(pagination.page)
-        }
-        toast('Transação atualizada!', 'success')
-      } else {
-        const data = await apiRequest<Transacao>('/api/v1/transacoes', { method: 'POST', body: payload })
-        setTransacoes((prev) => [data, ...prev])
-        if (usePaginationV1) {
-          await refreshTransacoes(1)
-        }
-        toast('Transação criada!', 'success')
-      }
+    let ok: boolean
+    if (editingTx) {
+      ok = await updateMutation.mutate(payload, editingTx.id)
+    } else {
+      ok = await createMutation.mutate(payload)
+    }
+
+    if (ok) {
       await loadDesvio()
       closeForm()
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Erro ao salvar transação', 'error')
     }
   }
 
   async function deleteTx(id: string) {
     const ok = await confirm({ title: 'Excluir transação?', description: 'Essa ação não pode ser desfeita.', confirmLabel: 'Excluir', variant: 'danger' })
     if (!ok) return
-    try {
-      await apiRequest<{ success: boolean }>(`/api/v1/transacoes/${id}`, { method: 'DELETE' })
-      const nextPage = usePaginationV1 && transacoes.length === 1 && pagination.page > 1
-        ? pagination.page - 1
-        : pagination.page
-      setTransacoes((prev) => prev.filter((t) => t.id !== id))
-      if (usePaginationV1) {
-        await refreshTransacoes(nextPage)
-      }
+
+    const success = await deleteMutation.mutate(undefined, id)
+    if (success) {
       await loadDesvio()
-      toast('Transação excluída', 'info')
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Erro ao excluir transação', 'error')
     }
   }
 
@@ -293,10 +305,10 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
           <span className={`font-semibold text-sm ${t.tipo === 'Receita' ? 'text-emerald-600' : 'text-red-500'}`}>
             {t.tipo === 'Receita' ? '+' : '-'}{fmt(t.valor)}
           </span>
-          <button onClick={() => openEditTx(t)} className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-sand-600 transition-all">
+          <button onClick={() => openEditTx(t)} className="md:opacity-0 md:group-hover:opacity-100 p-1 text-gray-400 hover:text-sand-600 transition-all">
             <Pencil className="w-3.5 h-3.5" />
           </button>
-          <button onClick={() => deleteTx(t.id)} className="opacity-0 group-hover:opacity-100 p-1 text-red-400 hover:text-red-600 transition-all">
+          <button onClick={() => deleteTx(t.id)} className="md:opacity-0 md:group-hover:opacity-100 p-1 text-red-400 hover:text-red-600 transition-all">
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -463,34 +475,94 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
 
       {/* Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="modal-glass modal-animate w-full max-w-md rounded-3xl shadow-2xl dark:bg-gray-900 p-6">
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm">
+          <div className="modal-glass modal-animate w-full md:max-w-md rounded-t-3xl md:rounded-3xl shadow-2xl dark:bg-gray-900 p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{editingTx ? 'Editar Transação' : 'Nova Transação'}</h3>
               <button onClick={closeForm} className="p-1 text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
-            <div className="space-y-3">
-              <input value={form.descricao} onChange={(e) => setForm((f) => ({ ...f, descricao: e.target.value }))} placeholder="Descrição *" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white" />
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+              <FormField label="Descrição" error={errors.descricao} required>
+                <FormInput
+                  registration={register('descricao')}
+                  hasError={!!errors.descricao}
+                  placeholder="Descrição"
+                />
+              </FormField>
               <div className="grid grid-cols-2 gap-3">
-                <select value={form.tipo} onChange={(e) => setForm((f) => ({ ...f, tipo: e.target.value as 'Receita' | 'Despesa' }))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white">
-                  <option value="Receita">Receita</option>
-                  <option value="Despesa">Despesa</option>
-                </select>
-                <input value={form.categoria} onChange={(e) => setForm((f) => ({ ...f, categoria: e.target.value }))} placeholder="Categoria *" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white" />
+                <FormField label="Tipo" error={errors.tipo} required>
+                  <FormSelect registration={register('tipo')} hasError={!!errors.tipo}>
+                    <option value="Receita">Receita</option>
+                    <option value="Despesa">Despesa</option>
+                  </FormSelect>
+                </FormField>
+                <FormField label="Categoria" error={errors.categoria} required>
+                  <FormInput
+                    registration={register('categoria')}
+                    hasError={!!errors.categoria}
+                    placeholder="Categoria"
+                  />
+                </FormField>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <input value={form.valor} onChange={(e) => setForm((f) => ({ ...f, valor: e.target.value }))} placeholder="Valor (R$) *" type="number" step="0.01" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white" />
-                <input value={form.data} onChange={(e) => setForm((f) => ({ ...f, data: e.target.value }))} type="date" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white" />
+                <FormField label="Valor (R$)" error={errors.valor} required>
+                  <FormInput
+                    registration={register('valor', { valueAsNumber: true })}
+                    hasError={!!errors.valor}
+                    placeholder="0,00"
+                    type="number"
+                    step="0.01"
+                  />
+                </FormField>
+                <FormField label="Data" error={errors.data} required>
+                  <FormInput
+                    registration={register('data')}
+                    hasError={!!errors.data}
+                    type="date"
+                  />
+                </FormField>
               </div>
-              <select value={form.obra_id} onChange={(e) => setForm((f) => ({ ...f, obra_id: e.target.value }))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white">
-                <option value="">Obra (opcional)</option>
-                {obras.map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}
-              </select>
+              <div className="grid grid-cols-2 gap-3">
+                <FormField label="Status" error={errors.status}>
+                  <FormSelect registration={register('status')} hasError={!!errors.status}>
+                    <option value="Confirmado">Confirmado</option>
+                    <option value="Pendente">Pendente</option>
+                    <option value="Cancelado">Cancelado</option>
+                  </FormSelect>
+                </FormField>
+                <FormField label="Forma de Pagamento" error={errors.forma_pagto}>
+                  <FormInput
+                    registration={register('forma_pagto')}
+                    hasError={!!errors.forma_pagto}
+                    placeholder="Ex: PIX, Boleto"
+                  />
+                </FormField>
+              </div>
+              <FormField label="Obra" error={errors.obra_id}>
+                <FormSelect registration={register('obra_id')} hasError={!!errors.obra_id}>
+                  <option value="">Obra (opcional)</option>
+                  {obras.map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}
+                </FormSelect>
+              </FormField>
+              <FormField label="Notas" error={errors.notas}>
+                <FormTextarea
+                  registration={register('notas')}
+                  hasError={!!errors.notas}
+                  placeholder="Observações (opcional)"
+                  rows={2}
+                />
+              </FormField>
               <div className="flex gap-2 pt-2">
-                <button onClick={() => setShowForm(false)} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">Cancelar</button>
-                <button onClick={saveTx} className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all text-sm">{editingTx ? 'Salvar' : 'Criar'}</button>
+                <button type="button" onClick={() => setShowForm(false)} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">Cancelar</button>
+                <button
+                  type="submit"
+                  disabled={createMutation.isMutating || updateMutation.isMutating}
+                  className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all text-sm disabled:opacity-50"
+                >
+                  {(createMutation.isMutating || updateMutation.isMutating) ? 'Salvando...' : editingTx ? 'Salvar' : 'Criar'}
+                </button>
               </div>
-            </div>
+            </form>
           </div>
         </div>
       )}

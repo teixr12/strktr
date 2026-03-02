@@ -9,6 +9,8 @@ import { useConfirm } from '@/hooks/use-confirm'
 import { fmt, fmtDate } from '@/lib/utils'
 import { OBRA_STATUS_COLORS } from '@/lib/constants'
 import { ArrowLeft, Edit2, Trash2, Plus, CheckCircle, Loader, Circle, XCircle, AlertTriangle } from 'lucide-react'
+import { ModalSheet } from '@/components/ui/modal-sheet'
+import { FormField, FormInput, FormSelect } from '@/components/ui/form-field'
 import { ObraFormModal } from './obra-form-modal'
 import { DiarioObraTab } from './diario-obra'
 import { ObraChecklistsTab } from './obra-checklists'
@@ -489,7 +491,7 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
                         <option key={s2} value={s2}>{s2}</option>
                       ))}
                     </select>
-                    <button onClick={() => deleteEtapa(e.id)} className="opacity-0 group-hover:opacity-100 p-1 text-red-400 hover:text-red-600 transition-all">
+                    <button onClick={() => deleteEtapa(e.id)} className="md:opacity-0 md:group-hover:opacity-100 p-1 text-red-400 hover:text-red-600 transition-all">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -498,26 +500,26 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
             })
           )}
 
-          {/* Etapa Form Inline Modal */}
-          {showEtapaForm && (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-              <div className="modal-glass modal-animate w-full max-w-sm rounded-3xl shadow-2xl dark:bg-gray-900 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Nova Etapa</h3>
-                <form className="space-y-3" onSubmit={etapaForm.handleSubmit(saveEtapa)}>
-                  <input {...etapaForm.register('nome')} placeholder="Nome da etapa *" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none dark:text-white" />
-                  {etapaForm.formState.errors.nome && <p className="text-xs text-red-500">{etapaForm.formState.errors.nome.message}</p>}
-                  <input {...etapaForm.register('responsavel')} placeholder="Responsável" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none dark:text-white" />
-                  <select {...etapaForm.register('status')} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white">
-                    <option>Pendente</option><option>Em Andamento</option><option>Concluída</option><option>Bloqueada</option>
-                  </select>
-                  <div className="flex gap-2">
-                    <button type="button" onClick={() => setShowEtapaForm(false)} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">Cancelar</button>
-                    <button type="submit" className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all">Adicionar</button>
-                  </div>
-                </form>
+          {/* Etapa Form Modal */}
+          <ModalSheet open={showEtapaForm} onClose={() => setShowEtapaForm(false)} title="Nova Etapa">
+            <form className="space-y-3" onSubmit={etapaForm.handleSubmit(saveEtapa)}>
+              <FormField label="Nome da Etapa" error={etapaForm.formState.errors.nome} required>
+                <FormInput registration={etapaForm.register('nome')} hasError={!!etapaForm.formState.errors.nome} placeholder="Nome da etapa" />
+              </FormField>
+              <FormField label="Responsável" error={etapaForm.formState.errors.responsavel}>
+                <FormInput registration={etapaForm.register('responsavel')} hasError={!!etapaForm.formState.errors.responsavel} placeholder="Responsável" />
+              </FormField>
+              <FormField label="Status">
+                <FormSelect registration={etapaForm.register('status')}>
+                  <option>Pendente</option><option>Em Andamento</option><option>Concluída</option><option>Bloqueada</option>
+                </FormSelect>
+              </FormField>
+              <div className="flex gap-2 pt-1">
+                <button type="button" onClick={() => setShowEtapaForm(false)} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">Cancelar</button>
+                <button type="submit" className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all">Adicionar</button>
               </div>
-            </div>
-          )}
+            </form>
+          </ModalSheet>
         </div>
       )}
 

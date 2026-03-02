@@ -1,14 +1,20 @@
 'use client'
 
 import { useState, useRef, useMemo, useEffect } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { useConfirm } from '@/hooks/use-confirm'
 import { toast } from '@/hooks/use-toast'
+import { useCrudMutations } from '@/hooks/use-crud-mutations'
 import { apiRequest, apiRequestWithMeta } from '@/lib/api/client'
 import { track } from '@/lib/analytics/client'
 import { fmt, fmtDate } from '@/lib/utils'
 import { KANBAN_COLUMNS, TEMPERATURA_EMOJI, TEMPERATURA_COLORS } from '@/lib/constants'
 import { Plus, X, MessageCircle, Trash2, Edit2, GripVertical, Search } from 'lucide-react'
 import { featureFlags } from '@/lib/feature-flags'
+import { ModalSheet } from '@/components/ui/modal-sheet'
+import { FormField, FormInput, FormTextarea, FormSelect } from '@/components/ui/form-field'
 import {
   PageHeader,
   PaginationControls,
@@ -51,6 +57,19 @@ const V2_LANES: Array<{
   { id: 'Fechado', title: 'Fechado', dotClass: 'bg-emerald-500', countToneClass: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200' },
 ]
 
+const leadFormSchema = z.object({
+  nome: z.string().trim().min(2, 'Nome do lead é obrigatório'),
+  email: z.string().email('Email inválido').or(z.literal('')).optional(),
+  telefone: z.string().trim().optional(),
+  tipo_projeto: z.string().trim().optional(),
+  valor_potencial: z.string().optional(),
+  temperatura: z.enum(['Hot', 'Morno', 'Frio']).default('Morno'),
+  origem: z.string().trim().min(2, 'Origem é obrigatória'),
+  notas: z.string().trim().optional(),
+  status: z.enum(['Novo', 'Qualificado', 'Proposta', 'Negociação', 'Fechado', 'Perdido']).default('Novo'),
+})
+type LeadFormValues = z.infer<typeof leadFormSchema>
+
 export function LeadsContent({ initialLeads }: Props) {
   const { confirm, dialog: confirmDialog } = useConfirm()
   const usePaginationV1 = featureFlags.uiPaginationV1
@@ -74,6 +93,23 @@ export function LeadsContent({ initialLeads }: Props) {
   const [searchQuery, setSearchQuery] = useState('')
   const [sla, setSla] = useState<LeadsSlaSummary | null>(null)
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Leads
+
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<LeadFormValues>({
+    resolver: zodResolver(leadFormSchema) as never,
+    defaultValues: {
+      nome: '', email: '', telefone: '', tipo_projeto: 'Residencial',
+      valor_potencial: '', temperatura: 'Morno', origem: 'Indicação', notas: '', status: 'Novo',
+    },
+  })
+
+  const { createMutation, updateMutation, deleteMutation } = useCrudMutations<Lead>({
+    setItems: setLeads,
+    basePath: '/api/v1/leads',
+    entityName: 'Lead',
+    trackSource: 'leads',
+    trackEntityType: 'lead',
+    onSettled: usePaginationV1 ? () => refreshLeads(pagination.page) : undefined,
+  })
 
   useEffect(() => {
     const timer = setInterval(() => setNowMs(Date.now()), 60_000)
@@ -159,110 +195,62 @@ export function LeadsContent({ initialLeads }: Props) {
     }).length
   }, [filteredLeads, nowMs])
 
-  const [form, setForm] = useState({
-    nome: '', email: '', telefone: '', tipo_projeto: 'Residencial',
-    valor_potencial: '', temperatura: 'Morno' as LeadTemperatura,
-    origem: 'Indicação', notas: '', status: 'Novo' as LeadStatus,
-  })
-
-  function resetForm() {
-    setForm({ nome: '', email: '', telefone: '', tipo_projeto: 'Residencial', valor_potencial: '', temperatura: 'Morno', origem: 'Indicação', notas: '', status: 'Novo' })
+  function openNew() {
+    reset({
+      nome: '', email: '', telefone: '', tipo_projeto: 'Residencial',
+      valor_potencial: '', temperatura: 'Morno', origem: 'Indicação', notas: '', status: 'Novo',
+    })
+    setEditLead(null)
+    setShowForm(true)
   }
 
-  function openNew() { resetForm(); setEditLead(null); setShowForm(true) }
-
   function openEdit(l: Lead) {
-    setForm({
-      nome: l.nome, email: l.email || '', telefone: l.telefone || '',
-      tipo_projeto: l.tipo_projeto || 'Residencial', valor_potencial: l.valor_potencial ? String(l.valor_potencial) : '',
-      temperatura: l.temperatura, origem: l.origem, notas: l.notas || '', status: l.status,
+    reset({
+      nome: l.nome,
+      email: l.email || '',
+      telefone: l.telefone || '',
+      tipo_projeto: l.tipo_projeto || 'Residencial',
+      valor_potencial: l.valor_potencial ? String(l.valor_potencial) : '',
+      temperatura: l.temperatura,
+      origem: l.origem,
+      notas: l.notas || '',
+      status: l.status,
     })
     setEditLead(l)
     setDetailLead(null)
     setShowForm(true)
   }
 
-  async function saveLead() {
-    if (!form.nome.trim()) { toast('Nome é obrigatório', 'error'); return }
+  async function onSubmit(values: LeadFormValues) {
     const payload = {
-      nome: form.nome.trim(),
-      email: form.email || null,
-      telefone: form.telefone || null,
-      tipo_projeto: form.tipo_projeto,
-      valor_potencial: form.valor_potencial ? parseFloat(form.valor_potencial) : null,
-      temperatura: form.temperatura,
-      origem: form.origem,
-      notas: form.notas || null,
-      status: form.status,
+      nome: values.nome.trim(),
+      email: values.email || null,
+      telefone: values.telefone || null,
+      tipo_projeto: values.tipo_projeto || null,
+      valor_potencial: values.valor_potencial ? parseFloat(values.valor_potencial) : null,
+      temperatura: values.temperatura,
+      origem: values.origem,
+      notas: values.notas || null,
+      status: values.status,
     }
 
+    let ok: boolean
     if (editLead) {
-      try {
-        const data = await apiRequest<Lead>(`/api/v1/leads/${editLead.id}`, { method: 'PUT', body: payload })
-        setLeads((prev) => prev.map((l) => l.id === editLead.id ? data : l))
-        if (usePaginationV1) {
-          await refreshLeads(pagination.page)
-        }
-        toast('Lead atualizado!', 'success')
-        track('core_edit', {
-          source: 'leads',
-          entity_type: 'lead',
-          entity_id: editLead.id,
-          outcome: 'success',
-        }).catch(() => undefined)
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Erro ao atualizar lead'
-        toast(message, 'error')
-        return
-      }
+      ok = await updateMutation.mutate(payload, editLead.id)
     } else {
-      try {
-        const data = await apiRequest<Lead>('/api/v1/leads', { method: 'POST', body: payload })
-        setLeads((prev) => [data, ...prev])
-        if (usePaginationV1) {
-          await refreshLeads(1)
-        }
-        toast('Lead criado!', 'success')
-        track('core_create', {
-          source: 'leads',
-          entity_type: 'lead',
-          entity_id: data.id,
-          outcome: 'success',
-        }).catch(() => undefined)
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Erro ao criar lead'
-        toast(message, 'error')
-        return
-      }
+      ok = await createMutation.mutate(payload)
     }
-    setShowForm(false)
-    setEditLead(null)
+    if (ok) {
+      setShowForm(false)
+      setEditLead(null)
+    }
   }
 
   async function deleteLead(id: string) {
     const ok = await confirm({ title: 'Excluir lead?', description: 'Essa ação não pode ser desfeita.', confirmLabel: 'Excluir', variant: 'danger' })
     if (!ok) return
-    try {
-      await apiRequest(`/api/v1/leads/${id}`, { method: 'DELETE' })
-      const nextPage = usePaginationV1 && leads.length === 1 && pagination.page > 1
-        ? pagination.page - 1
-        : pagination.page
-      setLeads((prev) => prev.filter((l) => l.id !== id))
-      if (usePaginationV1) {
-        await refreshLeads(nextPage)
-      }
-      setDetailLead(null)
-      toast('Lead excluído', 'info')
-      track('core_delete', {
-        source: 'leads',
-        entity_type: 'lead',
-        entity_id: id,
-        outcome: 'success',
-      }).catch(() => undefined)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erro ao excluir lead'
-      toast(message, 'error')
-    }
+    const success = await deleteMutation.mutate(undefined, id)
+    if (success) setDetailLead(null)
   }
 
   async function updateStatus(id: string, status: LeadStatus) {
@@ -419,7 +407,7 @@ export function LeadsContent({ initialLeads }: Props) {
               ))}
             </div>
           ) : (
-            <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 md:grid md:grid-cols-2 md:overflow-visible xl:grid-cols-4">
+            <div className="kanban-scroll-hint flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 md:grid md:grid-cols-2 md:overflow-visible xl:grid-cols-4">
               {V2_LANES.map((lane) => (
                 <LeadLaneColumnV2
                   key={lane.id}
@@ -447,7 +435,7 @@ export function LeadsContent({ initialLeads }: Props) {
           </SectionCard>
         </>
       ) : (
-        <div className="flex gap-3 overflow-x-auto pb-4 snap-x snap-mandatory">
+        <div className="kanban-scroll-hint flex gap-3 overflow-x-auto pb-4 snap-x snap-mandatory">
           {KANBAN_COLUMNS.map((col) => {
             const colLeads = filteredLeads.filter((l) => l.status === col.id)
             const total = colLeads.reduce((s, l) => s + (l.valor_potencial || 0), 0)
@@ -485,7 +473,7 @@ export function LeadsContent({ initialLeads }: Props) {
                       >
                         <div className="flex items-start justify-between mb-1.5">
                           <div className="flex items-center gap-1.5 min-w-0">
-                            <GripVertical className="w-3.5 h-3.5 text-gray-300 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <GripVertical className="w-3.5 h-3.5 text-gray-300 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity" />
                             <span className="font-semibold text-sm text-gray-900 dark:text-white truncate">{l.nome}</span>
                           </div>
                           <div className="flex items-center gap-1.5">
@@ -590,50 +578,62 @@ export function LeadsContent({ initialLeads }: Props) {
       )}
 
       {/* Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="modal-glass modal-animate w-full max-w-md rounded-3xl shadow-2xl dark:bg-gray-900 p-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{editLead ? 'Editar Lead' : 'Novo Lead'}</h3>
-              <button onClick={() => { setShowForm(false); setEditLead(null) }} className="p-1 text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
-            </div>
+      <ModalSheet open={showForm} onClose={() => { setShowForm(false); setEditLead(null) }} title={editLead ? 'Editar Lead' : 'Novo Lead'}>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+          <FormField label="Nome" error={errors.nome} required>
+            <FormInput registration={register('nome')} hasError={!!errors.nome} placeholder="Nome do lead" />
+          </FormField>
 
-            <div className="space-y-3">
-              <input value={form.nome} onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))} placeholder="Nome *" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white" />
-              <input value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="Email" type="email" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white" />
-              <input value={form.telefone} onChange={(e) => setForm((f) => ({ ...f, telefone: e.target.value }))} placeholder="Telefone" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white" />
+          <FormField label="Email" error={errors.email}>
+            <FormInput registration={register('email')} hasError={!!errors.email} placeholder="Email" type="email" />
+          </FormField>
 
-              <div className="grid grid-cols-2 gap-3">
-                <select value={form.tipo_projeto} onChange={(e) => setForm((f) => ({ ...f, tipo_projeto: e.target.value }))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white">
-                  {TIPO_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
-                <input value={form.valor_potencial} onChange={(e) => setForm((f) => ({ ...f, valor_potencial: e.target.value }))} placeholder="Valor (R$)" type="number" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white" />
-              </div>
+          <FormField label="Telefone" error={errors.telefone}>
+            <FormInput registration={register('telefone')} hasError={!!errors.telefone} placeholder="Telefone" />
+          </FormField>
 
-              <div className="grid grid-cols-2 gap-3">
-                <select value={form.temperatura} onChange={(e) => setForm((f) => ({ ...f, temperatura: e.target.value as LeadTemperatura }))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white">
-                  <option value="Hot">🔥 Hot</option>
-                  <option value="Morno">🌤 Morno</option>
-                  <option value="Frio">❄️ Frio</option>
-                </select>
-                <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as LeadStatus }))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white">
-                  {KANBAN_COLUMNS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-                </select>
-              </div>
-
-              <input value={form.origem} onChange={(e) => setForm((f) => ({ ...f, origem: e.target.value }))} placeholder="Origem (ex: Indicação, Instagram)" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white" />
-              <textarea value={form.notas} onChange={(e) => setForm((f) => ({ ...f, notas: e.target.value }))} placeholder="Notas" rows={3} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 dark:text-white resize-none" />
-
-              <div className="flex gap-2 pt-2">
-                <button onClick={() => { setShowForm(false); setEditLead(null) }} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">Cancelar</button>
-                <button onClick={saveLead} className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all text-sm">
-                  {editLead ? 'Salvar' : 'Criar Lead'}
-                </button>
-              </div>
-            </div>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Tipo de Projeto">
+              <FormSelect registration={register('tipo_projeto')}>
+                {TIPO_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+              </FormSelect>
+            </FormField>
+            <FormField label="Valor (R$)">
+              <FormInput registration={register('valor_potencial')} placeholder="Valor" type="number" />
+            </FormField>
           </div>
-        </div>
-      )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Temperatura">
+              <FormSelect registration={register('temperatura')}>
+                <option value="Hot">🔥 Hot</option>
+                <option value="Morno">🌤 Morno</option>
+                <option value="Frio">❄️ Frio</option>
+              </FormSelect>
+            </FormField>
+            <FormField label="Status">
+              <FormSelect registration={register('status')}>
+                {KANBAN_COLUMNS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+              </FormSelect>
+            </FormField>
+          </div>
+
+          <FormField label="Origem" error={errors.origem} required>
+            <FormInput registration={register('origem')} hasError={!!errors.origem} placeholder="Origem (ex: Indicação, Instagram)" />
+          </FormField>
+
+          <FormField label="Notas">
+            <FormTextarea registration={register('notas')} placeholder="Notas" rows={3} />
+          </FormField>
+
+          <div className="flex gap-2 pt-2">
+            <button type="button" onClick={() => { setShowForm(false); setEditLead(null) }} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">Cancelar</button>
+            <button type="submit" disabled={createMutation.isMutating || updateMutation.isMutating} className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 disabled:opacity-50 text-white font-medium rounded-2xl btn-press transition-all text-sm">
+              {createMutation.isMutating || updateMutation.isMutating ? 'Salvando...' : editLead ? 'Salvar' : 'Criar Lead'}
+            </button>
+          </div>
+        </form>
+      </ModalSheet>
 
       {confirmDialog}
     </div>

@@ -44,6 +44,26 @@ type DashboardOrcamento = Pick<Orcamento, 'id' | 'status' | 'valor_total' | 'cre
 type DashboardCompra = Pick<Compra, 'id' | 'status' | 'created_at'>
 type DashboardProjeto = Pick<Projeto, 'id' | 'status' | 'valor_estimado' | 'created_at'>
 
+/** Pre-computed summary from /api/v1/dashboard/summary (Phase 1.2) */
+interface DashboardSummary {
+  kpis: {
+    obrasAtivas: number
+    receitas: number
+    despesas: number
+    saldo: number
+    leadsAtivos: number
+    compraPendenteCount: number
+    receitasCount: number
+    despesasCount: number
+  }
+  financeChart: { labels: string[]; receitas: number[]; despesas: number[] }
+  pipelineSummary: Array<{ id: string; label: string; count: number; total: number; dot: string }>
+  hotLeads: Array<{ id: string; nome: string; origem: string; valor_potencial: number | null }>
+  topObras: Array<Pick<DashboardObra, 'id' | 'nome' | 'cliente' | 'local' | 'status' | 'etapa_atual' | 'progresso' | 'valor_contrato'>>
+  proximasVisitas: Array<Pick<DashboardVisita, 'id' | 'titulo' | 'tipo' | 'status' | 'data_hora'>>
+  showOnboarding: boolean
+}
+
 interface DashboardContentProps {
   obras: DashboardObra[]
   leads: DashboardLead[]
@@ -52,6 +72,8 @@ interface DashboardContentProps {
   orcamentos: DashboardOrcamento[]
   compras: DashboardCompra[]
   projetos: DashboardProjeto[]
+  /** Pre-computed summary — when provided, skips client-side computation */
+  summary?: DashboardSummary
 }
 
 interface TodayAlert {
@@ -89,7 +111,7 @@ function toneFromSeverity(severity: TodayAlert['severity']) {
   return 'info' as const
 }
 
-export function DashboardContent({ obras, leads, transacoes, visitas, compras }: DashboardContentProps) {
+export function DashboardContent({ obras, leads, transacoes, visitas, compras, summary }: DashboardContentProps) {
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Dashboard
   const [todayAlerts, setTodayAlerts] = useState<TodayAlertsPayload | null>(null)
   const [todayAlertsLoading, setTodayAlertsLoading] = useState(true)
@@ -99,16 +121,17 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras }:
   const [roadmapError, setRoadmapError] = useState<string | null>(null)
   const [completingActionId, setCompletingActionId] = useState<string | null>(null)
 
-  const obrasAtivas = obras.filter((o) => o.status === 'Em Andamento').length
-  const receitas = transacoes.filter((t) => t.tipo === 'Receita').reduce((s, t) => s + (t.valor || 0), 0)
-  const despesas = transacoes.filter((t) => t.tipo === 'Despesa').reduce((s, t) => s + (t.valor || 0), 0)
-  const saldo = receitas - despesas
-  const leadsAtivos = leads.filter((l) => l.status !== 'Perdido').length
+  // Use pre-computed summary when available, otherwise compute from raw data
+  const obrasAtivas = summary?.kpis.obrasAtivas ?? obras.filter((o) => o.status === 'Em Andamento').length
+  const receitas = summary?.kpis.receitas ?? transacoes.filter((t) => t.tipo === 'Receita').reduce((s, t) => s + (t.valor || 0), 0)
+  const despesas = summary?.kpis.despesas ?? transacoes.filter((t) => t.tipo === 'Despesa').reduce((s, t) => s + (t.valor || 0), 0)
+  const saldo = summary?.kpis.saldo ?? (receitas - despesas)
+  const leadsAtivos = summary?.kpis.leadsAtivos ?? leads.filter((l) => l.status !== 'Perdido').length
 
-  const hotLeads = leads.filter((l) => l.temperatura === 'Hot').slice(0, 3)
-  const topObras = obras.slice(0, 3)
-  const proximasVisitas = visitas.filter((v) => v.status === 'Agendado').slice(0, 5)
-  const showOnboarding = obras.length === 0 || leads.length === 0
+  const hotLeads = summary?.hotLeads ?? leads.filter((l) => l.temperatura === 'Hot').slice(0, 3)
+  const topObras = summary?.topObras ?? obras.slice(0, 3)
+  const proximasVisitas = summary?.proximasVisitas ?? visitas.filter((v) => v.status === 'Agendado').slice(0, 5)
+  const showOnboarding = summary?.showOnboarding ?? (obras.length === 0 || leads.length === 0)
 
   const loadAlerts = useCallback(async () => {
     setTodayAlertsLoading(true)
@@ -186,6 +209,27 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras }:
   }, [showOnboarding, obras.length, leads.length])
 
   const financeData = useMemo(() => {
+    // Use pre-computed chart data when summary is available
+    if (summary?.financeChart) {
+      return {
+        labels: summary.financeChart.labels,
+        datasets: [
+          {
+            label: 'Receitas',
+            data: summary.financeChart.receitas,
+            borderRadius: 8,
+            backgroundColor: 'rgba(16,185,129,0.65)',
+          },
+          {
+            label: 'Despesas',
+            data: summary.financeChart.despesas,
+            borderRadius: 8,
+            backgroundColor: 'rgba(239,68,68,0.55)',
+          },
+        ],
+      }
+    }
+
     const now = new Date()
     const months: { key: string; label: string; rec: number; dep: number }[] = []
 
@@ -221,7 +265,7 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras }:
         },
       ],
     }
-  }, [transacoes])
+  }, [transacoes, summary])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const financeOptions: any = {
@@ -242,6 +286,8 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras }:
   }
 
   const pipelineSummary = useMemo(() => {
+    if (summary?.pipelineSummary) return summary.pipelineSummary
+
     return KANBAN_COLUMNS.filter((c) => c.id !== 'Perdido').map((col) => {
       const count = leads.filter((lead) => lead.status === col.id).length
       const total = leads
@@ -249,13 +295,13 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras }:
         .reduce((acc, lead) => acc + (lead.valor_potencial || 0), 0)
       return { id: col.id, label: col.label.replace(' ✓', ''), count, total, dot: col.dot }
     })
-  }, [leads])
+  }, [leads, summary])
 
-  const compraPendenteCount = compras.filter((compra) =>
+  const compraPendenteCount = summary?.kpis.compraPendenteCount ?? compras.filter((compra) =>
     compra.status === 'Pendente Aprovação Cliente' || compra.status === 'Revisão Cliente'
   ).length
-  const receitasLancamentos = transacoes.filter((t) => t.tipo === 'Receita').length
-  const despesasLancamentos = transacoes.filter((t) => t.tipo === 'Despesa').length
+  const receitasLancamentos = summary?.kpis.receitasCount ?? transacoes.filter((t) => t.tipo === 'Receita').length
+  const despesasLancamentos = summary?.kpis.despesasCount ?? transacoes.filter((t) => t.tipo === 'Despesa').length
   const saldoStatus = saldo >= 0 ? 'Positivo' : 'Atenção'
   const actionNow = todayAlerts?.alerts?.[0]
     ? {

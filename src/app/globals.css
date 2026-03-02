@@ -250,6 +250,35 @@ select {
   transition: width 0.9s ease;
 }
 
+/* Phase 1: Page transition animation */
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-page-enter {
+  animation: pageEnter 0.35s ease-out forwards;
+}
+
+/* Phase 1: Kanban scroll hint — gradient fade on right edge (mobile only) */
+.kanban-scroll-hint {
+  -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
+  mask-image: linear-gradient(to right, black 85%, transparent 100%);
+}
+
+@media (min-width: 768px) {
+  .kanban-scroll-hint {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+}
+
 .obra-card-cover {
   min-height: 9.75rem;
 }

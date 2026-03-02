@@ -336,7 +336,7 @@ export function ObraChecklistsTab({ obraId, initialChecklists, onChecklistChange
                             {dueDateEnabled && (
                               <button
                                 onClick={() => setEditingDateItemId(isEditingDate ? null : item.id)}
-                                className={`flex-shrink-0 p-1 rounded transition-all ${item.data_limite ? dateColor : 'text-gray-300 opacity-0 group-hover:opacity-100'} hover:text-sand-600`}
+                                className={`flex-shrink-0 p-1 rounded transition-all ${item.data_limite ? dateColor : 'text-gray-300 md:opacity-0 md:group-hover:opacity-100'} hover:text-sand-600`}
                                 title={item.data_limite ? `Prazo: ${fmtDate(item.data_limite)}` : 'Definir prazo'}
                               >
                                 <CalendarDays className="w-3.5 h-3.5" />
@@ -345,7 +345,7 @@ export function ObraChecklistsTab({ obraId, initialChecklists, onChecklistChange
 
                             <button
                               onClick={() => deleteItem(item.id)}
-                              className="opacity-0 group-hover:opacity-100 p-1 text-red-400 hover:text-red-600 transition-all flex-shrink-0"
+                              className="md:opacity-0 md:group-hover:opacity-100 p-1 text-red-400 hover:text-red-600 transition-all flex-shrink-0"
                             >
                               <Trash2 className="w-3 h-3" />
                             </button>
