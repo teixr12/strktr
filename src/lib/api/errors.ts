@@ -4,6 +4,8 @@ export const API_ERROR_CODES = {
   FORBIDDEN: 'FORBIDDEN',
   NOT_FOUND: 'NOT_FOUND',
   DB_ERROR: 'DB_ERROR',
+  RATE_LIMITED: 'RATE_LIMITED',
+  CONFLICT: 'CONFLICT',
 } as const
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES]
