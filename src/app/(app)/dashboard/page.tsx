@@ -12,6 +12,7 @@ export default async function DashboardPage() {
     const { data: session } = await supabase.auth.getSession()
     const token = session?.session?.access_token
     if (token) {
+      let summaryData = null
       try {
         const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
         const res = await fetch(`${baseUrl}/api/v1/dashboard/summary`, {
@@ -20,21 +21,24 @@ export default async function DashboardPage() {
         })
         if (res.ok) {
           const envelope = await res.json()
-          return (
-            <DashboardContent
-              obras={[]}
-              leads={[]}
-              transacoes={[]}
-              visitas={[]}
-              orcamentos={[]}
-              compras={[]}
-              projetos={[]}
-              summary={envelope.data}
-            />
-          )
+          summaryData = envelope.data
         }
       } catch {
         // Fall through to legacy path on any error
+      }
+      if (summaryData) {
+        return (
+          <DashboardContent
+            obras={[]}
+            leads={[]}
+            transacoes={[]}
+            visitas={[]}
+            orcamentos={[]}
+            compras={[]}
+            projetos={[]}
+            summary={summaryData}
+          />
+        )
       }
     }
   }

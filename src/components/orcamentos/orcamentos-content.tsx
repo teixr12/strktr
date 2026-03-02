@@ -22,7 +22,7 @@ import {
   QuickActionBar,
   SectionCard,
 } from '@/components/ui/enterprise'
-import type { Orcamento, OrcamentoStatus, Lead, Obra } from '@/types/database'
+import type { Orcamento, Lead, Obra } from '@/types/database'
 
 interface Props { initialOrcamentos: Orcamento[] }
 

@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/enterprise'
 import { LeadLaneColumnV2 } from './lead-lane-column-v2'
 import { LeadInteractionsTableV2 } from './lead-interactions-table-v2'
-import type { Lead, LeadStatus, LeadTemperatura } from '@/types/database'
+import type { Lead, LeadStatus } from '@/types/database'
 
 interface Props { initialLeads: Lead[] }
 
