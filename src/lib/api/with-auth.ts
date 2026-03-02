@@ -16,14 +16,14 @@ export interface AuthContext {
 }
 
 /**
- * Wraps an API route handler with authentication and permission checks.
- * Eliminates repeated auth boilerplate across 15+ route files.
+ * Wraps an API route handler with authentication and optional permission checks.
+ * Pass `null` as permission for auth-only (any org member).
  */
 export function withApiAuth(
-  permission: DomainPermission,
+  permission: DomainPermission | null,
   handler: (request: Request, ctx: AuthContext) => Promise<Response>
 ) {
-  return async (request: Request, _routeCtx?: unknown) => {
+  return async (request: Request) => {
     const { user, supabase, error, requestId, orgId, role, memberships } =
       await getApiUser(request)
 
@@ -43,8 +43,10 @@ export function withApiAuth(
       )
     }
 
-    const permissionError = requireDomainPermission(request, role, permission)
-    if (permissionError) return permissionError
+    if (permission) {
+      const permissionError = requireDomainPermission(request, role, permission)
+      if (permissionError) return permissionError
+    }
 
     return handler(request, {
       user,

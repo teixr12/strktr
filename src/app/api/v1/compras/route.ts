@@ -1,19 +1,12 @@
-import { getApiUser } from '@/lib/api/auth'
+import { withApiAuth } from '@/lib/api/with-auth'
 import { fail, ok } from '@/lib/api/response'
 import { log } from '@/lib/api/logger'
 import { API_ERROR_CODES } from '@/lib/api/errors'
-import { requireDomainPermission } from '@/lib/auth/domain-permissions'
 import { createCompraSchema } from '@/shared/schemas/business'
 import { ensurePendingApproval } from '@/server/services/portal/approval-service'
 import { buildPaginationMeta, getPaginationFromSearchParams } from '@/lib/api/pagination'
 
-export async function GET(request: Request) {
-  const { user, supabase, error, requestId, orgId, role } = await getApiUser(request)
-  if (!user || !supabase) return fail(request, { code: API_ERROR_CODES.UNAUTHORIZED, message: error || 'Não autorizado' }, 401)
-  if (!orgId) return fail(request, { code: API_ERROR_CODES.FORBIDDEN, message: 'Usuário sem organização ativa' }, 403)
-  const permissionError = requireDomainPermission(request, role, 'can_manage_finance')
-  if (permissionError) return permissionError
-
+export const GET = withApiAuth('can_manage_finance', async (request, { supabase, requestId, orgId, user }) => {
   const { searchParams } = new URL(request.url)
   const status = searchParams.get('status')
   const obra_id = searchParams.get('obra_id')
@@ -40,15 +33,9 @@ export async function GET(request: Request) {
   const total = count ?? data?.length ?? 0
 
   return ok(request, data ?? [], buildPaginationMeta(data?.length || 0, total, page, pageSize))
-}
+})
 
-export async function POST(request: Request) {
-  const { user, supabase, error, requestId, orgId, role } = await getApiUser(request)
-  if (!user || !supabase) return fail(request, { code: API_ERROR_CODES.UNAUTHORIZED, message: error || 'Não autorizado' }, 401)
-  if (!orgId) return fail(request, { code: API_ERROR_CODES.FORBIDDEN, message: 'Usuário sem organização ativa' }, 403)
-  const permissionError = requireDomainPermission(request, role, 'can_manage_finance')
-  if (permissionError) return permissionError
-
+export const POST = withApiAuth('can_manage_finance', async (request, { supabase, requestId, orgId, user }) => {
   const parsed = createCompraSchema.safeParse(await request.json())
   if (!parsed.success) {
     return fail(
@@ -141,4 +128,4 @@ export async function POST(request: Request) {
   }
 
   return ok(request, data, undefined, 201)
-}
+})

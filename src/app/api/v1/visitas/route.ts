@@ -1,29 +1,10 @@
-import { getApiUser } from '@/lib/api/auth'
+import { withApiAuth } from '@/lib/api/with-auth'
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { log } from '@/lib/api/logger'
 import { fail, ok } from '@/lib/api/response'
-import { requireDomainPermission } from '@/lib/auth/domain-permissions'
 import { createVisitaSchema } from '@/shared/schemas/business'
 
-export async function GET(request: Request) {
-  const { user, supabase, error, requestId, orgId, role } = await getApiUser(request)
-  if (!user || !supabase) {
-    return fail(
-      request,
-      { code: API_ERROR_CODES.UNAUTHORIZED, message: error || 'Não autorizado' },
-      401
-    )
-  }
-  if (!orgId) {
-    return fail(
-      request,
-      { code: API_ERROR_CODES.FORBIDDEN, message: 'Usuário sem organização ativa' },
-      403
-    )
-  }
-  const permissionError = requireDomainPermission(request, role, 'can_manage_leads')
-  if (permissionError) return permissionError
-
+export const GET = withApiAuth('can_manage_leads', async (request, { supabase, requestId, orgId, user }) => {
   const { searchParams } = new URL(request.url)
   const status = searchParams.get('status')
   const obraId = searchParams.get('obra_id')
@@ -57,27 +38,9 @@ export async function GET(request: Request) {
   }
 
   return ok(request, data ?? [], { count: data?.length || 0 })
-}
+})
 
-export async function POST(request: Request) {
-  const { user, supabase, error, requestId, orgId, role } = await getApiUser(request)
-  if (!user || !supabase) {
-    return fail(
-      request,
-      { code: API_ERROR_CODES.UNAUTHORIZED, message: error || 'Não autorizado' },
-      401
-    )
-  }
-  if (!orgId) {
-    return fail(
-      request,
-      { code: API_ERROR_CODES.FORBIDDEN, message: 'Usuário sem organização ativa' },
-      403
-    )
-  }
-  const permissionError = requireDomainPermission(request, role, 'can_manage_leads')
-  if (permissionError) return permissionError
-
+export const POST = withApiAuth('can_manage_leads', async (request, { supabase, requestId, orgId, user }) => {
   const parsed = createVisitaSchema.safeParse(await request.json())
   if (!parsed.success) {
     return fail(
@@ -126,4 +89,4 @@ export async function POST(request: Request) {
   }
 
   return ok(request, data, undefined, 201)
-}
+})
