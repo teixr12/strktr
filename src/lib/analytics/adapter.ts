@@ -28,12 +28,21 @@ type SessionContext = {
 const INTERNAL_ANALYTICS_URL = '/api/v1/analytics/events'
 const POSTHOG_DEFAULT_HOST = 'https://app.posthog.com'
 
+function normalizeEnv(value: string | undefined | null): string | null {
+  const normalized = (value || '').trim()
+  return normalized.length > 0 ? normalized : null
+}
+
 function resolvePosthogCaptureKey() {
   return (
-    process.env.NEXT_PUBLIC_POSTHOG_KEY ||
-    process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN ||
+    normalizeEnv(process.env.NEXT_PUBLIC_POSTHOG_KEY) ||
+    normalizeEnv(process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN) ||
     null
   )
+}
+
+function resolvePosthogHost() {
+  return normalizeEnv(process.env.NEXT_PUBLIC_POSTHOG_HOST) || POSTHOG_DEFAULT_HOST
 }
 
 let cachedAnonymousId: string | null = null
@@ -64,11 +73,7 @@ function analyticsEnabled() {
 }
 
 function externalAnalyticsEnabled() {
-  return (
-    featureFlags.analyticsExternalV1 &&
-    Boolean(resolvePosthogCaptureKey()) &&
-    Boolean(process.env.NEXT_PUBLIC_POSTHOG_HOST || POSTHOG_DEFAULT_HOST)
-  )
+  return featureFlags.analyticsExternalV1 && Boolean(resolvePosthogCaptureKey()) && Boolean(resolvePosthogHost())
 }
 
 async function getSessionContext(): Promise<SessionContext> {
@@ -126,7 +131,7 @@ async function sendPosthogCapture(
   session: SessionContext
 ) {
   const key = resolvePosthogCaptureKey()
-  const host = process.env.NEXT_PUBLIC_POSTHOG_HOST || POSTHOG_DEFAULT_HOST
+  const host = resolvePosthogHost()
   if (!key || !host) return
 
   const distinctId = payload.user_id || session.userId || getAnonymousId()
@@ -149,7 +154,7 @@ async function sendPosthogCapture(
 
 async function sendPosthogIdentify(identity: AnalyticsIdentity) {
   const key = resolvePosthogCaptureKey()
-  const host = process.env.NEXT_PUBLIC_POSTHOG_HOST || POSTHOG_DEFAULT_HOST
+  const host = resolvePosthogHost()
   if (!key || !host) return
 
   const identifyUrl = `${host.replace(/\/$/, '')}/identify/`
