@@ -39,5 +39,7 @@ select 'portal_comentarios', count(*)::bigint from public.portal_comentarios whe
 union all
 select 'aprovacoes_cliente', count(*)::bigint from public.aprovacoes_cliente where org_id is null
 union all
+select 'general_tasks', count(*)::bigint from public.general_tasks where org_id is null
+union all
 select 'cronograma_pdf_exports', count(*)::bigint from public.cronograma_pdf_exports where org_id is null
 order by table_name;
