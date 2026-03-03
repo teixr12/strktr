@@ -45,6 +45,9 @@ test('novos endpoints protegidos retornam envelope canônico sem token', async (
     { endpoint: '/api/v1/obras/00000000-0000-0000-0000-000000000000/cronograma/recalculate', method: 'POST' },
     { endpoint: '/api/v1/obras/00000000-0000-0000-0000-000000000000/cronograma/pdf', method: 'POST' },
     { endpoint: '/api/v1/obras/00000000-0000-0000-0000-000000000000/portal/invite', method: 'POST' },
+    { endpoint: '/api/v1/portal/admin/settings?obra_id=00000000-0000-0000-0000-000000000000', method: 'GET' },
+    { endpoint: '/api/v1/portal/admin/settings?obra_id=00000000-0000-0000-0000-000000000000', method: 'PATCH' },
+    { endpoint: '/api/v1/portal/admin/invites/00000000-0000-0000-0000-000000000000/regenerate', method: 'POST' },
   ]
 
   for (const { endpoint, method } of checks) {

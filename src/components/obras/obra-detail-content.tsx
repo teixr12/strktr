@@ -15,6 +15,7 @@ import { ObraFormModal } from './obra-form-modal'
 import { DiarioObraTab } from './diario-obra'
 import { ObraChecklistsTab } from './obra-checklists'
 import { ObraCronogramaTab } from './obra-cronograma'
+import { ObraPortalAdminTab } from './obra-portal-admin-tab'
 import { apiRequest } from '@/lib/api/client'
 import { track } from '@/lib/analytics/client'
 import { featureFlags } from '@/lib/feature-flags'
@@ -56,8 +57,9 @@ type ExecutionSummary = {
 export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, initialDiario = [], initialChecklists = [] }: Props) {
   const { confirm, dialog: confirmDialog } = useConfirm()
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2ObraTabs
+  const portalAdminEnabled = featureFlags.portalAdminV1 && featureFlags.clientPortal
   const router = useRouter()
-  const [tab, setTab] = useState<'resumo' | 'etapas' | 'cronograma' | 'financeiro' | 'diario' | 'checklists'>('resumo')
+  const [tab, setTab] = useState<'resumo' | 'etapas' | 'cronograma' | 'financeiro' | 'diario' | 'checklists' | 'portalAdmin'>('resumo')
   const [etapas, setEtapas] = useState(initialEtapas)
   const [showEditForm, setShowEditForm] = useState(false)
   const [showEtapaForm, setShowEtapaForm] = useState(false)
@@ -220,6 +222,7 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
     { id: 'financeiro' as const, label: 'Financeiro' },
     { id: 'diario' as const, label: 'Diario' },
     { id: 'checklists' as const, label: 'Checklists' },
+    ...(portalAdminEnabled ? [{ id: 'portalAdmin' as const, label: 'Portal Admin' }] : []),
   ]
 
   return (
@@ -576,6 +579,10 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
       {/* Checklists */}
       {tab === 'checklists' && (
         <ObraChecklistsTab obraId={obra.id} initialChecklists={initialChecklists} onChecklistChanged={loadExecutionSummary} />
+      )}
+
+      {tab === 'portalAdmin' && portalAdminEnabled && (
+        <ObraPortalAdminTab obraId={obra.id} />
       )}
 
       {showEditForm && (

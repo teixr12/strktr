@@ -23,6 +23,7 @@ export const ANALYTICS_EVENT_TYPES = [
   'portal_invite_sent',
   'portal_comment_created',
   'portal_approval_decision',
+  'portal_admin_updated',
 ] as const
 
 export type AnalyticsEventType = (typeof ANALYTICS_EVENT_TYPES)[number]
