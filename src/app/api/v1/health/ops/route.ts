@@ -6,6 +6,14 @@ export async function GET(request: Request) {
   try {
     const checks: Array<{ name: string; ok: boolean; message?: string }> = []
     checks.push({ name: 'runtime', ok: true })
+    const analyticsExternalEnabled =
+      process.env.NEXT_PUBLIC_FF_ANALYTICS_EXTERNAL_V1 === 'true'
+    const posthogKeyConfigured = Boolean(
+      process.env.NEXT_PUBLIC_POSTHOG_KEY || process.env.POSTHOG_API_KEY
+    )
+    const posthogHostConfigured = Boolean(
+      process.env.NEXT_PUBLIC_POSTHOG_HOST || process.env.POSTHOG_HOST
+    )
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,6 +25,16 @@ export async function GET(request: Request) {
       name: 'supabase_connection',
       ok: !error,
       message: error?.message,
+    })
+    checks.push({
+      name: 'analytics_external_config',
+      ok: !analyticsExternalEnabled || (posthogKeyConfigured && posthogHostConfigured),
+      message:
+        analyticsExternalEnabled && !posthogKeyConfigured
+          ? 'PostHog key ausente'
+          : analyticsExternalEnabled && !posthogHostConfigured
+            ? 'PostHog host ausente'
+            : undefined,
     })
 
     const degraded = checks.some((c) => !c.ok)
@@ -50,8 +68,9 @@ export async function GET(request: Request) {
           process.env.NEXT_PUBLIC_FF_TABLE_VIRTUALIZATION === 'true',
         checklistDueDate: process.env.NEXT_PUBLIC_FF_CHECKLIST_DUE_DATE === 'true',
         productAnalytics: process.env.NEXT_PUBLIC_FF_PRODUCT_ANALYTICS === 'true',
-        analyticsExternalV1:
-          process.env.NEXT_PUBLIC_FF_ANALYTICS_EXTERNAL_V1 === 'true',
+        analyticsExternalV1: analyticsExternalEnabled,
+        analyticsExternalReady:
+          !analyticsExternalEnabled || (posthogKeyConfigured && posthogHostConfigured),
         cronogramaEngine: process.env.NEXT_PUBLIC_FF_CRONOGRAMA_ENGINE === 'true',
         cronogramaPdf: process.env.NEXT_PUBLIC_FF_CRONOGRAMA_PDF === 'true',
         clientPortal: process.env.NEXT_PUBLIC_FF_CLIENT_PORTAL === 'true',
