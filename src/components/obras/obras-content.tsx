@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { apiRequest } from '@/lib/api/client'
+import { useToast } from '@/hooks/use-toast'
 import { fmt, fmtDate } from '@/lib/utils'
 import { OBRA_STATUS_COLORS, OBRA_ICON_COLORS } from '@/lib/constants'
 import { Plus, HardHat, Home, Building, TreePine, Search } from 'lucide-react'
@@ -21,6 +22,7 @@ const obraIcons: Record<string, React.ComponentType<{ className?: string }>> = {
 const STATUS_OPTIONS: ('Todas' | ObraStatus)[] = ['Todas', 'Em Andamento', 'Orçamento', 'Pausada', 'Concluída', 'Cancelada']
 
 export function ObrasContent({ initialObras }: { initialObras: Obra[] }) {
+  const toast = useToast()
   const [obras, setObras] = useState(initialObras)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [refreshError, setRefreshError] = useState<string | null>(null)
@@ -36,9 +38,12 @@ export function ObrasContent({ initialObras }: { initialObras: Obra[] }) {
     try {
       const data = await apiRequest<Obra[]>('/api/v1/obras?limit=100')
       setObras(data)
+      toast('Lista de obras atualizada', 'success')
     } catch (err) {
       // keep current list if refresh fails
-      setRefreshError(err instanceof Error ? err.message : 'Falha ao atualizar obras')
+      const message = err instanceof Error ? err.message : 'Falha ao atualizar obras'
+      setRefreshError(message)
+      toast(message, 'error')
     } finally {
       setIsRefreshing(false)
     }
@@ -56,7 +61,7 @@ export function ObrasContent({ initialObras }: { initialObras: Obra[] }) {
   }, [obras, search, statusFilter])
 
   return (
-    <div className="tailadmin-page space-y-4">
+    <div className="tailadmin-page space-y-4" aria-busy={isRefreshing}>
       <PageHeader
         title="Gestão de Obras"
         subtitle={`${filtered.length} obras visualizadas`}

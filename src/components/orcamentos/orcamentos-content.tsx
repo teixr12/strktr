@@ -70,6 +70,7 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
     hasMore: false,
   })
   const [isPageLoading, setIsPageLoading] = useState(false)
+  const [pageError, setPageError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editOrc, setEditOrc] = useState<Orcamento | null>(null)
   const [viewOrc, setViewOrc] = useState<Orcamento | null>(null)
@@ -121,6 +122,7 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
   async function refreshOrcamentos(targetPage = 1) {
     if (!usePaginationV1) return
     setIsPageLoading(true)
+    setPageError(null)
     try {
       const params = new URLSearchParams({
         page: String(targetPage),
@@ -139,7 +141,9 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
         }
       )
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Erro ao recarregar orçamentos', 'error')
+      const message = err instanceof Error ? err.message : 'Erro ao recarregar orçamentos'
+      setPageError(message)
+      toast(message, 'error')
     } finally {
       setIsPageLoading(false)
     }
@@ -355,6 +359,22 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
           </select>
         </div>
       </SectionCard>
+
+      {pageError ? (
+        <SectionCard className="p-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-red-600 dark:text-red-400">{pageError}</p>
+            <button
+              type="button"
+              onClick={() => void refreshOrcamentos(pagination.page || 1)}
+              disabled={isPageLoading}
+              className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200 disabled:opacity-60 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+            >
+              {isPageLoading ? 'Atualizando...' : 'Tentar novamente'}
+            </button>
+          </div>
+        </SectionCard>
+      ) : null}
 
       {/* List */}
       {filtered.length === 0 ? (

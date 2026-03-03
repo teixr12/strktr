@@ -84,6 +84,9 @@ interface NotificacoesContentProps {
 export function NotificacoesContent({ initialNotificacoes }: NotificacoesContentProps) {
   const [notificacoes, setNotificacoes] = useState(initialNotificacoes)
   const [filter, setFilter] = useState<FilterTab>('all')
+  const [isSyncing, setIsSyncing] = useState(false)
+  const [syncError, setSyncError] = useState<string | null>(null)
+  const [retryAction, setRetryAction] = useState<{ type: 'mark-one'; id: string } | { type: 'mark-all' } | null>(null)
   const toast = useToast()
 
   const unreadCount = notificacoes.filter((n) => !n.lida).length
@@ -97,17 +100,52 @@ export function NotificacoesContent({ initialNotificacoes }: NotificacoesContent
   const groups = groupByDate(filtered)
 
   async function markAsRead(id: string) {
+    const previous = notificacoes
+    setSyncError(null)
+    setRetryAction(null)
     setNotificacoes((prev) => prev.map((n) => (n.id === id ? { ...n, lida: true } : n)))
-    await apiRequest(`/api/v1/notificacoes/${id}`, {
-      method: 'PATCH',
-      body: { lida: true },
-    }).catch(() => undefined)
+    setIsSyncing(true)
+    try {
+      await apiRequest(`/api/v1/notificacoes/${id}`, {
+        method: 'PATCH',
+        body: { lida: true },
+      })
+    } catch {
+      setNotificacoes(previous)
+      setSyncError('Falha ao marcar notificação como lida.')
+      setRetryAction({ type: 'mark-one', id })
+      toast('Falha ao sincronizar notificação', 'error')
+    } finally {
+      setIsSyncing(false)
+    }
   }
 
   async function markAllRead() {
+    const previous = notificacoes
+    setSyncError(null)
+    setRetryAction(null)
     setNotificacoes((prev) => prev.map((n) => ({ ...n, lida: true })))
-    await apiRequest('/api/v1/notificacoes/read-all', { method: 'POST' }).catch(() => undefined)
-    toast('Todas marcadas como lidas', 'success')
+    setIsSyncing(true)
+    try {
+      await apiRequest('/api/v1/notificacoes/read-all', { method: 'POST' })
+      toast('Todas marcadas como lidas', 'success')
+    } catch {
+      setNotificacoes(previous)
+      setSyncError('Falha ao marcar todas como lidas.')
+      setRetryAction({ type: 'mark-all' })
+      toast('Falha ao sincronizar notificações', 'error')
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
+  async function retrySync() {
+    if (!retryAction) return
+    if (retryAction.type === 'mark-all') {
+      await markAllRead()
+      return
+    }
+    await markAsRead(retryAction.id)
   }
 
   function handleClick(n: NotificacaoItem) {
@@ -122,7 +160,7 @@ export function NotificacoesContent({ initialNotificacoes }: NotificacoesContent
   ]
 
   return (
-    <div className="tailadmin-page space-y-5">
+    <div className="tailadmin-page space-y-5" aria-busy={isSyncing}>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
@@ -135,6 +173,7 @@ export function NotificacoesContent({ initialNotificacoes }: NotificacoesContent
         {unreadCount > 0 && (
           <button
             onClick={markAllRead}
+            disabled={isSyncing}
             className="flex items-center gap-1.5 rounded-xl bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
           >
             <CheckCheck className="h-4 w-4" />
@@ -142,6 +181,22 @@ export function NotificacoesContent({ initialNotificacoes }: NotificacoesContent
           </button>
         )}
       </div>
+
+      {syncError ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-200">
+          <div className="flex items-center justify-between gap-2">
+            <span>{syncError}</span>
+            <button
+              type="button"
+              onClick={() => void retrySync()}
+              disabled={isSyncing}
+              className="rounded-lg bg-white/70 px-2 py-1 font-semibold text-red-700 hover:bg-white disabled:opacity-60 dark:bg-red-950/40 dark:text-red-100 dark:hover:bg-red-950/60"
+            >
+              {isSyncing ? 'Sincronizando...' : 'Tentar novamente'}
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="flex items-center gap-2">
         {TABS.map((tab) => (
