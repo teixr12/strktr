@@ -82,6 +82,13 @@ interface Props {
   token: string
 }
 
+type DecisionFeedback = {
+  tone: 'success' | 'info'
+  title: string
+  description: string
+  decidedAt: string
+}
+
 export function PortalClientView({ token }: Props) {
   const [data, setData] = useState<PortalPayload | null>(null)
   const [loading, setLoading] = useState(true)
@@ -91,6 +98,7 @@ export function PortalClientView({ token }: Props) {
   const [busyApprovalId, setBusyApprovalId] = useState<string | null>(null)
   const [rejectApprovalId, setRejectApprovalId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
+  const [decisionFeedback, setDecisionFeedback] = useState<DecisionFeedback | null>(null)
 
   const loadSession = useCallback(async () => {
     setLoading(true)
@@ -179,6 +187,9 @@ export function PortalClientView({ token }: Props) {
         throw new Error(payload?.error?.message || 'Falha ao atualizar aprovação')
       }
 
+      const decidedAt = new Date().toISOString()
+      const slaDueAt = payload?.data?.slaDueAt as string | undefined
+      const requiredNextVersion = payload?.data?.requiredNextVersion as number | undefined
       await loadSession()
       track('portal_approval_decision', {
         source: 'portal',
@@ -188,8 +199,20 @@ export function PortalClientView({ token }: Props) {
         decision: action,
       }).catch(() => undefined)
       if (action === 'approve') {
+        setDecisionFeedback({
+          tone: 'success',
+          title: 'Aprovação registrada com sucesso',
+          description: 'A equipe responsável já pode seguir com a execução deste item.',
+          decidedAt,
+        })
         toast('Aprovação registrada', 'success')
       } else {
+        setDecisionFeedback({
+          tone: 'info',
+          title: 'Reprovação registrada',
+          description: `Solicitação enviada para revisão${requiredNextVersion ? ` (versão ${requiredNextVersion})` : ''}${slaDueAt ? `. Prazo estimado de retorno: ${fmtDate(slaDueAt)}.` : '.'}`,
+          decidedAt,
+        })
         toast('Reprovação registrada', 'info')
       }
     } catch (err) {
@@ -262,6 +285,45 @@ export function PortalClientView({ token }: Props) {
             <span className="rounded-full bg-blue-100 px-3 py-1 font-medium text-blue-700">Cliente: {data.portalCliente?.nome || 'Portal'}</span>
           </div>
         </header>
+
+        {decisionFeedback ? (
+          <section
+            className={`rounded-2xl border p-4 ${
+              decisionFeedback.tone === 'success'
+                ? 'border-emerald-200 bg-emerald-50'
+                : 'border-amber-200 bg-amber-50'
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p
+                  className={`text-sm font-semibold ${
+                    decisionFeedback.tone === 'success' ? 'text-emerald-700' : 'text-amber-700'
+                  }`}
+                >
+                  {decisionFeedback.title}
+                </p>
+                <p
+                  className={`mt-1 text-xs ${
+                    decisionFeedback.tone === 'success' ? 'text-emerald-700/90' : 'text-amber-700/90'
+                  }`}
+                >
+                  {decisionFeedback.description}
+                </p>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Atualizado em {fmtDateTime(decisionFeedback.decidedAt)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDecisionFeedback(null)}
+                className="rounded-lg bg-white/70 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-white"
+              >
+                Fechar
+              </button>
+            </div>
+          </section>
+        ) : null}
 
         <section className="grid gap-5 lg:grid-cols-3">
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">

@@ -13,7 +13,7 @@ npm run build
 printf '\n[3/4] API contract checks\n'
 npm run validate:api-contracts
 
-printf '\n[4/4] E2E smoke\n'
+printf '\n[4/5] E2E smoke\n'
 if [[ -n "${PLAYWRIGHT_BASE_URL:-}" ]]; then
   PLAYWRIGHT_BASE_URL="${PLAYWRIGHT_BASE_URL}" npm run test:e2e
 else
@@ -37,5 +37,8 @@ else
     npm run test:e2e
   fi
 fi
+
+printf '\n[5/5] UX quality audit\n'
+npm run audit:ux-quality
 
 printf '\nAll release readiness checks passed.\n'

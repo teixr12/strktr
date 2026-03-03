@@ -81,6 +81,7 @@ export function PerfilContent({ profile }: Props) {
   const avatarUrl = canUseCustomAvatar ? (watchedAvatarUrl || '') : fallbackAvatar
   const avatarSource: UiAvatarSource =
     canUseCustomAvatar ? 'profile' : 'fallback'
+  const profileUnavailable = !profile
 
   async function onProfileSubmit(values: ProfileFormValues) {
     const trimmedAvatar = (values.avatar_url || '').trim()
@@ -134,8 +135,29 @@ export function PerfilContent({ profile }: Props) {
   }
 
   return (
-    <div className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} mx-auto max-w-2xl space-y-6`}>
+    <div
+      className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} mx-auto max-w-2xl space-y-6`}
+      aria-busy={saving || changingPw}
+    >
       <PageHeader title="Perfil" subtitle="Atualize suas informações e segurança de acesso" />
+
+      {profileUnavailable ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-100">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="font-semibold">Nenhum dado completo de perfil foi carregado.</p>
+              <p className="text-xs opacity-90">Falha ao carregar parte dos dados. Você pode tentar novamente.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="rounded-lg bg-white/70 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-white dark:bg-amber-950/40 dark:text-amber-100 dark:hover:bg-amber-950/60"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {/* Header */}
       <div className="glass-card rounded-3xl p-6 flex items-center gap-5">

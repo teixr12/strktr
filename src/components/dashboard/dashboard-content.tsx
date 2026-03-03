@@ -8,6 +8,7 @@ import type { Obra, Lead, Transacao, Visita, Orcamento, Compra, Projeto } from '
 import { apiRequest } from '@/lib/api/client'
 import { track } from '@/lib/analytics/client'
 import { featureFlags } from '@/lib/feature-flags'
+import { toast } from '@/hooks/use-toast'
 import { fmt, fmtDateTime } from '@/lib/utils'
 import { KANBAN_COLUMNS, TIPO_VISITA_COLORS } from '@/lib/constants'
 import type { RoadmapAction } from '@/shared/types/roadmap-automation'
@@ -221,8 +222,9 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras, s
         body: { status: 'completed' },
       })
       await loadRoadmap()
+      toast('Ação concluída', 'success')
     } catch {
-      // no-op for dashboard quick action
+      toast('Não foi possível concluir a ação agora', 'error')
     } finally {
       setCompletingActionId(null)
     }
