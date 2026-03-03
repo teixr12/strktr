@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { isFlagDisabledByDefault } from '@/lib/feature-flags'
 import type { AnalyticsEventType } from '@/shared/types/analytics'
 
 export type ProductEventType = AnalyticsEventType
@@ -16,27 +17,41 @@ interface ProductEventInput {
 
 const POSTHOG_DEFAULT_HOST = 'https://app.posthog.com'
 
+function normalizeEnv(value: string | undefined | null): string | null {
+  const normalized = (value || '').trim()
+  return normalized.length > 0 ? normalized : null
+}
+
 function resolvePosthogCaptureKey() {
   return (
-    process.env.NEXT_PUBLIC_POSTHOG_KEY ||
-    process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN ||
-    process.env.POSTHOG_PROJECT_TOKEN ||
-    process.env.POSTHOG_PROJECT_API_KEY ||
+    normalizeEnv(process.env.NEXT_PUBLIC_POSTHOG_KEY) ||
+    normalizeEnv(process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN) ||
+    normalizeEnv(process.env.POSTHOG_PROJECT_TOKEN) ||
+    normalizeEnv(process.env.POSTHOG_PROJECT_API_KEY) ||
     null
   )
 }
 
 async function mirrorToPosthog(input: ProductEventInput) {
   const externalEnabled =
-    process.env.NEXT_PUBLIC_FF_ANALYTICS_EXTERNAL_V1 === 'true' ||
-    process.env.FF_ANALYTICS_EXTERNAL_V1 === 'true'
+    isFlagDisabledByDefault(normalizeEnv(process.env.NEXT_PUBLIC_FF_ANALYTICS_EXTERNAL_V1) || undefined) ||
+    isFlagDisabledByDefault(normalizeEnv(process.env.FF_ANALYTICS_EXTERNAL_V1) || undefined)
   const key = resolvePosthogCaptureKey()
   const host =
-    process.env.NEXT_PUBLIC_POSTHOG_HOST ||
-    process.env.POSTHOG_HOST ||
+    normalizeEnv(process.env.NEXT_PUBLIC_POSTHOG_HOST) ||
+    normalizeEnv(process.env.POSTHOG_HOST) ||
     POSTHOG_DEFAULT_HOST
 
-  if (!externalEnabled) return
+  if (!externalEnabled) {
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        message: 'telemetry.posthog.mirror_skipped_flag_disabled',
+        eventType: input.eventType,
+      })
+    )
+    return
+  }
   if (!key) {
     console.warn(
       JSON.stringify({
@@ -81,6 +96,7 @@ async function mirrorToPosthog(input: ProductEventInput) {
         message: 'telemetry.posthog.mirror_failed',
         eventType: input.eventType,
         status: response?.status ?? null,
+        statusText: response?.statusText ?? null,
       })
     )
   }

@@ -3,20 +3,26 @@ import { API_ERROR_CODES } from '@/lib/api/errors'
 import { fail, ok } from '@/lib/api/response'
 import { isFlagDisabledByDefault, isFlagEnabledByDefault } from '@/lib/feature-flags'
 
+function normalizeEnv(value: string | undefined | null): string | null {
+  const normalized = (value || '').trim()
+  return normalized.length > 0 ? normalized : null
+}
+
 export async function GET(request: Request) {
   try {
     const checks: Array<{ name: string; ok: boolean; message?: string }> = []
     checks.push({ name: 'runtime', ok: true })
     const analyticsExternalEnabled =
-      isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_ANALYTICS_EXTERNAL_V1)
+      isFlagDisabledByDefault(normalizeEnv(process.env.NEXT_PUBLIC_FF_ANALYTICS_EXTERNAL_V1) || undefined) ||
+      isFlagDisabledByDefault(normalizeEnv(process.env.FF_ANALYTICS_EXTERNAL_V1) || undefined)
     const posthogKeyConfigured = Boolean(
-      process.env.NEXT_PUBLIC_POSTHOG_KEY ||
-      process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN ||
-      process.env.POSTHOG_PROJECT_TOKEN ||
-      process.env.POSTHOG_PROJECT_API_KEY
+      normalizeEnv(process.env.NEXT_PUBLIC_POSTHOG_KEY) ||
+      normalizeEnv(process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN) ||
+      normalizeEnv(process.env.POSTHOG_PROJECT_TOKEN) ||
+      normalizeEnv(process.env.POSTHOG_PROJECT_API_KEY)
     )
     const posthogHostConfigured = Boolean(
-      process.env.NEXT_PUBLIC_POSTHOG_HOST || process.env.POSTHOG_HOST
+      normalizeEnv(process.env.NEXT_PUBLIC_POSTHOG_HOST) || normalizeEnv(process.env.POSTHOG_HOST)
     )
 
     const supabase = createClient(
