@@ -25,6 +25,7 @@ with tracked_tables as (
     ('portal_comentarios'),
     ('aprovacoes_cliente'),
     ('portal_admin_settings'),
+    ('general_tasks'),
     ('cronograma_pdf_exports')
   ) t(table_name)
 ),

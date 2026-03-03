@@ -90,6 +90,10 @@ metrics as (
     from public.portal_comentarios
    where org_id in (select org_id from qa_orgs)
   union all
+  select 'general_tasks.qa_orgs', count(*)::bigint
+    from public.general_tasks
+   where org_id in (select org_id from qa_orgs)
+  union all
   select 'cronograma_pdf_exports.qa_orgs', count(*)::bigint
     from public.cronograma_pdf_exports
    where org_id in (select org_id from qa_orgs)

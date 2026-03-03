@@ -16,6 +16,7 @@ delete from public.portal_comentarios where org_id in (select org_id from tmp_qa
 delete from public.portal_sessions where org_id in (select org_id from tmp_qa_orgs);
 delete from public.portal_clientes where org_id in (select org_id from tmp_qa_orgs);
 delete from public.aprovacoes_cliente where org_id in (select org_id from tmp_qa_orgs);
+delete from public.general_tasks where org_id in (select org_id from tmp_qa_orgs);
 delete from public.cronograma_dependencias where org_id in (select org_id from tmp_qa_orgs);
 delete from public.cronograma_itens where org_id in (select org_id from tmp_qa_orgs);
 delete from public.cronograma_baselines where org_id in (select org_id from tmp_qa_orgs);
