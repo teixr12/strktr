@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local Claude worktrees can include generated Next artifacts and should
+    // not affect repository lint health.
+    ".claude/**",
   ]),
 ]);
 
