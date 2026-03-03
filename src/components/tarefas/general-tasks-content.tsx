@@ -12,7 +12,12 @@ import {
   QuickActionBar,
   SectionCard,
 } from '@/components/ui/enterprise'
-import type { GeneralTask, GeneralTaskPriority, GeneralTaskStatus } from '@/shared/types/general-tasks'
+import type {
+  GeneralTask,
+  GeneralTaskAssignee,
+  GeneralTaskPriority,
+  GeneralTaskStatus,
+} from '@/shared/types/general-tasks'
 
 interface PaginationMeta {
   count: number
@@ -64,6 +69,8 @@ export function GeneralTasksContent() {
   const [error, setError] = useState<string | null>(null)
   const [newTitle, setNewTitle] = useState('')
   const [dragTaskId, setDragTaskId] = useState<string | null>(null)
+  const [assignees, setAssignees] = useState<GeneralTaskAssignee[]>([])
+  const [loadingAssignees, setLoadingAssignees] = useState(false)
 
   const moduleEnabled = featureFlags.generalTasksV1
 
@@ -94,10 +101,24 @@ export function GeneralTasksContent() {
     }
   }
 
+  async function loadAssignees() {
+    if (!moduleEnabled || !featureFlags.taskAssignV1) return
+    setLoadingAssignees(true)
+    try {
+      const members = await apiRequest<GeneralTaskAssignee[]>('/api/v1/general-tasks/assignees')
+      setAssignees(members || [])
+    } catch {
+      setAssignees([])
+    } finally {
+      setLoadingAssignees(false)
+    }
+  }
+
   useEffect(() => {
     void load(1)
+    void loadAssignees()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [moduleEnabled])
+  }, [moduleEnabled, featureFlags.taskAssignV1])
 
   async function createTask() {
     const title = newTitle.trim()
@@ -157,6 +178,29 @@ export function GeneralTasksContent() {
     await updateTask(taskId, { status: nextStatus })
   }
 
+  async function assignTask(taskId: string, assigneeUserId: string | null) {
+    setSaving(true)
+    try {
+      if (featureFlags.taskAssignV1 && assigneeUserId) {
+        await apiRequest(`/api/v1/general-tasks/${taskId}/assign`, {
+          method: 'POST',
+          body: { assignee_user_id: assigneeUserId },
+        })
+      } else {
+        await apiRequest(`/api/v1/general-tasks/${taskId}`, {
+          method: 'PATCH',
+          body: { assignee_user_id: assigneeUserId },
+        })
+      }
+      toast(assigneeUserId ? 'Responsável atualizado' : 'Atribuição removida', 'success')
+      await load(pagination.page || 1)
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao atualizar responsável', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const tasksByStatus = useMemo(() => {
     const map: Record<GeneralTaskStatus, GeneralTask[]> = {
       todo: [],
@@ -167,6 +211,10 @@ export function GeneralTasksContent() {
     for (const task of tasks) map[task.status].push(task)
     return map
   }, [tasks])
+
+  const assigneeById = useMemo(() => {
+    return new Map(assignees.map((member) => [member.user_id, member]))
+  }, [assignees])
 
   if (!moduleEnabled) {
     return (
@@ -287,6 +335,28 @@ export function GeneralTasksContent() {
                           {PRIORITY_LABELS[task.priority]}
                         </span>
                         <span className="text-[11px] text-gray-500">{formatDate(task.due_date)}</span>
+                        {task.assignee_user_id ? (
+                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                            {assigneeById.get(task.assignee_user_id)?.nome || 'Responsável'}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="mt-2">
+                        <select
+                          value={task.assignee_user_id || ''}
+                          onChange={(event) =>
+                            void assignTask(task.id, event.target.value || null)
+                          }
+                          disabled={saving || loadingAssignees}
+                          className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] text-gray-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                        >
+                          <option value="">Sem responsável</option>
+                          {assignees.map((member) => (
+                            <option key={member.user_id} value={member.user_id}>
+                              {member.nome}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </article>
                   ))}
