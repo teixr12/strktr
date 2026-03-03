@@ -28,6 +28,9 @@ PROBE_STATUS="skip"
 PROBE_COUNT="0"
 PROBE_ID="ops-probe-$(date +%s)-$RANDOM"
 PROBE_MESSAGE="capture probe não executado"
+PROBE_MAX_ATTEMPTS="${PROBE_MAX_ATTEMPTS:-20}"
+PROBE_SLEEP_SECONDS="${PROBE_SLEEP_SECONDS:-6}"
+PROBE_LOOKBACK_MINUTES="${PROBE_LOOKBACK_MINUTES:-60}"
 
 if [[ -n "$POSTHOG_PROJECT_ID" && -n "$POSTHOG_API_KEY" && -n "$CAPTURE_KEY" ]]; then
   CAPTURE_PAYLOAD="$(jq -n \
@@ -45,7 +48,8 @@ if [[ -n "$POSTHOG_PROJECT_ID" && -n "$POSTHOG_API_KEY" && -n "$CAPTURE_KEY" ]];
     query_payload="$(jq -n \
       --arg probe "$PROBE_ID" \
       --arg attempt "$attempt" \
-      '{query:{kind:"HogQLQuery",query:("SELECT count(*) FROM events WHERE event = '\''ops_capture_probe'\'' AND distinct_id = '\''" + $probe + "'\'' AND timestamp >= now() - INTERVAL 30 minute /*attempt:" + $attempt + "*/")}}')"
+      --arg lookback "$PROBE_LOOKBACK_MINUTES" \
+      '{query:{kind:"HogQLQuery",query:("SELECT count(*) FROM events WHERE event = '\''ops_capture_probe'\'' AND distinct_id = '\''" + $probe + "'\'' AND timestamp >= now() - INTERVAL " + $lookback + " minute /*attempt:" + $attempt + "*/")}}')"
 
     curl -sS -X POST "${POSTHOG_HOST%/}/api/projects/${POSTHOG_PROJECT_ID}/query/" \
       -H "Authorization: Bearer ${POSTHOG_API_KEY}" \
@@ -55,12 +59,12 @@ if [[ -n "$POSTHOG_PROJECT_ID" && -n "$POSTHOG_API_KEY" && -n "$CAPTURE_KEY" ]];
     jq -r '.results[0][0] // 0' "$TMP_DIR/query.json" 2>/dev/null || echo "0"
   }
 
-  for attempt in 1 2 3 4 5 6 7 8; do
+  for attempt in $(seq 1 "$PROBE_MAX_ATTEMPTS"); do
     PROBE_COUNT="$(query_probe "$attempt")"
     if [[ "$PROBE_COUNT" != "0" ]]; then
       break
     fi
-    sleep 4
+    sleep "$PROBE_SLEEP_SECONDS"
   done
 
   CAPTURE_STATUS="$(jq -r '.status // empty' "$TMP_DIR/capture.json")"
