@@ -9,7 +9,10 @@ export async function GET(request: Request) {
     const analyticsExternalEnabled =
       process.env.NEXT_PUBLIC_FF_ANALYTICS_EXTERNAL_V1 === 'true'
     const posthogKeyConfigured = Boolean(
-      process.env.NEXT_PUBLIC_POSTHOG_KEY || process.env.POSTHOG_API_KEY
+      process.env.NEXT_PUBLIC_POSTHOG_KEY ||
+      process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN ||
+      process.env.POSTHOG_PROJECT_TOKEN ||
+      process.env.POSTHOG_PROJECT_API_KEY
     )
     const posthogHostConfigured = Boolean(
       process.env.NEXT_PUBLIC_POSTHOG_HOST || process.env.POSTHOG_HOST
@@ -31,7 +34,7 @@ export async function GET(request: Request) {
       ok: !analyticsExternalEnabled || (posthogKeyConfigured && posthogHostConfigured),
       message:
         analyticsExternalEnabled && !posthogKeyConfigured
-          ? 'PostHog key ausente'
+          ? 'PostHog project token ausente'
           : analyticsExternalEnabled && !posthogHostConfigured
             ? 'PostHog host ausente'
             : undefined,

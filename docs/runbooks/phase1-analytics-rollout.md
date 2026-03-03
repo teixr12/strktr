@@ -7,7 +7,7 @@ Ativar analytics externo (PostHog) sem interromper o tracking interno já existe
 - Deploy em produção com commit da Phase 1.
 - `NEXT_PUBLIC_FF_PRODUCT_ANALYTICS=true`.
 - Secrets configurados no Vercel:
-  - `NEXT_PUBLIC_POSTHOG_KEY`
+  - `NEXT_PUBLIC_POSTHOG_KEY` **ou** `POSTHOG_PROJECT_TOKEN` (token de ingestão/capture)
   - `NEXT_PUBLIC_POSTHOG_HOST` (ex: `https://app.posthog.com`)
 - Secrets no GitHub Actions (auditoria diária):
   - `SUPABASE_ACCESS_TOKEN`
@@ -18,7 +18,7 @@ Ativar analytics externo (PostHog) sem interromper o tracking interno já existe
 - Flag externa iniciando em `false`:
   - `NEXT_PUBLIC_FF_ANALYTICS_EXTERNAL_V1=false`
 
-Se `NEXT_PUBLIC_POSTHOG_KEY` ou `NEXT_PUBLIC_POSTHOG_HOST` não existir em produção:
+Se token de ingestão (`NEXT_PUBLIC_POSTHOG_KEY` ou `POSTHOG_PROJECT_TOKEN`) ou `NEXT_PUBLIC_POSTHOG_HOST` não existir em produção:
 1. manter `NEXT_PUBLIC_FF_ANALYTICS_EXTERNAL_V1=false`;
 2. registrar issue operacional bloqueante;
 3. manter analytics interno como source of truth até regularização.
