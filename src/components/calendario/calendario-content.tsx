@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { apiRequest } from '@/lib/api/client'
 import { useConfirm } from '@/hooks/use-confirm'
+import { toast } from '@/hooks/use-toast'
 import { useCrudMutations } from '@/hooks/use-crud-mutations'
 import { fmtDateTime } from '@/lib/utils'
 import { TIPO_VISITA_COLORS, VISITA_STATUS_COLORS } from '@/lib/constants'
@@ -27,6 +28,9 @@ export function CalendarioContent({ initialVisitas }: Props) {
   const [obras, setObras] = useState<Pick<Obra, 'id' | 'nome'>[]>([])
   const [leads, setLeads] = useState<Pick<Lead, 'id' | 'nome'>[]>([])
   const [agendaTasks, setAgendaTasks] = useState<AgendaTask[]>([])
+  const [isReferenceLoading, setIsReferenceLoading] = useState(false)
+  const [isAgendaTasksLoading, setIsAgendaTasksLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   const { createMutation, updateMutation, deleteMutation } = useCrudMutations<Visita>({
     setItems: setVisitas,
@@ -59,6 +63,8 @@ export function CalendarioContent({ initialVisitas }: Props) {
 
   useEffect(() => {
     async function load() {
+      setIsReferenceLoading(true)
+      setLoadError(null)
       try {
         const [obrasData, leadsData] = await Promise.all([
           apiRequest<Pick<Obra, 'id' | 'nome'>[]>('/api/v1/obras?limit=200'),
@@ -69,9 +75,13 @@ export function CalendarioContent({ initialVisitas }: Props) {
       } catch {
         setObras([])
         setLeads([])
+        setLoadError('Falha ao carregar dados auxiliares da agenda. Tentar novamente.')
+        toast('Falha ao carregar dados auxiliares da agenda. Tentar novamente.', 'error')
+      } finally {
+        setIsReferenceLoading(false)
       }
     }
-    load()
+    void load()
   }, [])
 
   useEffect(() => {
@@ -80,14 +90,19 @@ export function CalendarioContent({ initialVisitas }: Props) {
         setAgendaTasks([])
         return
       }
+      setIsAgendaTasksLoading(true)
       try {
         const payload = await apiRequest<{ tasks: AgendaTask[] }>('/api/v1/agenda/arquiteto')
         setAgendaTasks(payload.tasks || [])
       } catch {
         setAgendaTasks([])
+        setLoadError('Falha ao carregar tarefas da agenda. Tentar novamente.')
+        toast('Falha ao carregar tarefas da agenda. Tentar novamente.', 'error')
+      } finally {
+        setIsAgendaTasksLoading(false)
       }
     }
-    loadAgendaTasks()
+    void loadAgendaTasks()
   }, [])
 
   const now = new Date()
@@ -221,7 +236,16 @@ export function CalendarioContent({ initialVisitas }: Props) {
   }
 
   return (
-    <div className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} space-y-5`}>
+    <div
+      aria-busy={
+        isReferenceLoading ||
+        isAgendaTasksLoading ||
+        createMutation.isMutating ||
+        updateMutation.isMutating ||
+        deleteMutation.isMutating
+      }
+      className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} space-y-5`}
+    >
       <PageHeader
         title="Agenda"
         subtitle={`${agendadas} visitas agendadas`}
@@ -236,6 +260,26 @@ export function CalendarioContent({ initialVisitas }: Props) {
           />
         }
       />
+
+      {loadError && (
+        <SectionCard className="p-4 border border-red-200/70 dark:border-red-800/70">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-red-700 dark:text-red-300">{loadError}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="rounded-xl bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition-colors"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        </SectionCard>
+      )}
+
+      {(isReferenceLoading || isAgendaTasksLoading) && (
+        <SectionCard className="p-4">
+          <p className="text-sm text-gray-500">Carregando dados da agenda...</p>
+        </SectionCard>
+      )}
 
       {featureFlags.architectAgenda && agendaTasks.length > 0 && (
         <SectionCard className="p-4">

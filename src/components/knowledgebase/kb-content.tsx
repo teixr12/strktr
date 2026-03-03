@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useConfirm } from '@/hooks/use-confirm'
 import { useCrudMutations } from '@/hooks/use-crud-mutations'
+import { toast } from '@/hooks/use-toast'
+import { apiRequest } from '@/lib/api/client'
 import { featureFlags } from '@/lib/feature-flags'
 import { fmt } from '@/lib/utils'
 import { z } from 'zod'
@@ -61,6 +63,8 @@ export function KnowledgebaseContent({ initialItems }: Props) {
   const [editItem, setEditItem] = useState<KnowledgebaseItem | null>(null)
   const [busca, setBusca] = useState('')
   const [filtroCategoria, setFiltroCategoria] = useState<string>('Todos')
+  const [isLoadingItems, setIsLoadingItems] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   const { createMutation, updateMutation, deleteMutation } = useCrudMutations<KnowledgebaseItem>({
     setItems,
@@ -91,6 +95,23 @@ export function KnowledgebaseContent({ initialItems }: Props) {
       return matchBusca && matchCategoria
     })
   }, [items, busca, filtroCategoria])
+
+  useEffect(() => {
+    async function refreshItems() {
+      setIsLoadingItems(true)
+      setLoadError(null)
+      try {
+        const refreshed = await apiRequest<KnowledgebaseItem[]>('/api/v1/knowledgebase?ativo=true&limit=250')
+        setItems(refreshed)
+      } catch {
+        setLoadError('Falha ao carregar base de conhecimento. Tentar novamente.')
+        toast('Falha ao carregar base de conhecimento. Tentar novamente.', 'error')
+      } finally {
+        setIsLoadingItems(false)
+      }
+    }
+    void refreshItems()
+  }, [])
 
   function openNew() {
     reset(FORM_DEFAULTS)
@@ -146,7 +167,15 @@ export function KnowledgebaseContent({ initialItems }: Props) {
   const isSaving = createMutation.isMutating || updateMutation.isMutating
 
   return (
-    <div className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} space-y-5`}>
+    <div
+      aria-busy={
+        isLoadingItems ||
+        createMutation.isMutating ||
+        updateMutation.isMutating ||
+        deleteMutation.isMutating
+      }
+      className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} space-y-5`}
+    >
       <PageHeader
         title="Base de Conhecimento"
         subtitle={`${items.length} itens · SOPs, materiais e referencias`}
@@ -161,6 +190,26 @@ export function KnowledgebaseContent({ initialItems }: Props) {
           />
         }
       />
+
+      {loadError && (
+        <SectionCard className="p-4 border border-red-200/70 dark:border-red-800/70">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-red-700 dark:text-red-300">{loadError}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="rounded-xl bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition-colors"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        </SectionCard>
+      )}
+
+      {isLoadingItems && (
+        <SectionCard className="p-4">
+          <p className="text-sm text-gray-500">Carregando base de conhecimento...</p>
+        </SectionCard>
+      )}
 
       {/* Search + Filters */}
       <SectionCard className="space-y-3 p-4">

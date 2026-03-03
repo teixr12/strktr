@@ -1,11 +1,13 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import Image from 'next/image'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useConfirm } from '@/hooks/use-confirm'
 import { useCrudMutations } from '@/hooks/use-crud-mutations'
+import { toast } from '@/hooks/use-toast'
+import { apiRequest } from '@/lib/api/client'
 import { featureFlags } from '@/lib/feature-flags'
 import { fmt } from '@/lib/utils'
 import { MEMBRO_STATUS_COLORS } from '@/lib/constants'
@@ -24,6 +26,8 @@ export function EquipeContent({ initialMembros }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [editMembro, setEditMembro] = useState<Membro | null>(null)
   const [busca, setBusca] = useState('')
+  const [isLoadingMembros, setIsLoadingMembros] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   const { createMutation, updateMutation, deleteMutation } = useCrudMutations<Membro>({
     setItems: setMembros,
@@ -60,6 +64,23 @@ export function EquipeContent({ initialMembros }: Props) {
     const q = busca.toLowerCase()
     return membros.filter((m) => m.nome.toLowerCase().includes(q) || m.cargo.toLowerCase().includes(q))
   }, [membros, busca])
+
+  useEffect(() => {
+    async function refreshMembros() {
+      setIsLoadingMembros(true)
+      setLoadError(null)
+      try {
+        const refreshed = await apiRequest<Membro[]>('/api/v1/equipe?limit=120')
+        setMembros(refreshed)
+      } catch {
+        setLoadError('Falha ao carregar equipe. Tentar novamente.')
+        toast('Falha ao carregar equipe. Tentar novamente.', 'error')
+      } finally {
+        setIsLoadingMembros(false)
+      }
+    }
+    void refreshMembros()
+  }, [])
 
   function openNew() {
     reset({
@@ -129,7 +150,15 @@ export function EquipeContent({ initialMembros }: Props) {
   }
 
   return (
-    <div className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} space-y-5`}>
+    <div
+      aria-busy={
+        isLoadingMembros ||
+        createMutation.isMutating ||
+        updateMutation.isMutating ||
+        deleteMutation.isMutating
+      }
+      className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} space-y-5`}
+    >
       <PageHeader
         title="Equipe"
         subtitle={`${membros.length} membros · ${ativos} ativos`}
@@ -144,6 +173,26 @@ export function EquipeContent({ initialMembros }: Props) {
           />
         }
       />
+
+      {loadError && (
+        <SectionCard className="p-4 border border-red-200/70 dark:border-red-800/70">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-red-700 dark:text-red-300">{loadError}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="rounded-xl bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition-colors"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        </SectionCard>
+      )}
+
+      {isLoadingMembros && (
+        <SectionCard className="p-4">
+          <p className="text-sm text-gray-500">Carregando equipe...</p>
+        </SectionCard>
+      )}
 
       {/* Search */}
       <SectionCard className="p-4">

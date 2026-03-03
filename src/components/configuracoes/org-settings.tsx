@@ -41,6 +41,8 @@ export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembr
   const [membros, setMembros] = useState(initialMembros)
   const [showCreateOrg, setShowCreateOrg] = useState(false)
   const [showInvite, setShowInvite] = useState(false)
+  const [isBusy, setIsBusy] = useState(false)
+  const [lastError, setLastError] = useState<string | null>(null)
 
   const { register: registerOrg, handleSubmit: handleOrgSubmit, formState: { errors: orgErrors } } = useForm<OrgFormValues>({
     resolver: zodResolver(orgFormSchema) as never,
@@ -57,6 +59,8 @@ export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembr
   const isManagerOrAbove = canAccess(userRole, 'manager')
 
   async function onOrgSubmit(values: OrgFormValues) {
+    setIsBusy(true)
+    setLastError(null)
     try {
       const created = await apiRequest<{ organizacao: Organizacao; membership: OrgMembro }>(
         '/api/v1/config/org',
@@ -68,12 +72,18 @@ export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembr
       toast('Organização criada!', 'success')
       window.location.reload()
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Erro ao criar organização', 'error')
+      const message = err instanceof Error ? `${err.message}. Tentar novamente.` : 'Erro ao criar organização. Tentar novamente.'
+      setLastError(message)
+      toast(message, 'error')
+    } finally {
+      setIsBusy(false)
     }
   }
 
   async function onInviteSubmit(values: InviteFormValues) {
     if (!org) return
+    setIsBusy(true)
+    setLastError(null)
     try {
       const member = await apiRequest<OrgMembro>('/api/v1/config/org-members', {
         method: 'POST',
@@ -87,11 +97,17 @@ export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembr
       setShowInvite(false)
       resetInvite()
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Erro ao adicionar membro', 'error')
+      const message = err instanceof Error ? `${err.message}. Tentar novamente.` : 'Erro ao adicionar membro. Tentar novamente.'
+      setLastError(message)
+      toast(message, 'error')
+    } finally {
+      setIsBusy(false)
     }
   }
 
   async function updateMemberRole(membroId: string, newRole: UserRole) {
+    setIsBusy(true)
+    setLastError(null)
     try {
       const updated = await apiRequest<OrgMembro>(`/api/v1/config/org-members/${membroId}/role`, {
         method: 'PATCH',
@@ -100,7 +116,11 @@ export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembr
       setMembros((prev) => prev.map((m) => m.id === membroId ? updated : m))
       toast('Role atualizado!', 'success')
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Erro ao atualizar papel', 'error')
+      const message = err instanceof Error ? `${err.message}. Tentar novamente.` : 'Erro ao atualizar papel. Tentar novamente.'
+      setLastError(message)
+      toast(message, 'error')
+    } finally {
+      setIsBusy(false)
     }
   }
 
@@ -108,17 +128,25 @@ export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembr
     if (membroUserId === userId) { toast('Você não pode se remover da organização', 'error'); return }
     const ok = await confirm({ title: 'Remover membro?', description: 'O membro será removido da organização.', confirmLabel: 'Remover', variant: 'danger' })
     if (!ok) return
+    setIsBusy(true)
+    setLastError(null)
     try {
       await apiRequest<{ success: boolean }>(`/api/v1/config/org-members/${membroId}`, { method: 'DELETE' })
       setMembros((prev) => prev.filter((m) => m.id !== membroId))
       toast('Membro removido', 'info')
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Erro ao remover membro', 'error')
+      const message = err instanceof Error ? `${err.message}. Tentar novamente.` : 'Erro ao remover membro. Tentar novamente.'
+      setLastError(message)
+      toast(message, 'error')
+    } finally {
+      setIsBusy(false)
     }
   }
 
   async function updateOrgName(nome: string) {
     if (!org || !nome.trim()) return
+    setIsBusy(true)
+    setLastError(null)
     try {
       const updated = await apiRequest<Organizacao>('/api/v1/config/org', {
         method: 'PATCH',
@@ -127,15 +155,33 @@ export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembr
       setOrg(updated)
       toast('Nome atualizado!', 'success')
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Erro ao atualizar organização', 'error')
+      const message = err instanceof Error ? `${err.message}. Tentar novamente.` : 'Erro ao atualizar organização. Tentar novamente.'
+      setLastError(message)
+      toast(message, 'error')
+    } finally {
+      setIsBusy(false)
     }
   }
 
   // No organization — show create or solo mode
   if (!org) {
     return (
-      <div className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} space-y-6`}>
+      <div aria-busy={isBusy} className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} space-y-6`}>
         <PageHeader title="Configurações" subtitle="Gerencie sua organização e equipe" />
+
+        {lastError && (
+          <SectionCard className="mx-auto max-w-lg p-4 border border-red-200/70 dark:border-red-800/70">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-red-700 dark:text-red-300">{lastError}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="rounded-xl bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition-colors"
+              >
+                Tentar novamente
+              </button>
+            </div>
+          </SectionCard>
+        )}
 
         <SectionCard className="mx-auto max-w-lg p-8 text-center">
           <Building2 className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
@@ -179,7 +225,7 @@ export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembr
 
   // Has organization — show settings
   return (
-    <div className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} space-y-6`}>
+    <div aria-busy={isBusy} className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} space-y-6`}>
       <PageHeader
         title="Configurações"
         subtitle="Gerencie sua organização e equipe"
@@ -196,6 +242,20 @@ export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembr
           ) : undefined
         }
       />
+
+      {lastError && (
+        <SectionCard className="p-4 border border-red-200/70 dark:border-red-800/70">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-red-700 dark:text-red-300">{lastError}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="rounded-xl bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition-colors"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        </SectionCard>
+      )}
 
       {/* Org Info */}
       <div className="glass-card rounded-2xl p-5">
