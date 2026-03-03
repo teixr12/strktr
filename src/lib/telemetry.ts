@@ -16,11 +16,21 @@ interface ProductEventInput {
 
 const POSTHOG_DEFAULT_HOST = 'https://app.posthog.com'
 
+function resolvePosthogCaptureKey() {
+  return (
+    process.env.NEXT_PUBLIC_POSTHOG_KEY ||
+    process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN ||
+    process.env.POSTHOG_PROJECT_TOKEN ||
+    process.env.POSTHOG_PROJECT_API_KEY ||
+    null
+  )
+}
+
 async function mirrorToPosthog(input: ProductEventInput) {
   const externalEnabled =
     process.env.NEXT_PUBLIC_FF_ANALYTICS_EXTERNAL_V1 === 'true' ||
     process.env.FF_ANALYTICS_EXTERNAL_V1 === 'true'
-  const key = process.env.NEXT_PUBLIC_POSTHOG_KEY || process.env.POSTHOG_API_KEY
+  const key = resolvePosthogCaptureKey()
   const host =
     process.env.NEXT_PUBLIC_POSTHOG_HOST ||
     process.env.POSTHOG_HOST ||

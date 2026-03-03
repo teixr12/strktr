@@ -28,6 +28,14 @@ type SessionContext = {
 const INTERNAL_ANALYTICS_URL = '/api/v1/analytics/events'
 const POSTHOG_DEFAULT_HOST = 'https://app.posthog.com'
 
+function resolvePosthogCaptureKey() {
+  return (
+    process.env.NEXT_PUBLIC_POSTHOG_KEY ||
+    process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN ||
+    null
+  )
+}
+
 let cachedAnonymousId: string | null = null
 
 // Cache session context to avoid redundant Supabase calls per analytics event
@@ -58,7 +66,7 @@ function analyticsEnabled() {
 function externalAnalyticsEnabled() {
   return (
     featureFlags.analyticsExternalV1 &&
-    Boolean(process.env.NEXT_PUBLIC_POSTHOG_KEY) &&
+    Boolean(resolvePosthogCaptureKey()) &&
     Boolean(process.env.NEXT_PUBLIC_POSTHOG_HOST || POSTHOG_DEFAULT_HOST)
   )
 }
@@ -117,7 +125,7 @@ async function sendPosthogCapture(
   payload: AnalyticsProps,
   session: SessionContext
 ) {
-  const key = process.env.NEXT_PUBLIC_POSTHOG_KEY
+  const key = resolvePosthogCaptureKey()
   const host = process.env.NEXT_PUBLIC_POSTHOG_HOST || POSTHOG_DEFAULT_HOST
   if (!key || !host) return
 
@@ -140,7 +148,7 @@ async function sendPosthogCapture(
 }
 
 async function sendPosthogIdentify(identity: AnalyticsIdentity) {
-  const key = process.env.NEXT_PUBLIC_POSTHOG_KEY
+  const key = resolvePosthogCaptureKey()
   const host = process.env.NEXT_PUBLIC_POSTHOG_HOST || POSTHOG_DEFAULT_HOST
   if (!key || !host) return
 
