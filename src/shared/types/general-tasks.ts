@@ -17,6 +17,13 @@ export interface GeneralTask {
   updated_at: string
 }
 
+export interface GeneralTaskAssignee {
+  user_id: string
+  nome: string
+  email: string | null
+  role: string
+}
+
 export interface GeneralTaskListPayload {
   items: GeneralTask[]
 }
