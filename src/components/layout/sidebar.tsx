@@ -22,6 +22,7 @@ import {
   BookOpen,
   Bell,
   ListTodo,
+  ClipboardList,
 } from 'lucide-react'
 import type { Profile } from '@/types/database'
 import { featureFlags } from '@/lib/feature-flags'
@@ -46,6 +47,7 @@ const icons = {
   BookOpen,
   Bell,
   ListTodo,
+  ClipboardList,
 } as const
 
 const NAV_ITEMS = [
@@ -61,6 +63,7 @@ const NAV_ITEMS = [
   { id: 'knowledgebase', label: 'Base de Conhecimento', icon: 'BookOpen' as const, href: '/knowledgebase' },
   { id: 'notificacoes', label: 'Notificações', icon: 'Bell' as const, href: '/notificacoes' },
   { id: 'tarefas', label: 'Tarefas Gerais', icon: 'ListTodo' as const, href: '/tarefas' },
+  { id: 'sops', label: 'SOP Builder', icon: 'ClipboardList' as const, href: '/sops' },
   { id: 'configuracoes', label: 'Configurações', icon: 'Building2' as const, href: '/configuracoes' },
 ]
 
@@ -145,10 +148,13 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
     }
   }
 
+  const visibleNavItems = NAV_ITEMS.filter((item) => {
+    if (item.id === 'tarefas') return featureFlags.generalTasksV1
+    if (item.id === 'sops') return featureFlags.sopBuilderV1
+    return true
+  })
+
   if (!featureFlags.uiTailadminV1) {
-    const visibleNavItems = featureFlags.generalTasksV1
-      ? NAV_ITEMS
-      : NAV_ITEMS.filter((item) => item.id !== 'tarefas')
     return (
       <>
         {mobileOpen && <div className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm" onClick={onClose} />}
@@ -190,10 +196,6 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
       </>
     )
   }
-
-  const visibleNavItems = featureFlags.generalTasksV1
-    ? NAV_ITEMS
-    : NAV_ITEMS.filter((item) => item.id !== 'tarefas')
 
   return (
     <>
