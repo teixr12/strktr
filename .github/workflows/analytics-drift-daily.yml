@@ -18,12 +18,14 @@ jobs:
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
           POSTHOG_PROJECT_ID: ${{ secrets.POSTHOG_PROJECT_ID }}
           POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          POSTHOG_PROJECT_TOKEN: ${{ secrets.POSTHOG_PROJECT_TOKEN }}
         run: |
           set -euo pipefail
           test -n "$SUPABASE_ACCESS_TOKEN"
           test -n "$SUPABASE_PROJECT_REF"
           test -n "$POSTHOG_PROJECT_ID"
           test -n "$POSTHOG_API_KEY"
+          test -n "$POSTHOG_PROJECT_TOKEN"
 
       - name: Prepare credentials files
         env:
@@ -31,6 +33,7 @@ jobs:
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
           POSTHOG_PROJECT_ID: ${{ secrets.POSTHOG_PROJECT_ID }}
           POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          POSTHOG_PROJECT_TOKEN: ${{ secrets.POSTHOG_PROJECT_TOKEN }}
           POSTHOG_HOST: ${{ secrets.POSTHOG_HOST }}
         run: |
           set -euo pipefail
@@ -42,6 +45,7 @@ jobs:
           cat > posthog-credentials.txt <<EOF
           POSTHOG_PROJECT_ID=${POSTHOG_PROJECT_ID}
           POSTHOG_API_KEY=${POSTHOG_API_KEY}
+          POSTHOG_PROJECT_TOKEN=${POSTHOG_PROJECT_TOKEN}
           EOF
 
           if [[ -n "${POSTHOG_HOST}" ]]; then
@@ -49,14 +53,19 @@ jobs:
             echo "POSTHOG_HOST=${POSTHOG_HOST}" >> "$GITHUB_ENV"
           fi
 
+      - name: Run analytics capture probe
+        run: PROBE_STRICT=1 ./scripts/audit-analytics-capture-probe.sh
+
       - name: Run analytics drift audit
         run: ./scripts/audit-analytics-drift.sh
 
       - name: Upload report artifact
         uses: actions/upload-artifact@v4
         with:
-          name: analytics-drift-report
-          path: docs/reports/analytics-drift-*.md
+          name: analytics-ops-report
+          path: |
+            docs/reports/analytics-drift-*.md
+            docs/reports/analytics-capture-probe-*.md
           if-no-files-found: error
 
       - name: Cleanup temporary credentials

@@ -14,6 +14,7 @@ Ativar analytics externo (PostHog) sem interromper o tracking interno já existe
   - `SUPABASE_PROJECT_REF`
   - `POSTHOG_PROJECT_ID`
   - `POSTHOG_API_KEY`
+  - `POSTHOG_PROJECT_TOKEN`
   - `POSTHOG_HOST` (opcional)
 - Flag externa iniciando em `false`:
   - `NEXT_PUBLIC_FF_ANALYTICS_EXTERNAL_V1=false`
@@ -43,6 +44,15 @@ Se token de ingestão (`NEXT_PUBLIC_POSTHOG_KEY` ou `POSTHOG_PROJECT_TOKEN`) ou 
      - `npm run audit:analytics-drift`
    - validar relatório em `docs/reports/analytics-drift-*.md`.
 6. Se estável, liberar geral.
+
+## Guardrail de ingestão externa (imediato)
+
+- Execução local opcional:
+  - `npm run audit:analytics-capture-probe`
+- Esse probe envia um evento técnico `ops_capture_probe` para o PostHog e confirma
+  leitura por query em janela de 30 minutos.
+- Em CI diário (`analytics-drift-daily.yml`), o probe roda em modo estrito:
+  - falha se ingestão externa estiver indisponível ou token inválido.
 
 ## Automação diária de drift
 - Workflow: `.github/workflows/analytics-drift-daily.yml`
