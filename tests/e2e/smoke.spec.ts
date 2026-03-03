@@ -24,7 +24,7 @@ test('api protegida retorna envelope de erro sem token', async ({ request }) => 
 })
 
 test('novos endpoints protegidos retornam envelope canônico sem token', async ({ request }) => {
-  const checks: Array<{ endpoint: string; method: 'GET' | 'POST' | 'PATCH' }> = [
+  const checks: Array<{ endpoint: string; method: 'GET' | 'POST' | 'PATCH' | 'DELETE' }> = [
     { endpoint: '/api/v1/alerts/today', method: 'GET' },
     { endpoint: '/api/v1/transacoes', method: 'GET' },
     { endpoint: '/api/v1/compras', method: 'GET' },
@@ -55,12 +55,21 @@ test('novos endpoints protegidos retornam envelope canônico sem token', async (
     { endpoint: '/api/v1/general-tasks', method: 'POST' },
     { endpoint: '/api/v1/general-tasks/00000000-0000-0000-0000-000000000000', method: 'PATCH' },
     { endpoint: '/api/v1/general-tasks/00000000-0000-0000-0000-000000000000/assign', method: 'POST' },
+    { endpoint: '/api/v1/sops', method: 'GET' },
+    { endpoint: '/api/v1/sops', method: 'POST' },
+    { endpoint: '/api/v1/sops/00000000-0000-0000-0000-000000000000', method: 'PATCH' },
+    { endpoint: '/api/v1/sops/00000000-0000-0000-0000-000000000000', method: 'DELETE' },
+    { endpoint: '/api/v1/sops/00000000-0000-0000-0000-000000000000/export/pdf', method: 'POST' },
+    { endpoint: '/api/v1/sops/00000000-0000-0000-0000-000000000000/share/whatsapp', method: 'POST' },
+    { endpoint: '/api/v1/sops/00000000-0000-0000-0000-000000000000/send-email', method: 'POST' },
   ]
 
   for (const { endpoint, method } of checks) {
     const response =
       method === 'GET'
         ? await request.get(endpoint)
+        : method === 'DELETE'
+          ? await request.delete(endpoint, { data: {} })
         : method === 'PATCH'
           ? await request.patch(endpoint, { data: {} })
           : await request.post(endpoint, { data: {} })
