@@ -359,10 +359,10 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
       {/* List */}
       {filtered.length === 0 ? (
         <EmptyStateAction
-          icon={<FileText className="h-6 w-6 text-sand-600 dark:text-sand-300" />}
-          title="Nenhum orçamento encontrado"
-          description="Adicione itens e gere propostas padronizadas para acelerar aprovação do cliente."
-          actionLabel="Novo orçamento"
+          icon={<FileText className="h-5 w-5 text-sand-600" />}
+          title={orcamentos.length === 0 ? 'Nenhum orçamento criado' : 'Nenhum orçamento encontrado'}
+          description={orcamentos.length === 0 ? 'Crie orçamentos detalhados com itens e envie propostas aos clientes.' : 'Adicione itens e gere propostas padronizadas para acelerar aprovação do cliente.'}
+          actionLabel="Novo Orçamento"
           onAction={openNew}
         />
       ) : (

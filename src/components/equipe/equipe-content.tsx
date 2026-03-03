@@ -11,7 +11,7 @@ import { fmt } from '@/lib/utils'
 import { MEMBRO_STATUS_COLORS } from '@/lib/constants'
 import { createMembroSchema, type CreateMembroDTO } from '@/shared/schemas/business'
 import { FormField, FormInput, FormSelect } from '@/components/ui/form-field'
-import { Plus, X, Trash2, Edit2, Search, Star, Phone, Mail } from 'lucide-react'
+import { Plus, X, Trash2, Edit2, Search, Star, Phone, Mail, Users } from 'lucide-react'
 import { EmptyStateAction, PageHeader, QuickActionBar, SectionCard } from '@/components/ui/enterprise'
 import type { Membro } from '@/types/database'
 
@@ -156,10 +156,10 @@ export function EquipeContent({ initialMembros }: Props) {
       {/* Grid */}
       {filtered.length === 0 ? (
         <EmptyStateAction
-          icon={<Search className="h-6 w-6 text-sand-600 dark:text-sand-300" />}
-          title="Nenhum membro encontrado"
-          description="Monte o time da obra para distribuir tarefas e acompanhar produtividade."
-          actionLabel="Adicionar membro"
+          icon={<Users className="h-5 w-5 text-sand-600" />}
+          title={membros.length === 0 ? 'Nenhum membro na equipe' : 'Nenhum membro encontrado'}
+          description={membros.length === 0 ? 'Adicione membros para definir permissões e acompanhar produtividade.' : 'Monte o time da obra para distribuir tarefas e acompanhar produtividade.'}
+          actionLabel="Adicionar Membro"
           onAction={openNew}
         />
       ) : (

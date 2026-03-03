@@ -267,10 +267,10 @@ export function ComprasContent({ initialCompras, obras }: Props) {
       {/* List */}
       {filtered.length === 0 ? (
         <EmptyStateAction
-          icon={<ShoppingCart className="h-6 w-6 text-sand-600 dark:text-sand-300" />}
-          title="Nenhuma compra encontrada"
-          description="Crie compras para controlar materiais, aprovacoes do cliente e urgencias."
-          actionLabel="Nova compra"
+          icon={<ShoppingCart className="h-5 w-5 text-sand-600" />}
+          title={compras.length === 0 ? 'Nenhuma compra registrada' : 'Nenhuma compra encontrada'}
+          description={compras.length === 0 ? 'Registre compras para controlar custos por obra e aprovar pedidos.' : 'Crie compras para controlar materiais, aprovacoes do cliente e urgencias.'}
+          actionLabel="Nova Compra"
           onAction={() => openForm()}
         />
       ) : (

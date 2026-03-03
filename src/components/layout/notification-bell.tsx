@@ -83,7 +83,9 @@ export function NotificationBell() {
       <button
         onClick={() => setOpen(!open)}
         className="relative p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-500"
-        title="Notificações"
+        aria-label={unread > 0 ? `Notificações (${unread} não lidas)` : 'Notificações'}
+        aria-expanded={open}
+        aria-haspopup="true"
       >
         <Bell className="w-5 h-5" />
         {unread > 0 && (
@@ -94,7 +96,7 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-12 w-80 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-2xl z-50 overflow-hidden">
+        <div role="menu" className="absolute right-0 top-12 w-80 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-2xl z-50 overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Notificações</h3>
@@ -176,6 +178,17 @@ export function NotificationBell() {
                 )
               })
             )}
+          </div>
+
+          {/* Ver todas link */}
+          <div className="border-t border-gray-100 dark:border-gray-800 px-4 py-2.5">
+            <a
+              href="/notificacoes"
+              className="block text-center text-xs font-semibold text-sand-600 hover:text-sand-700 dark:text-sand-400 dark:hover:text-sand-300"
+              onClick={() => setOpen(false)}
+            >
+              Ver todas as notificações
+            </a>
           </div>
         </div>
       )}

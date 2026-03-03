@@ -14,8 +14,9 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url)
-  const limit = Math.min(parseInt(searchParams.get('limit') || '20', 10), 100)
+  const limit = Math.min(parseInt(searchParams.get('limit') || '20', 10), 200)
   const unreadOnly = searchParams.get('unread') === 'true'
+  const tipo = searchParams.get('tipo')
 
   let query = supabase
     .from('notificacoes')
@@ -24,6 +25,7 @@ export async function GET(request: Request) {
     .order('created_at', { ascending: false })
     .limit(limit)
   if (unreadOnly) query = query.eq('lida', false)
+  if (tipo) query = query.eq('tipo', tipo)
 
   const { data, error: dbError } = await query
   if (dbError) {

@@ -19,6 +19,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/calendario': 'Agenda',
   '/perfil': 'Meu Perfil',
   '/knowledgebase': 'Base de Conhecimento',
+  '/notificacoes': 'Notificações',
   '/configuracoes': 'Configurações',
 }
 
@@ -41,6 +42,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
         <div className="flex items-center gap-3">
           <button
             onClick={onMenuToggle}
+            aria-label="Alternar menu"
             className="md:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
           >
             <Menu className="w-5 h-5" />
@@ -53,6 +55,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
           <NotificationBell />
           <button
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            aria-label="Alternar tema"
             className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-500"
           >
             <Sun className="w-5 h-5 hidden dark:block" />
@@ -68,6 +71,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
       <div className="flex items-center gap-3">
         <button
           onClick={onMenuToggle}
+          aria-label="Alternar menu"
           className="md:hidden rounded-xl border border-gray-200 p-2 text-gray-500 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
         >
           <Menu className="w-5 h-5" />
@@ -84,6 +88,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
       <div className="flex items-center gap-2">
         <button
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          aria-label="Alternar tema"
           className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
         >
           <Sun className="w-4 h-4 hidden dark:block" />

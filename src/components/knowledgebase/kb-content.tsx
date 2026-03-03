@@ -180,10 +180,10 @@ export function KnowledgebaseContent({ initialItems }: Props) {
       {/* List */}
       {filtered.length === 0 ? (
         <EmptyStateAction
-          icon={<BookOpen className="h-6 w-6 text-sand-600 dark:text-sand-300" />}
-          title="Nenhum item encontrado"
-          description="Documente padroes de obra, referencias de preco e procedimentos para reduzir retrabalho."
-          actionLabel="Novo item"
+          icon={<BookOpen className="h-5 w-5 text-sand-600" />}
+          title={items.length === 0 ? 'Base vazia' : 'Nenhum item encontrado'}
+          description={items.length === 0 ? 'Adicione artigos, procedimentos e documentos para centralizar conhecimento.' : 'Documente padroes de obra, referencias de preco e procedimentos para reduzir retrabalho.'}
+          actionLabel="Novo Artigo"
           onAction={openNew}
         />
       ) : (

@@ -28,10 +28,23 @@ export async function GET(request: Request) {
   }
 
   try {
-    // ---------- Parallel queries ----------
-    const sixMonthsAgo = new Date()
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
-    const sixMonthsAgoStr = sixMonthsAgo.toISOString().slice(0, 10)
+    // ---------- Date range from query param ----------
+    const url = new URL(request.url)
+    const range = url.searchParams.get('range') || '6m'
+    const now = new Date()
+    const startDate = new Date()
+    switch (range) {
+      case '30d': startDate.setDate(now.getDate() - 30); break
+      case '90d': startDate.setDate(now.getDate() - 90); break
+      case '12m': startDate.setMonth(now.getMonth() - 12); break
+      case 'ytd': startDate.setMonth(0); startDate.setDate(1); break
+      default: startDate.setMonth(now.getMonth() - 6); break // '6m'
+    }
+    const startDateStr = startDate.toISOString().slice(0, 10)
+
+    // Compute months count for chart buckets
+    const monthsDiff = (now.getFullYear() - startDate.getFullYear()) * 12 + (now.getMonth() - startDate.getMonth()) + 1
+    const bucketCount = Math.max(2, Math.min(monthsDiff, 12))
 
     const [
       obrasAtivasRes,
@@ -44,6 +57,10 @@ export async function GET(request: Request) {
       proximasVisitasRes,
       obrasCountRes,
       leadsCountRes,
+      obrasTrendRes,
+      leadsTrendRes,
+      membrosCountRes,
+      transacoesTotalRes,
     ] = await Promise.all([
       // KPI: obras ativas count
       supabase
@@ -66,12 +83,12 @@ export async function GET(request: Request) {
         .eq('org_id', orgId)
         .in('status', ['Pendente Aprovação Cliente', 'Revisão Cliente']),
 
-      // Finance chart: lightweight transacoes for last 6 months
+      // Finance chart: lightweight transacoes for selected range
       supabase
         .from('transacoes')
         .select('tipo, valor, data')
         .eq('org_id', orgId)
-        .gte('data', sixMonthsAgoStr)
+        .gte('data', startDateStr)
         .order('data', { ascending: true }),
 
       // Pipeline: all leads with status + valor_potencial
@@ -117,6 +134,32 @@ export async function GET(request: Request) {
         .from('leads')
         .select('id', { count: 'exact', head: true })
         .eq('org_id', orgId),
+
+      // Trends: obras created_at for sparklines
+      supabase
+        .from('obras')
+        .select('created_at')
+        .eq('org_id', orgId)
+        .gte('created_at', startDateStr),
+
+      // Trends: leads created_at for sparklines
+      supabase
+        .from('leads')
+        .select('created_at')
+        .eq('org_id', orgId)
+        .gte('created_at', startDateStr),
+
+      // Onboarding: membros count
+      supabase
+        .from('membros')
+        .select('id', { count: 'exact', head: true })
+        .eq('org_id', orgId),
+
+      // Onboarding: transacoes total count
+      supabase
+        .from('transacoes')
+        .select('id', { count: 'exact', head: true })
+        .eq('org_id', orgId),
     ])
 
     // ---------- Compute KPIs ----------
@@ -140,10 +183,9 @@ export async function GET(request: Request) {
     }
     const saldo = receitas - despesas
 
-    // ---------- Compute finance chart (6-month buckets) ----------
-    const now = new Date()
+    // ---------- Compute finance chart (dynamic buckets) ----------
     const months: { key: string; label: string; rec: number; dep: number }[] = []
-    for (let i = 5; i >= 0; i--) {
+    for (let i = bucketCount - 1; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
       const label = d.toLocaleDateString('pt-BR', { month: 'short' })
@@ -178,9 +220,29 @@ export async function GET(request: Request) {
       }
     })
 
+    // ---------- Trends (monthly sparkline data) ----------
+    function groupByMonth(items: Array<{ created_at: string }>) {
+      const counts = new Array(months.length).fill(0)
+      for (const item of items) {
+        const key = item.created_at.slice(0, 7)
+        const idx = months.findIndex((m) => m.key === key)
+        if (idx >= 0) counts[idx]++
+      }
+      return counts
+    }
+
+    const trends = {
+      obrasAtivas: groupByMonth(obrasTrendRes.data ?? []),
+      leadsAtivos: groupByMonth(leadsTrendRes.data ?? []),
+      receitas: financeChart.receitas,
+      despesas: financeChart.despesas,
+    }
+
     // ---------- Onboarding flag ----------
     const totalObras = obrasCountRes.count ?? 0
     const totalLeads = leadsCountRes.count ?? 0
+    const membrosCount = membrosCountRes.count ?? 0
+    const transacoesTotal = transacoesTotalRes.count ?? 0
     const showOnboarding = totalObras === 0 || totalLeads === 0
 
     // ---------- Response ----------
@@ -201,6 +263,9 @@ export async function GET(request: Request) {
       topObras: topObrasRes.data ?? [],
       proximasVisitas: proximasVisitasRes.data ?? [],
       showOnboarding,
+      trends,
+      membrosCount,
+      transacoesTotal,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Erro ao calcular resumo do dashboard'
