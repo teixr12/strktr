@@ -52,7 +52,7 @@ if [[ -n "$POSTHOG_PROJECT_ID" && -n "$POSTHOG_API_KEY" && -n "$CAPTURE_KEY" ]];
       -H "Content-Type: application/json" \
       --data "$query_payload" > "$TMP_DIR/query.json"
 
-    jq -r '.results[0][0] // 0' "$TMP_DIR/query.json"
+    jq -r '.results[0][0] // 0' "$TMP_DIR/query.json" 2>/dev/null || echo "0"
   }
 
   for attempt in 1 2 3 4 5 6 7 8; do
@@ -65,7 +65,7 @@ if [[ -n "$POSTHOG_PROJECT_ID" && -n "$POSTHOG_API_KEY" && -n "$CAPTURE_KEY" ]];
 
   CAPTURE_STATUS="$(jq -r '.status // empty' "$TMP_DIR/capture.json")"
 
-  if [[ "$CAPTURE_STATUS" == "Ok" && "$PROBE_COUNT" != "0" ]]; then
+  if [[ "$CAPTURE_STATUS" == "Ok" ]] && [[ "$PROBE_COUNT" =~ ^[0-9]+$ ]] && (( PROBE_COUNT > 0 )); then
     PROBE_STATUS="pass"
     PROBE_MESSAGE="evento de probe capturado no PostHog"
   else
