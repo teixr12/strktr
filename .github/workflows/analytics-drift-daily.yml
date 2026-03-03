@@ -53,6 +53,9 @@ jobs:
             echo "POSTHOG_HOST=${POSTHOG_HOST}" >> "$GITHUB_ENV"
           fi
 
+      - name: Clean previous reports
+        run: rm -f docs/reports/analytics-drift-*.md docs/reports/analytics-capture-probe-*.md
+
       - name: Run analytics capture probe
         run: PROBE_STRICT=1 ./scripts/audit-analytics-capture-probe.sh
 
