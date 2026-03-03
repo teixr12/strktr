@@ -13,7 +13,6 @@ import { KANBAN_COLUMNS, TIPO_VISITA_COLORS } from '@/lib/constants'
 import type { RoadmapAction } from '@/shared/types/roadmap-automation'
 import {
   AlertBanner,
-  EmptyStateAction,
   KpiCard,
   PageHeader,
   QuickActionBar,
@@ -21,6 +20,8 @@ import {
   StatBadge,
 } from '@/components/ui/enterprise'
 import { HardHat, Banknote, Crown, TrendingUp, ArrowRight, Wrench, Flame, CheckCircle2 } from 'lucide-react'
+import { PipelineFunnel } from './pipeline-funnel'
+import { OnboardingChecklist } from './onboarding-checklist'
 
 const LazyBarChart = dynamic(
   () =>
@@ -44,7 +45,7 @@ type DashboardOrcamento = Pick<Orcamento, 'id' | 'status' | 'valor_total' | 'cre
 type DashboardCompra = Pick<Compra, 'id' | 'status' | 'created_at'>
 type DashboardProjeto = Pick<Projeto, 'id' | 'status' | 'valor_estimado' | 'created_at'>
 
-/** Pre-computed summary from /api/v1/dashboard/summary (Phase 1.2) */
+/** Pre-computed summary from /api/v1/dashboard/summary */
 interface DashboardSummary {
   kpis: {
     obrasAtivas: number
@@ -62,6 +63,14 @@ interface DashboardSummary {
   topObras: Array<Pick<DashboardObra, 'id' | 'nome' | 'cliente' | 'local' | 'status' | 'etapa_atual' | 'progresso' | 'valor_contrato'>>
   proximasVisitas: Array<Pick<DashboardVisita, 'id' | 'titulo' | 'tipo' | 'status' | 'data_hora'>>
   showOnboarding: boolean
+  trends?: {
+    obrasAtivas: number[]
+    leadsAtivos: number[]
+    receitas: number[]
+    despesas: number[]
+  }
+  membrosCount?: number
+  transacoesTotal?: number
 }
 
 interface DashboardContentProps {
@@ -111,8 +120,20 @@ function toneFromSeverity(severity: TodayAlert['severity']) {
   return 'info' as const
 }
 
-export function DashboardContent({ obras, leads, transacoes, visitas, compras, summary }: DashboardContentProps) {
+type DateRange = '30d' | '90d' | '6m' | '12m' | 'ytd'
+const RANGE_OPTIONS: Array<{ value: DateRange; label: string }> = [
+  { value: '30d', label: '30 dias' },
+  { value: '90d', label: '90 dias' },
+  { value: '6m', label: '6 meses' },
+  { value: '12m', label: '12 meses' },
+  { value: 'ytd', label: 'Este ano' },
+]
+
+export function DashboardContent({ obras, leads, transacoes, visitas, compras, summary: initialSummary }: DashboardContentProps) {
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Dashboard
+  const [range, setRange] = useState<DateRange>('6m')
+  const [summary, setSummary] = useState<DashboardSummary | undefined>(initialSummary)
+  const [rangeLoading, setRangeLoading] = useState(false)
   const [todayAlerts, setTodayAlerts] = useState<TodayAlertsPayload | null>(null)
   const [todayAlertsLoading, setTodayAlertsLoading] = useState(true)
   const [todayAlertsError, setTodayAlertsError] = useState<string | null>(null)
@@ -174,6 +195,22 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras, s
   useEffect(() => {
     void loadRoadmap()
   }, [loadRoadmap])
+
+  // Re-fetch summary when date range changes (skip initial '6m' which uses SSR data)
+  useEffect(() => {
+    if (range === '6m' && initialSummary) {
+      setSummary(initialSummary)
+      return
+    }
+    if (!featureFlags.dashboardSsrV2) return
+    let cancelled = false
+    setRangeLoading(true)
+    apiRequest<DashboardSummary>(`/api/v1/dashboard/summary?range=${range}`)
+      .then((data) => { if (!cancelled) setSummary(data) })
+      .catch(() => { /* keep previous data on error */ })
+      .finally(() => { if (!cancelled) setRangeLoading(false) })
+    return () => { cancelled = true }
+  }, [range, initialSummary])
 
   async function completeRoadmapAction(actionId: string) {
     if (!featureFlags.personalRoadmap) return
@@ -369,6 +406,25 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras, s
         />
       ) : null}
 
+      {featureFlags.dashboardSsrV2 && (
+        <div className="flex items-center gap-2 overflow-x-auto">
+          {RANGE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setRange(opt.value)}
+              className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                range === opt.value
+                  ? 'bg-sand-500 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+          {rangeLoading && <span className="text-xs text-gray-400 animate-pulse">Atualizando...</span>}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           icon={<HardHat className="h-5 w-5 text-sand-700 dark:text-sand-300" />}
@@ -380,6 +436,7 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras, s
           accent="sand"
           href="/obras"
           drilldownLabel="Ver obras ativas"
+          sparkline={summary?.trends?.obrasAtivas}
         />
         <KpiCard
           icon={<Banknote className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />}
@@ -391,6 +448,7 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras, s
           accent="emerald"
           href="/financeiro"
           drilldownLabel="Abrir financeiro"
+          sparkline={summary?.trends?.receitas}
         />
         <KpiCard
           icon={<Crown className="h-5 w-5 text-ocean-700 dark:text-ocean-300" />}
@@ -402,6 +460,7 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras, s
           accent="ocean"
           href="/leads"
           drilldownLabel="Abrir pipeline"
+          sparkline={summary?.trends?.leadsAtivos}
         />
         <KpiCard
           icon={<TrendingUp className="h-5 w-5 text-violet-700 dark:text-violet-300" />}
@@ -413,6 +472,7 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras, s
           accent="violet"
           href="/financeiro"
           drilldownLabel="Ver composição"
+          sparkline={summary?.trends?.despesas}
         />
       </div>
 
@@ -455,20 +515,12 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras, s
       </SectionCard>
 
       {showOnboarding ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          <EmptyStateAction
-            title="Primeira obra"
-            description="Crie sua primeira obra para destravar cronograma, checklist e diário operacional."
-            actionLabel="Criar Obra"
-            actionHref="/obras"
-          />
-          <EmptyStateAction
-            title="Primeiro lead"
-            description="Cadastre um lead para ativar SLA comercial e próxima melhor ação."
-            actionLabel="Criar Lead"
-            actionHref="/leads"
-          />
-        </div>
+        <OnboardingChecklist
+          obrasCount={summary ? (summary.kpis.obrasAtivas > 0 ? 1 : 0) : obras.length}
+          leadsCount={summary ? (summary.kpis.leadsAtivos > 0 ? 1 : 0) : leads.length}
+          membrosCount={summary?.membrosCount ?? 1}
+          transacoesCount={summary?.transacoesTotal ?? transacoes.length}
+        />
       ) : null}
 
       {featureFlags.personalRoadmap ? (
@@ -602,27 +654,14 @@ export function DashboardContent({ obras, leads, transacoes, visitas, compras, s
           )}
         </SectionCard>
 
-        <SectionCard title="Pipeline Q4 2026" subtitle="Etapas comerciais" className="p-5">
-          <div className="space-y-2.5">
-            {pipelineSummary.map((item) => (
-              <div key={item.id} className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: item.dot }} />
-                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{item.label}</p>
-                  </div>
-                  <span className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{item.count}</span>
-                </div>
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{fmt(item.total)}</p>
-              </div>
-            ))}
-            {compraPendenteCount > 0 ? (
-              <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20">
-                <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">{compraPendenteCount} aprovações pendentes</p>
-                <Link href="/compras" className="text-xs text-amber-700 underline dark:text-amber-300">Ir para compras</Link>
-              </div>
-            ) : null}
-          </div>
+        <SectionCard title="Pipeline Comercial" subtitle="Funil de conversão" className="p-5">
+          <PipelineFunnel stages={pipelineSummary} />
+          {compraPendenteCount > 0 ? (
+            <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20">
+              <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">{compraPendenteCount} aprovações pendentes</p>
+              <Link href="/compras" className="text-xs text-amber-700 underline dark:text-amber-300">Ir para compras</Link>
+            </div>
+          ) : null}
         </SectionCard>
       </div>
 

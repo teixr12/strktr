@@ -12,7 +12,7 @@ import { Plus, X, Trash2, CalendarDays, Clock, MapPin, Pencil } from 'lucide-rea
 import { featureFlags } from '@/lib/feature-flags'
 import { createVisitaSchema, type CreateVisitaDTO } from '@/shared/schemas/business'
 import { FormField, FormInput, FormTextarea, FormSelect } from '@/components/ui/form-field'
-import { PageHeader, QuickActionBar, SectionCard } from '@/components/ui/enterprise'
+import { EmptyStateAction, PageHeader, QuickActionBar, SectionCard } from '@/components/ui/enterprise'
 import type { Visita, Lead, Obra } from '@/types/database'
 import type { AgendaTask } from '@/shared/types/cronograma'
 
@@ -266,10 +266,13 @@ export function CalendarioContent({ initialVisitas }: Props) {
       )}
 
       {visitas.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 gap-3">
-          <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center"><CalendarDays className="w-7 h-7 text-gray-400" /></div>
-          <p className="text-sm text-gray-500">Nenhuma visita agendada</p>
-        </div>
+        <EmptyStateAction
+          icon={<CalendarDays className="h-5 w-5 text-sand-600" />}
+          title="Nenhuma visita agendada"
+          description="Agende visitas a obras e leads para manter o pipeline ativo."
+          actionLabel="Agendar Visita"
+          onAction={openNew}
+        />
       ) : (
         <>
           {renderGroup('Hoje', grouped.hoje)}

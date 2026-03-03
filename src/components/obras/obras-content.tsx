@@ -135,10 +135,10 @@ export function ObrasContent({ initialObras }: { initialObras: Obra[] }) {
 
       {filtered.length === 0 ? (
         <EmptyStateAction
-          icon={<HardHat className="h-6 w-6 text-sand-600 dark:text-sand-300" />}
-          title={obras.length === 0 ? 'Nenhuma obra cadastrada ainda' : 'Nenhuma obra encontrada'}
-          description="Cadastre uma obra para acompanhar progresso, etapas e custo em tempo real."
-          actionLabel="Criar obra"
+          icon={<HardHat className="h-5 w-5 text-sand-600" />}
+          title={obras.length === 0 ? 'Nenhuma obra cadastrada' : 'Nenhuma obra encontrada'}
+          description={obras.length === 0 ? 'Crie sua primeira obra para destravar cronograma, checklist e diário operacional.' : 'Cadastre uma obra para acompanhar progresso, etapas e custo em tempo real.'}
+          actionLabel="Criar Obra"
           onAction={() => {
             setEditingObra(null)
             setShowForm(true)

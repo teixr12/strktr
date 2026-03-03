@@ -11,11 +11,12 @@ import { apiRequest, apiRequestWithMeta } from '@/lib/api/client'
 import { track } from '@/lib/analytics/client'
 import { fmt, fmtDate } from '@/lib/utils'
 import { KANBAN_COLUMNS, TEMPERATURA_EMOJI, TEMPERATURA_COLORS } from '@/lib/constants'
-import { Plus, X, MessageCircle, Trash2, Edit2, GripVertical, Search } from 'lucide-react'
+import { Plus, X, MessageCircle, Trash2, Edit2, GripVertical, Search, Crown } from 'lucide-react'
 import { featureFlags } from '@/lib/feature-flags'
 import { ModalSheet } from '@/components/ui/modal-sheet'
 import { FormField, FormInput, FormTextarea, FormSelect } from '@/components/ui/form-field'
 import {
+  EmptyStateAction,
   PageHeader,
   PaginationControls,
   QuickActionBar,
@@ -308,6 +309,20 @@ export function LeadsContent({ initialLeads }: Props) {
 
   function whatsappUrl(phone: string) {
     return `https://wa.me/55${phone.replace(/\D/g, '')}`
+  }
+
+  if (!isPageLoading && leads.length === 0) {
+    return (
+      <div className="tailadmin-page">
+        <EmptyStateAction
+          icon={<Crown className="h-5 w-5 text-sand-600" />}
+          title="Nenhum lead cadastrado"
+          description="Cadastre seu primeiro lead para ativar o funil comercial e acompanhamento de SLA."
+          actionLabel="Criar Lead"
+          onAction={openNew}
+        />
+      </div>
+    )
   }
 
   return (

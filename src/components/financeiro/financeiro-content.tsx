@@ -14,6 +14,7 @@ import { createTransacaoSchema, type CreateTransacaoDTO } from '@/shared/schemas
 import { Plus, X, Trash2, TrendingUp, TrendingDown, Wallet, Hash, Pencil } from 'lucide-react'
 import type { Transacao, Obra } from '@/types/database'
 import {
+  EmptyStateAction,
   PageHeader,
   PaginationControls,
   QuickActionBar,
@@ -312,6 +313,23 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
+      </div>
+    )
+  }
+
+  if (!isPageLoading && transacoes.length === 0) {
+    return (
+      <div className="tailadmin-page">
+        <EmptyStateAction
+          icon={<Wallet className="h-5 w-5 text-sand-600" />}
+          title="Nenhuma transação registrada"
+          description="Registre receitas e despesas para acompanhar o fluxo de caixa em tempo real."
+          actionLabel="Nova Transação"
+          onAction={() => {
+            closeForm()
+            setShowForm(true)
+          }}
+        />
       </div>
     )
   }

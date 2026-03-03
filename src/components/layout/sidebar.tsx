@@ -20,6 +20,7 @@ import {
   X,
   Building2,
   BookOpen,
+  Bell,
 } from 'lucide-react'
 import type { Profile } from '@/types/database'
 import { featureFlags } from '@/lib/feature-flags'
@@ -42,6 +43,7 @@ const icons = {
   ShoppingCart,
   Building2,
   BookOpen,
+  Bell,
 } as const
 
 const NAV_ITEMS = [
@@ -55,6 +57,7 @@ const NAV_ITEMS = [
   { id: 'equipe', label: 'Equipe', icon: 'Users' as const, href: '/equipe' },
   { id: 'calendario', label: 'Agenda', icon: 'CalendarDays' as const, href: '/calendario' },
   { id: 'knowledgebase', label: 'Base de Conhecimento', icon: 'BookOpen' as const, href: '/knowledgebase' },
+  { id: 'notificacoes', label: 'Notificações', icon: 'Bell' as const, href: '/notificacoes' },
   { id: 'configuracoes', label: 'Configurações', icon: 'Building2' as const, href: '/configuracoes' },
 ]
 
@@ -153,7 +156,7 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
               <Image src="/strktr-logo-black.png" alt="STRKTR" width={120} height={22} className="dark:hidden" />
               <Image src="/strktr-logo-white.png" alt="STRKTR" width={120} height={22} className="hidden dark:block" />
             </div>
-            <button onClick={onClose} className="md:hidden p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+            <button onClick={onClose} aria-label="Fechar menu" className="md:hidden p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -166,6 +169,7 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
                   key={item.id}
                   href={item.href}
                   onClick={onClose}
+                  aria-current={isActive ? 'page' : undefined}
                   className={`nav-item w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-apple text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 ${
                     isActive ? 'active' : ''
                   }`}
@@ -207,7 +211,7 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
               className="hidden dark:block"
             />
           </div>
-          <button onClick={onClose} className="rounded-xl p-2 hover:bg-gray-100 md:hidden dark:hover:bg-gray-800">
+          <button onClick={onClose} aria-label="Fechar menu" className="rounded-xl p-2 hover:bg-gray-100 md:hidden dark:hover:bg-gray-800">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -223,6 +227,7 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
                   key={item.id}
                   href={item.href}
                   onClick={onClose}
+                  aria-current={isActive ? 'page' : undefined}
                   className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium transition-colors ${
                     isActive
                       ? 'bg-sand-100 text-sand-800 dark:bg-sand-900/40 dark:text-sand-200'
