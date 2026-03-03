@@ -13,6 +13,13 @@ const modules = [
   { name: 'Portal', file: 'src/components/portal/portal-client-view.tsx' },
   { name: 'Notificacoes', file: 'src/components/notificacoes/notificacoes-content.tsx' },
   { name: 'Obras Lista', file: 'src/components/obras/obras-content.tsx' },
+  { name: 'Obra Cronograma', file: 'src/components/obras/obra-cronograma.tsx' },
+  { name: 'Compras', file: 'src/components/compras/compras-content.tsx' },
+  { name: 'Projetos', file: 'src/components/projetos/projetos-content.tsx' },
+  { name: 'Calendario', file: 'src/components/calendario/calendario-content.tsx' },
+  { name: 'Equipe', file: 'src/components/equipe/equipe-content.tsx' },
+  { name: 'Knowledgebase', file: 'src/components/knowledgebase/kb-content.tsx' },
+  { name: 'Configuracoes', file: 'src/components/configuracoes/org-settings.tsx' },
   { name: 'Orcamentos', file: 'src/components/orcamentos/orcamentos-content.tsx' },
   { name: 'Perfil', file: 'src/components/perfil/perfil-content.tsx' },
 ]

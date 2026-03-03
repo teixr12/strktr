@@ -75,6 +75,8 @@ export async function GET(request: Request) {
         analyticsExternalReady:
           !analyticsExternalEnabled || (posthogKeyConfigured && posthogHostConfigured),
         cronogramaEngine: process.env.NEXT_PUBLIC_FF_CRONOGRAMA_ENGINE === 'true',
+        cronogramaViewsV1:
+          process.env.NEXT_PUBLIC_FF_CRONOGRAMA_VIEWS_V1 === 'true',
         cronogramaPdf: process.env.NEXT_PUBLIC_FF_CRONOGRAMA_PDF === 'true',
         clientPortal: process.env.NEXT_PUBLIC_FF_CLIENT_PORTAL === 'true',
         approvalGate: process.env.NEXT_PUBLIC_FF_APPROVAL_GATE === 'true',

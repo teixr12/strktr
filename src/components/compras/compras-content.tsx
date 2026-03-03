@@ -62,6 +62,7 @@ export function ComprasContent({ initialCompras, obras }: Props) {
     hasMore: false,
   })
   const [isPageLoading, setIsPageLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [showForm, setShowForm] = useState(false)
@@ -115,16 +116,20 @@ export function ComprasContent({ initialCompras, obras }: Props) {
   async function refresh(targetPage = 1) {
     if (!usePaginationV1) {
       try {
+        setLoadError(null)
         const data = await apiRequest<Compra[]>('/api/v1/compras?limit=200')
         setCompras(data)
       } catch (err) {
-        toast(err instanceof Error ? err.message : 'Erro ao recarregar compras', 'error')
+        const message = err instanceof Error ? `${err.message}. Tentar novamente.` : 'Erro ao recarregar compras. Tentar novamente.'
+        setLoadError(message)
+        toast(message, 'error')
       }
       return
     }
 
     setIsPageLoading(true)
     try {
+      setLoadError(null)
       const params = new URLSearchParams({
         page: String(targetPage),
         pageSize: String(PAGE_SIZE),
@@ -142,7 +147,9 @@ export function ComprasContent({ initialCompras, obras }: Props) {
         }
       )
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Erro ao recarregar compras', 'error')
+      const message = err instanceof Error ? `${err.message}. Tentar novamente.` : 'Erro ao recarregar compras. Tentar novamente.'
+      setLoadError(message)
+      toast(message, 'error')
     } finally {
       setIsPageLoading(false)
     }
@@ -228,7 +235,7 @@ export function ComprasContent({ initialCompras, obras }: Props) {
   }
 
   return (
-    <div className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} space-y-4`}>
+    <div aria-busy={isPageLoading || createMutation.isMutating || updateMutation.isMutating || deleteMutation.isMutating} className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} space-y-4`}>
       <PageHeader
         title="Compras"
         subtitle={`${pagination.total || compras.length} compras registradas`}
@@ -243,6 +250,20 @@ export function ComprasContent({ initialCompras, obras }: Props) {
           />
         }
       />
+
+      {loadError && (
+        <SectionCard className="p-4 border border-red-200/70 dark:border-red-800/70">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-red-700 dark:text-red-300">{loadError}</p>
+            <button
+              onClick={() => void refresh(pagination.page || 1)}
+              className="rounded-xl bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition-colors"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        </SectionCard>
+      )}
 
       {/* Header + Search */}
       <SectionCard className="p-4">

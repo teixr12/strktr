@@ -67,6 +67,16 @@ type InviteResult = {
   emailSent: boolean
 }
 
+type CronogramaItem = CronogramaPayload['itens'][number]
+type CronogramaViewMode = 'list' | 'timeline' | 'calendar' | 'board'
+
+const STATUS_LABELS: Record<CronogramaItem['status'], string> = {
+  pendente: 'Pendente',
+  em_andamento: 'Em andamento',
+  concluido: 'Concluído',
+  bloqueado: 'Bloqueado',
+}
+
 interface Props {
   obraId: string
 }
@@ -76,6 +86,8 @@ type InviteClientPortalFormValues = z.input<typeof inviteClientPortalSchema>
 
 export function ObraCronogramaTab({ obraId }: Props) {
   const cronogramaEnabled = process.env.NEXT_PUBLIC_FF_CRONOGRAMA_ENGINE === 'true'
+  const cronogramaViewsEnabled =
+    process.env.NEXT_PUBLIC_FF_CRONOGRAMA_VIEWS_V1 === 'true'
   const portalEnabled = process.env.NEXT_PUBLIC_FF_CLIENT_PORTAL === 'true'
   const pdfEnabled = process.env.NEXT_PUBLIC_FF_CRONOGRAMA_PDF === 'true'
 
@@ -85,6 +97,7 @@ export function ObraCronogramaTab({ obraId }: Props) {
   const [inviteResult, setInviteResult] = useState<InviteResult | null>(null)
   const [calendarDays, setCalendarDays] = useState<number[]>([1, 2, 3, 4, 5])
   const [holidayInput, setHolidayInput] = useState('')
+  const [viewMode, setViewMode] = useState<CronogramaViewMode>('list')
 
   const createForm = useForm<CreateCronogramaItemFormValues>({
     resolver: zodResolver(createCronogramaItemSchema),
@@ -310,6 +323,53 @@ export function ObraCronogramaTab({ obraId }: Props) {
     () => (payload?.itens || []).filter((item) => item.atraso_dias > 0 || item.status === 'bloqueado').length,
     [payload?.itens]
   )
+  const cronogramaItems = useMemo(() => payload?.itens || [], [payload?.itens])
+
+  const timelineItems = useMemo(
+    () =>
+      [...cronogramaItems].sort((a, b) => {
+        const startA = a.data_inicio_planejada ? new Date(a.data_inicio_planejada).getTime() : Number.MAX_SAFE_INTEGER
+        const startB = b.data_inicio_planejada ? new Date(b.data_inicio_planejada).getTime() : Number.MAX_SAFE_INTEGER
+        if (startA !== startB) return startA - startB
+        return a.ordem - b.ordem
+      }),
+    [cronogramaItems]
+  )
+
+  const calendarBuckets = useMemo(() => {
+    const buckets = new Map<string, CronogramaItem[]>()
+    for (const item of timelineItems) {
+      const keySource = item.data_inicio_planejada || item.data_fim_planejada || 'sem-data'
+      const key =
+        keySource === 'sem-data'
+          ? 'Sem data'
+          : new Date(`${keySource}T00:00:00`).toLocaleDateString('pt-BR', {
+              month: 'long',
+              year: 'numeric',
+            })
+      const existing = buckets.get(key) || []
+      existing.push(item)
+      buckets.set(key, existing)
+    }
+    return Array.from(buckets.entries()).map(([monthLabel, items]) => ({
+      monthLabel,
+      items,
+    }))
+  }, [timelineItems])
+
+  const boardColumns = useMemo(() => {
+    const columns: Array<{ status: CronogramaItem['status']; title: string; items: CronogramaItem[] }> = [
+      { status: 'pendente', title: STATUS_LABELS.pendente, items: [] },
+      { status: 'em_andamento', title: STATUS_LABELS.em_andamento, items: [] },
+      { status: 'bloqueado', title: STATUS_LABELS.bloqueado, items: [] },
+      { status: 'concluido', title: STATUS_LABELS.concluido, items: [] },
+    ]
+    const map = new Map(columns.map((column) => [column.status, column]))
+    for (const item of cronogramaItems) {
+      map.get(item.status)?.items.push(item)
+    }
+    return columns
+  }, [cronogramaItems])
 
   if (!cronogramaEnabled) {
     return <p className="text-sm text-gray-500">Cronograma avançado está desativado por feature flag.</p>
@@ -393,6 +453,38 @@ export function ObraCronogramaTab({ obraId }: Props) {
             </div>
           </div>
 
+          {cronogramaViewsEnabled ? (
+            <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900/40">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Visualização
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {[
+                  { id: 'list' as const, label: 'Lista' },
+                  { id: 'timeline' as const, label: 'Timeline' },
+                  { id: 'calendar' as const, label: 'Calendário' },
+                  { id: 'board' as const, label: 'Quadro' },
+                ].map((mode) => (
+                  <button
+                    key={mode.id}
+                    type="button"
+                    onClick={() => setViewMode(mode.id)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      viewMode === mode.id
+                        ? 'bg-sand-500 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    {mode.label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-[11px] text-gray-500">
+                Edição completa de itens disponível no modo Lista.
+              </p>
+            </div>
+          ) : null}
+
           <form onSubmit={createForm.handleSubmit(createItem)} className="rounded-2xl border border-dashed border-sand-300 bg-sand-50/60 p-4">
             <p className="mb-3 text-xs font-semibold text-sand-700">Novo item de cronograma</p>
             <div className="grid gap-2 md:grid-cols-3">
@@ -436,103 +528,196 @@ export function ObraCronogramaTab({ obraId }: Props) {
             </button>
           </form>
 
-          <div className="space-y-2">
-            {(payload?.itens || []).length === 0 ? (
-              <p className="text-sm text-gray-500">Nenhum item no cronograma ainda.</p>
-            ) : (
-              (payload?.itens || []).map((item) => {
-                const draft = drafts[item.id] || {}
-                return (
-                  <div key={item.id} className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900/40">
-                    <div className="grid gap-2 md:grid-cols-6">
-                      <input
-                        value={String(draft.nome ?? '')}
-                        onChange={(event) =>
-                          setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], nome: event.target.value } }))
-                        }
-                        className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs md:col-span-2 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                      />
-                      <select
-                        value={String(draft.status ?? 'pendente')}
-                        onChange={(event) =>
-                          setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], status: event.target.value as CronogramaPayload['itens'][number]['status'] } }))
-                        }
-                        className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                      >
-                        <option value="pendente">Pendente</option>
-                        <option value="em_andamento">Em andamento</option>
-                        <option value="concluido">Concluído</option>
-                        <option value="bloqueado">Bloqueado</option>
-                      </select>
-                      <input
-                        value={String(draft.empresa_responsavel ?? '')}
-                        onChange={(event) =>
-                          setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], empresa_responsavel: event.target.value } }))
-                        }
-                        placeholder="Empresa"
-                        className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                      />
-                      <input
-                        value={String(draft.responsavel ?? '')}
-                        onChange={(event) =>
-                          setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], responsavel: event.target.value } }))
-                        }
-                        placeholder="Responsável"
-                        className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                      />
-                      <input
-                        type="number"
-                        value={Number(draft.duracao_dias ?? 1)}
-                        onChange={(event) =>
-                          setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], duracao_dias: Number(event.target.value || 1) } }))
-                        }
-                        placeholder="Dias"
-                        className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                      />
-                      <input
-                        type="date"
-                        value={String(draft.data_inicio_planejada ?? '')}
-                        onChange={(event) =>
-                          setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], data_inicio_planejada: event.target.value || null } }))
-                        }
-                        className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                      />
-                      <input
-                        type="date"
-                        value={String(draft.data_fim_planejada ?? '')}
-                        onChange={(event) =>
-                          setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], data_fim_planejada: event.target.value || null } }))
-                        }
-                        className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                      />
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={Number(draft.progresso ?? 0)}
-                        onChange={(event) =>
-                          setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], progresso: Number(event.target.value || 0) } }))
-                        }
-                        placeholder="Progresso"
-                        className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                      />
-                      <button
-                        onClick={() => saveItem(item.id)}
-                        className="rounded-lg bg-gray-900 px-2 py-1.5 text-xs font-semibold text-white hover:bg-gray-700"
-                      >
-                        Salvar
-                      </button>
+          {!cronogramaViewsEnabled || viewMode === 'list' ? (
+            <div className="space-y-2">
+              {cronogramaItems.length === 0 ? (
+                <p className="text-sm text-gray-500">Nenhum item no cronograma ainda.</p>
+              ) : (
+                cronogramaItems.map((item) => {
+                  const draft = drafts[item.id] || {}
+                  return (
+                    <div key={item.id} className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900/40">
+                      <div className="grid gap-2 md:grid-cols-6">
+                        <input
+                          value={String(draft.nome ?? '')}
+                          onChange={(event) =>
+                            setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], nome: event.target.value } }))
+                          }
+                          className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs md:col-span-2 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                        />
+                        <select
+                          value={String(draft.status ?? 'pendente')}
+                          onChange={(event) =>
+                            setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], status: event.target.value as CronogramaPayload['itens'][number]['status'] } }))
+                          }
+                          className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                        >
+                          <option value="pendente">Pendente</option>
+                          <option value="em_andamento">Em andamento</option>
+                          <option value="concluido">Concluído</option>
+                          <option value="bloqueado">Bloqueado</option>
+                        </select>
+                        <input
+                          value={String(draft.empresa_responsavel ?? '')}
+                          onChange={(event) =>
+                            setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], empresa_responsavel: event.target.value } }))
+                          }
+                          placeholder="Empresa"
+                          className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                        />
+                        <input
+                          value={String(draft.responsavel ?? '')}
+                          onChange={(event) =>
+                            setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], responsavel: event.target.value } }))
+                          }
+                          placeholder="Responsável"
+                          className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                        />
+                        <input
+                          type="number"
+                          value={Number(draft.duracao_dias ?? 1)}
+                          onChange={(event) =>
+                            setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], duracao_dias: Number(event.target.value || 1) } }))
+                          }
+                          placeholder="Dias"
+                          className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                        />
+                        <input
+                          type="date"
+                          value={String(draft.data_inicio_planejada ?? '')}
+                          onChange={(event) =>
+                            setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], data_inicio_planejada: event.target.value || null } }))
+                          }
+                          className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                        />
+                        <input
+                          type="date"
+                          value={String(draft.data_fim_planejada ?? '')}
+                          onChange={(event) =>
+                            setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], data_fim_planejada: event.target.value || null } }))
+                          }
+                          className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                        />
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          value={Number(draft.progresso ?? 0)}
+                          onChange={(event) =>
+                            setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], progresso: Number(event.target.value || 0) } }))
+                          }
+                          placeholder="Progresso"
+                          className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => saveItem(item.id)}
+                          className="rounded-lg bg-gray-900 px-2 py-1.5 text-xs font-semibold text-white hover:bg-gray-700"
+                        >
+                          Salvar
+                        </button>
+                      </div>
+                      {item.atraso_dias > 0 || item.status === 'bloqueado' ? (
+                        <p className="mt-2 text-[11px] text-red-500">
+                          Atenção: item crítico ({STATUS_LABELS[item.status]}) com atraso de {item.atraso_dias} dia(s)
+                        </p>
+                      ) : null}
                     </div>
-                    {item.atraso_dias > 0 || item.status === 'bloqueado' ? (
-                      <p className="mt-2 text-[11px] text-red-500">
-                        Atenção: item crítico ({item.status}) com atraso de {item.atraso_dias} dia(s)
-                      </p>
-                    ) : null}
+                  )
+                })
+              )}
+            </div>
+          ) : null}
+
+          {cronogramaViewsEnabled && viewMode === 'timeline' ? (
+            <div className="space-y-2">
+              {timelineItems.length === 0 ? (
+                <p className="text-sm text-gray-500">Nenhum item no cronograma ainda.</p>
+              ) : (
+                timelineItems.map((item) => (
+                  <div
+                    key={`timeline-${item.id}`}
+                    className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900/40"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">{item.nome}</p>
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-200">
+                        {STATUS_LABELS[item.status]}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {fmtDate(item.data_inicio_planejada)} → {fmtDate(item.data_fim_planejada)} · duração {item.duracao_dias} dia(s)
+                    </p>
+                    <div className="mt-2 h-2 w-full rounded-full bg-gray-100 dark:bg-gray-800">
+                      <div
+                        className="h-full rounded-full bg-sand-500 transition-[width] duration-200"
+                        style={{ width: `${Math.max(0, Math.min(100, item.progresso || 0))}%` }}
+                      />
+                    </div>
                   </div>
-                )
-              })
-            )}
-          </div>
+                ))
+              )}
+            </div>
+          ) : null}
+
+          {cronogramaViewsEnabled && viewMode === 'calendar' ? (
+            <div className="space-y-3">
+              {calendarBuckets.length === 0 ? (
+                <p className="text-sm text-gray-500">Nenhum item com data planejada.</p>
+              ) : (
+                calendarBuckets.map((bucket) => (
+                  <section
+                    key={`calendar-${bucket.monthLabel}`}
+                    className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900/40"
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      {bucket.monthLabel}
+                    </p>
+                    <div className="mt-2 space-y-2">
+                      {bucket.items.map((item) => (
+                        <div key={`calendar-item-${item.id}`} className="rounded-xl bg-gray-50 px-3 py-2 dark:bg-gray-800/60">
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">{item.nome}</p>
+                          <p className="text-xs text-gray-500">
+                            {fmtDate(item.data_inicio_planejada)} → {fmtDate(item.data_fim_planejada)} · {STATUS_LABELS[item.status]}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ))
+              )}
+            </div>
+          ) : null}
+
+          {cronogramaViewsEnabled && viewMode === 'board' ? (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {boardColumns.map((column) => (
+                <section
+                  key={`board-${column.status}`}
+                  className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900/40"
+                >
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{column.title}</p>
+                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-200">
+                      {column.items.length}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {column.items.length === 0 ? (
+                      <p className="text-xs text-gray-400">Sem itens</p>
+                    ) : (
+                      column.items.map((item) => (
+                        <div key={`board-item-${item.id}`} className="rounded-xl bg-gray-50 px-3 py-2 dark:bg-gray-800/60">
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">{item.nome}</p>
+                          <p className="text-xs text-gray-500">{fmtDate(item.data_fim_planejada)}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </section>
+              ))}
+            </div>
+          ) : null}
 
           {portalEnabled && (
             <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-4">
