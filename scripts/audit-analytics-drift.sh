@@ -33,19 +33,22 @@ fi
 
 EXTERNAL_STATUS="skipped"
 if [[ -n "$POSTHOG_PROJECT_ID" && -n "$POSTHOG_API_KEY" ]]; then
+  QUERY_NONCE="$(date +%s)-$RANDOM"
   cat > "$TMP_DIR/posthog_payload.json" <<'JSON'
 {
   "query": {
     "kind": "HogQLQuery",
-    "query": "SELECT event, count(*) AS total FROM events WHERE timestamp >= now() - INTERVAL 24 hour AND ((event = 'PageViewed' AND properties['user_id'] IS NOT NULL) OR (event = 'ChecklistItemToggled' AND properties['source'] = 'server') OR (event = 'portal_approval_decision' AND properties['source'] = 'server') OR (event IN ('core_create','core_move'))) GROUP BY event ORDER BY event"
+    "query": "__POSTHOG_HOGQL_QUERY__"
   }
 }
 JSON
+  HOGQL_QUERY="SELECT event, count(*) AS total FROM events WHERE timestamp >= now() - INTERVAL 24 hour AND ((event = 'PageViewed' AND properties['user_id'] IS NOT NULL) OR (event = 'ChecklistItemToggled' AND properties['source'] = 'server') OR (event = 'portal_approval_decision' AND properties['source'] = 'server') OR (event IN ('core_create','core_move'))) GROUP BY event ORDER BY event /* nonce:${QUERY_NONCE} */"
+  jq --arg query "$HOGQL_QUERY" '.query.query = $query' "$TMP_DIR/posthog_payload.json" > "$TMP_DIR/posthog_payload.resolved.json"
 
   if curl -sS -X POST "${POSTHOG_HOST%/}/api/projects/${POSTHOG_PROJECT_ID}/query/" \
     -H "Authorization: Bearer ${POSTHOG_API_KEY}" \
     -H "Content-Type: application/json" \
-    --data @"$TMP_DIR/posthog_payload.json" \
+    --data @"$TMP_DIR/posthog_payload.resolved.json" \
     > "$TMP_DIR/posthog_raw.json"; then
     jq '[.results[]? | { event_type: .[0], external_total_24h: (.[1] | tonumber) }]' "$TMP_DIR/posthog_raw.json" > "$EXTERNAL_OUT"
     EXTERNAL_STATUS="ok"
