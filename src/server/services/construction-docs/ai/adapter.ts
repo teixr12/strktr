@@ -2,6 +2,18 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 import { z } from 'zod'
 import type { InspectionReportPayload, SchedulePayload } from '@/shared/types/construction-docs'
 
+type ConstructionDocsAiErrorReason = 'not_configured' | 'provider_failure' | 'invalid_output'
+
+export class ConstructionDocsAiError extends Error {
+  readonly reason: ConstructionDocsAiErrorReason
+
+  constructor(message: string, reason: ConstructionDocsAiErrorReason) {
+    super(message)
+    this.name = 'ConstructionDocsAiError'
+    this.reason = reason
+  }
+}
+
 const inspectionSchema = z.object({
   summary: z.string().min(10),
   findings: z.array(z.string().min(3)).min(1),
@@ -35,46 +47,26 @@ function parseJson<T>(raw: string, schema: z.ZodSchema<T>): T | null {
   }
 }
 
-function fallbackInspection(prompt: string): InspectionReportPayload {
-  return {
-    summary: `Relatório gerado em modo fallback para: ${prompt.slice(0, 120) || 'vistoria de obra'}`,
-    findings: ['Necessário revisar pendências estruturais com check visual no local.'],
-    recommendations: ['Registrar fotos por ambiente e definir plano de correção com responsável e prazo.'],
-    generatedAt: new Date().toISOString(),
-  }
-}
-
-function fallbackSchedule(prompt: string): SchedulePayload {
-  const now = new Date()
-  const start = now.toISOString().slice(0, 10)
-  const end = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-  return {
-    summary: `Cronograma gerado em modo fallback para: ${prompt.slice(0, 120) || 'obra'}`,
-    tasks: [
-      {
-        id: 'task-1',
-        title: 'Planejamento inicial',
-        startsAt: start,
-        endsAt: end,
-        dependsOn: [],
-      },
-    ],
-    generatedAt: new Date().toISOString(),
-  }
-}
-
 const genAI = process.env.GOOGLE_GEMINI_API_KEY
   ? new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY)
   : null
 
-async function runPrompt(prompt: string): Promise<string | null> {
-  if (!genAI) return null
+async function runPrompt(prompt: string): Promise<string> {
+  if (!genAI) {
+    throw new ConstructionDocsAiError(
+      'Integração de IA não configurada para geração de documentos.',
+      'not_configured'
+    )
+  }
   const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
   try {
     const result = await model.generateContent(prompt)
     return result.response.text()
   } catch {
-    return null
+    throw new ConstructionDocsAiError(
+      'Falha temporária no provedor de IA. Tente novamente em instantes.',
+      'provider_failure'
+    )
   }
 }
 
@@ -82,8 +74,13 @@ export async function generateInspectionReport(prompt: string): Promise<Inspecti
   const raw = await runPrompt(
     `${prompt}\nRetorne APENAS JSON com summary, findings(string[]), recommendations(string[]).`
   )
-  const parsed = raw ? parseJson(raw, inspectionSchema) : null
-  if (!parsed) return fallbackInspection(prompt)
+  const parsed = parseJson(raw, inspectionSchema)
+  if (!parsed) {
+    throw new ConstructionDocsAiError(
+      'A IA retornou um formato inválido para relatório de inspeção.',
+      'invalid_output'
+    )
+  }
   return {
     ...parsed,
     generatedAt: new Date().toISOString(),
@@ -94,8 +91,13 @@ export async function generateSchedule(prompt: string): Promise<SchedulePayload>
   const raw = await runPrompt(
     `${prompt}\nRetorne APENAS JSON com summary e tasks[{id,title,startsAt,endsAt,dependsOn:string[]}].`
   )
-  const parsed = raw ? parseJson(raw, scheduleSchema) : null
-  if (!parsed) return fallbackSchedule(prompt)
+  const parsed = parseJson(raw, scheduleSchema)
+  if (!parsed) {
+    throw new ConstructionDocsAiError(
+      'A IA retornou um formato inválido para cronograma.',
+      'invalid_output'
+    )
+  }
   return {
     ...parsed,
     generatedAt: new Date().toISOString(),
@@ -109,4 +111,3 @@ export async function generateSop(prompt: string): Promise<InspectionReportPaylo
 export function isConstructionDocsAiConfigured(): boolean {
   return Boolean(process.env.GOOGLE_GEMINI_API_KEY)
 }
-
