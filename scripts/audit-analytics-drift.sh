@@ -42,7 +42,7 @@ if [[ -n "$POSTHOG_PROJECT_ID" && -n "$POSTHOG_API_KEY" ]]; then
   }
 }
 JSON
-  HOGQL_QUERY="SELECT event, count(*) AS total FROM events WHERE timestamp >= now() - INTERVAL 24 hour AND ((event = 'PageViewed' AND properties['user_id'] IS NOT NULL) OR (event = 'ChecklistItemToggled' AND properties['source'] = 'server') OR (event = 'portal_approval_decision' AND properties['source'] = 'server') OR (event IN ('core_create','core_move'))) GROUP BY event ORDER BY event /* nonce:${QUERY_NONCE} */"
+  HOGQL_QUERY="SELECT event, count(DISTINCT if(event = 'portal_approval_decision', coalesce(nullIf(toString(properties['_event_id']), ''), toString(uuid)), toString(uuid))) AS total FROM events WHERE timestamp >= now() - INTERVAL 24 hour AND ((event = 'PageViewed' AND properties['user_id'] IS NOT NULL) OR (event = 'ChecklistItemToggled' AND properties['source'] = 'server') OR (event = 'portal_approval_decision' AND properties['source'] = 'server') OR (event IN ('core_create','core_move'))) GROUP BY event ORDER BY event /* nonce:${QUERY_NONCE} */"
   jq --arg query "$HOGQL_QUERY" '.query.query = $query' "$TMP_DIR/posthog_payload.json" > "$TMP_DIR/posthog_payload.resolved.json"
 
   if curl -sS -X POST "${POSTHOG_HOST%/}/api/projects/${POSTHOG_PROJECT_ID}/query/" \
