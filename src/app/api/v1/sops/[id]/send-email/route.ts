@@ -4,6 +4,19 @@ import { fail, ok } from '@/lib/api/response'
 import { sendNotificationEmail } from '@/lib/email/resend'
 import { sendSopEmailSchema } from '@/shared/schemas/sops'
 
+function resolveBaseUrl(request: Request) {
+  const origin = new URL(request.url).origin
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim()
+  if (appUrl) {
+    try {
+      return new URL(appUrl).origin
+    } catch {
+      // fallback to request origin for invalid environment values
+    }
+  }
+  return origin
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -42,12 +55,14 @@ export async function POST(
 
     const subject = parsed.data.subject?.trim() || `SOP: ${sop.title}`
     const description = parsed.data.message?.trim() || sop.description || `Status atual: ${sop.status}`
+    const baseUrl = resolveBaseUrl(innerRequest)
+    const sopUrl = `${baseUrl}/sops`
     const result = await sendNotificationEmail(
       parsed.data.to,
       subject,
       sop.title,
       description,
-      'https://strktr.vercel.app/sops'
+      sopUrl
     )
 
     if (!result) {
