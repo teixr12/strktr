@@ -22,6 +22,7 @@ interface VisitPayload {
     id: string
     room_id: string | null
     url: string
+    signed_url?: string | null
     metadata: Record<string, unknown>
     annotations: Array<{
       id: string
@@ -172,7 +173,11 @@ export function ConstructionDocsVisitContent({ visitId }: { visitId: string }) {
                   {photos.map((photo) => (
                     <div key={photo.id} className="rounded-xl border border-gray-200 p-2 dark:border-gray-700">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={photo.url} alt="Foto da visita" className="h-28 w-full rounded-lg object-cover" />
+                      <img
+                        src={photo.signed_url || photo.url}
+                        alt="Foto da visita"
+                        className="h-28 w-full rounded-lg object-cover"
+                      />
                       <p className="mt-2 text-[11px] text-gray-500">Anotações: {photo.annotations.length}</p>
                     </div>
                   ))}

@@ -39,8 +39,14 @@ export async function uploadConstructionPhoto(input: {
       upsert: false,
     })
     if (upload.error) continue
+
+    const signed = await service.storage.from(bucket).createSignedUrl(storageKey, 60 * 60 * 24 * 7)
     const publicUrl = service.storage.from(bucket).getPublicUrl(storageKey).data.publicUrl
-    return { bucket, storageKey, publicUrl }
+    return {
+      bucket,
+      storageKey,
+      publicUrl: signed.data?.signedUrl || publicUrl,
+    }
   }
   return null
 }
@@ -78,4 +84,3 @@ export async function resolveDownloadUrl(
   if (signed.error || !signed.data?.signedUrl) return null
   return signed.data.signedUrl
 }
-

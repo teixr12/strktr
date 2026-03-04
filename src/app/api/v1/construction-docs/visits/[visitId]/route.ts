@@ -4,6 +4,9 @@ import { getConstructionDocsFlagMeta, withConstructionDocsAuth } from '@/lib/con
 import { updateVisitSchema } from '@/shared/schemas/construction-docs'
 import { ensureVisitOwnership } from '@/server/repositories/construction-docs/repository'
 import { appendConstructionAudit } from '@/server/services/construction-docs/audit-service'
+import { resolveDownloadUrl } from '@/server/services/construction-docs/storage-service'
+
+const DEFAULT_MEDIA_BUCKET = 'construction-docs-media'
 
 export async function GET(
   request: Request,
@@ -20,7 +23,7 @@ export async function GET(
       )
     }
 
-    const [{ data: rooms }, { data: photos }, { data: annotations }] = await Promise.all([
+    const [{ data: rooms }, { data: photos }] = await Promise.all([
       supabase
         .from('construction_docs_rooms')
         .select('id, org_id, visit_id, name, sort_order, created_at, updated_at')
@@ -33,14 +36,35 @@ export async function GET(
         .eq('org_id', orgId)
         .eq('visit_id', visitId)
         .order('created_at', { ascending: true }),
-      supabase
-        .from('construction_docs_annotations')
-        .select('id, org_id, photo_id, type, geometry, text, created_by, created_at, updated_at')
-        .eq('org_id', orgId)
-        .order('created_at', { ascending: true }),
     ])
 
-    const photosWithAnnotations = (photos || []).map((photo) => ({
+    const photoIds = (photos || []).map((photo) => photo.id)
+    const { data: annotations } =
+      photoIds.length > 0
+        ? await supabase
+            .from('construction_docs_annotations')
+            .select('id, org_id, photo_id, type, geometry, text, created_by, created_at, updated_at')
+            .eq('org_id', orgId)
+            .in('photo_id', photoIds)
+            .order('created_at', { ascending: true })
+        : { data: [] }
+
+    const photosWithSignedUrl = await Promise.all(
+      (photos || []).map(async (photo) => {
+        const metadata = photo.metadata && typeof photo.metadata === 'object' ? photo.metadata : {}
+        const bucket =
+          typeof (metadata as Record<string, unknown>).bucket === 'string'
+            ? ((metadata as Record<string, unknown>).bucket as string)
+            : DEFAULT_MEDIA_BUCKET
+        const signedUrl = await resolveDownloadUrl(supabase, bucket, photo.storage_key)
+        return {
+          ...photo,
+          signed_url: signedUrl || photo.url || null,
+        }
+      })
+    )
+
+    const photosWithAnnotations = photosWithSignedUrl.map((photo) => ({
       ...photo,
       annotations: (annotations || []).filter((annotation) => annotation.photo_id === photo.id),
     }))
