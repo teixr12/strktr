@@ -45,6 +45,7 @@ const NAV_ITEMS: PaletteItem[] = [
   { id: 'equipe', label: 'Equipe', href: '/equipe', icon: Users, section: 'nav' },
   { id: 'calendario', label: 'Agenda', href: '/calendario', icon: CalendarDays, section: 'nav' },
   { id: 'knowledgebase', label: 'Base de Conhecimento', href: '/knowledgebase', icon: BookOpen, section: 'nav' },
+  { id: 'construction-docs', label: 'Construction Docs', href: '/construction-docs/templates', icon: FileText, section: 'nav' },
   { id: 'configuracoes', label: 'Configura\u00e7\u00f5es', href: '/configuracoes', icon: Building2, section: 'nav' },
 ]
 
@@ -74,6 +75,13 @@ const SECTION_LABELS: Record<string, string> = {
 export function CommandPalette() {
   const enabled = featureFlags.cmdPalette
 
+  const visibleItems = useMemo(() => {
+    return ALL_ITEMS.filter((item) => {
+      if (item.id === 'construction-docs') return featureFlags.constructionDocs
+      return true
+    })
+  }, [])
+
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
@@ -83,10 +91,10 @@ export function CommandPalette() {
 
   /* ---------- filtered results ---------- */
   const filtered = useMemo(() => {
-    if (!query.trim()) return ALL_ITEMS
+    if (!query.trim()) return visibleItems
     const q = query.toLowerCase()
-    return ALL_ITEMS.filter((item) => item.label.toLowerCase().includes(q))
-  }, [query])
+    return visibleItems.filter((item) => item.label.toLowerCase().includes(q))
+  }, [query, visibleItems])
 
   /* ---------- grouped for display ---------- */
   const grouped = useMemo(() => {

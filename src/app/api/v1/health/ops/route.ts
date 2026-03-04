@@ -87,6 +87,9 @@ export async function GET(request: Request) {
         generalTasksV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_GENERAL_TASKS_V1),
         taskAssignV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_TASK_ASSIGN_V1),
         mobileUxV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_MOBILE_UX_V1),
+        constructionDocs: isFlagDisabledByDefault(
+          process.env.FEATURE_CONSTRUCTION_DOCS || process.env.NEXT_PUBLIC_FF_CONSTRUCTION_DOCS_V1
+        ),
         cronogramaEngine: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_CRONOGRAMA_ENGINE),
         cronogramaViewsV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_CRONOGRAMA_VIEWS_V1),
         cronogramaPdf: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_CRONOGRAMA_PDF),

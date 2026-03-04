@@ -80,6 +80,42 @@ test('novos endpoints protegidos retornam envelope canônico sem token', async (
   }
 })
 
+test('construction docs respeita gate por feature flag (off=404-safe, on=401 sem token)', async ({ request }) => {
+  const healthResponse = await request.get('/api/v1/health/ops')
+  expect(healthResponse.ok()).toBeTruthy()
+  const healthPayload = await healthResponse.json()
+  const isEnabled = Boolean(healthPayload?.data?.flags?.constructionDocs)
+
+  const checks: Array<{ endpoint: string; method: 'GET' | 'POST' }> = [
+    { endpoint: '/api/v1/construction-docs/templates', method: 'GET' },
+    { endpoint: '/api/v1/construction-docs/projects/00000000-0000-0000-0000-000000000000/visits', method: 'GET' },
+    { endpoint: '/api/v1/construction-docs/documents/generate/inspection', method: 'POST' },
+    { endpoint: '/api/v1/construction-docs/documents/generate/schedule', method: 'POST' },
+    { endpoint: '/api/v1/construction-docs/documents/generate/sop', method: 'POST' },
+  ]
+
+  for (const check of checks) {
+    const response =
+      check.method === 'GET'
+        ? await request.get(check.endpoint)
+        : await request.post(check.endpoint, { data: {} })
+
+    const payload = await response.json()
+    const expectedStatus = isEnabled ? 401 : 404
+    const expectedCode = isEnabled ? 'UNAUTHORIZED' : 'NOT_FOUND'
+
+    expect(response.status(), check.endpoint).toBe(expectedStatus)
+    expect(payload?.error?.code, check.endpoint).toBe(expectedCode)
+    expect(payload?.requestId, check.endpoint).toBeTruthy()
+  }
+
+  const publicShareResponse = await request.get('/api/v1/construction-docs/share/token-invalido')
+  expect(publicShareResponse.status(), '/api/v1/construction-docs/share/:token').toBe(404)
+  const publicSharePayload = await publicShareResponse.json()
+  expect(publicSharePayload?.error?.code, '/api/v1/construction-docs/share/:token').toBe('NOT_FOUND')
+  expect(publicSharePayload?.requestId, '/api/v1/construction-docs/share/:token').toBeTruthy()
+})
+
 test('portal público exige token válido e retorna envelope de erro', async ({ request }) => {
   const endpoints: Array<{ endpoint: string; method: 'GET' | 'POST'; body?: Record<string, unknown> }> = [
     { endpoint: '/api/v1/portal/session/token-invalido', method: 'GET' },
