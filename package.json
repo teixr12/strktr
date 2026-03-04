@@ -19,6 +19,11 @@
     "audit:analytics-capture-probe": "./scripts/audit-analytics-capture-probe.sh",
     "ops:reconcile-analytics-portal": "./scripts/reconcile-analytics-portal.sh",
     "audit:ux-quality": "node scripts/audit-ux-quality.mjs",
+    "governance:boundaries": "node scripts/check-dependency-boundaries.mjs",
+    "governance:analytics": "node scripts/check-analytics-taxonomy.mjs",
+    "governance:performance": "node scripts/check-performance-budget.mjs",
+    "governance:ux": "UX_AUDIT_STRICT=1 node scripts/audit-ux-quality.mjs",
+    "governance:all": "npm run governance:boundaries && npm run governance:analytics && npm run governance:performance && npm run governance:ux",
     "baseline:tag": "./scripts/create-baseline-tag.sh",
     "ops:post-wave2": "./scripts/post-wave2-closure.sh",
     "ops:post-wave2:full": "./scripts/post-wave2-closure.sh --with-readiness"

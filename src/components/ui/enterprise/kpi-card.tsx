@@ -1,6 +1,8 @@
 import { memo, type ReactNode } from 'react'
 import Link from 'next/link'
 import { Info } from 'lucide-react'
+import { validateKpiCardDefinition } from '@/platform/ui/kpi-card-contract'
+import type { KpiCardDefinition } from '@/shared/types/kpi-contract'
 
 interface KpiCardProps {
   icon: ReactNode
@@ -13,6 +15,7 @@ interface KpiCardProps {
   href?: string
   drilldownLabel?: string
   sparkline?: number[]
+  definition?: KpiCardDefinition
 }
 
 const ACCENT_CLASS = {
@@ -40,7 +43,19 @@ export const KpiCard = memo(function KpiCard({
   href,
   drilldownLabel = 'Ver detalhes',
   sparkline,
+  definition,
 }: KpiCardProps) {
+  if (process.env.NODE_ENV !== 'production' && definition) {
+    const violations = validateKpiCardDefinition(definition)
+    if (violations.length > 0) {
+      console.warn(`[KpiCard] invalid KPI contract for "${definition.key}": ${violations.join(', ')}`)
+    }
+  }
+
+  const resolvedLabel = definition?.label || label
+  const resolvedHint = definition?.description || hint
+  const resolvedHref = definition?.drilldownHref || href
+
   return (
     <article className="enterprise-card p-5">
       <div className="mb-4 flex items-start justify-between">
@@ -51,9 +66,9 @@ export const KpiCard = memo(function KpiCard({
       </div>
       <p className="text-3xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">{value}</p>
       <div className="mt-1 flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
-        <p>{label}</p>
-        {hint ? (
-          <span title={hint} aria-label={hint}>
+        <p>{resolvedLabel}</p>
+        {resolvedHint ? (
+          <span title={resolvedHint} aria-label={resolvedHint}>
             <Info className="h-3.5 w-3.5 text-gray-400" />
           </span>
         ) : null}
@@ -81,10 +96,10 @@ export const KpiCard = memo(function KpiCard({
           <div className="h-2 rounded-full bg-gradient-to-r from-sand-500 to-ocean-500" style={{ width: `${Math.max(0, Math.min(100, progress))}%` }} />
         </div>
       ) : null}
-      {href ? (
+      {resolvedHref ? (
         <div className="mt-3">
           <Link
-            href={href}
+            href={resolvedHref}
             className="text-xs font-semibold text-sand-700 underline-offset-2 hover:underline dark:text-sand-300"
           >
             {drilldownLabel}

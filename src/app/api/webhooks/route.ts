@@ -1,16 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
 import crypto from 'crypto'
 import { legacyFail, legacyOk } from '@/lib/api/legacy-compat-response'
+import { enforceSecureWebhook } from '@/platform/security/secure-webhook'
 
 export async function POST(request: Request) {
   try {
-    const dispatchToken = process.env.WEBHOOK_DISPATCH_TOKEN?.trim()
-    if (dispatchToken) {
-      const token = request.headers.get('x-strktr-webhook-token')
-      if (token !== dispatchToken) {
-        return legacyFail(request, 'Não autorizado', 403, 'UNAUTHORIZED')
-      }
-    }
+    const secureWebhookError = enforceSecureWebhook(request, {
+      token: process.env.WEBHOOK_DISPATCH_TOKEN,
+      allowInsecureOverrideEnv: 'WEBHOOK_DISPATCH_ALLOW_UNSECURED',
+    })
+    if (secureWebhookError) return secureWebhookError
 
     const body = (await request.json().catch(() => null)) as
       | { event?: string; data?: unknown }
