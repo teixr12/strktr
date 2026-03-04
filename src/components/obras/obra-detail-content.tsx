@@ -22,6 +22,8 @@ import { featureFlags } from '@/lib/feature-flags'
 import type { Obra, ObraEtapa, Transacao, DiarioObra as DiarioEntry, ObraChecklist } from '@/types/database'
 import { createEtapaSchema, type CreateEtapaDTO } from '@/shared/schemas/execution'
 import type { ExecutionAlert, RecommendedAction } from '@/shared/types/execution'
+import type { ObraKpisPayload } from '@/shared/types/obra-kpis'
+import type { ObraAlertsPayload } from '@/shared/types/obra-alerts'
 
 const etapaStatusInfo: Record<string, { c: string; Icon: React.ComponentType<{ className?: string }> }> = {
   Concluída: { c: 'text-emerald-600', Icon: CheckCircle },
@@ -58,12 +60,16 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
   const { confirm, dialog: confirmDialog } = useConfirm()
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2ObraTabs
   const portalAdminEnabled = featureFlags.portalAdminV1 && featureFlags.clientPortal
+  const obraKpiEnabled = featureFlags.obraKpiV1
+  const obraAlertsEnabled = featureFlags.obraAlertsV1
   const router = useRouter()
   const [tab, setTab] = useState<'resumo' | 'etapas' | 'cronograma' | 'financeiro' | 'diario' | 'checklists' | 'portalAdmin'>('resumo')
   const [etapas, setEtapas] = useState(initialEtapas)
   const [showEditForm, setShowEditForm] = useState(false)
   const [showEtapaForm, setShowEtapaForm] = useState(false)
   const [executionSummary, setExecutionSummary] = useState<ExecutionSummary | null>(null)
+  const [obraKpis, setObraKpis] = useState<ObraKpisPayload | null>(null)
+  const [obraAlerts, setObraAlerts] = useState<ObraAlertsPayload | null>(null)
   const [loadingSummary, setLoadingSummary] = useState(false)
   const [summaryError, setSummaryError] = useState<string | null>(null)
   const etapaForm = useForm<CreateEtapaDTO>({
@@ -91,16 +97,32 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
   const loadExecutionSummary = useCallback(async () => {
     setLoadingSummary(true)
     setSummaryError(null)
+    if (obraKpiEnabled) setObraKpis(null)
+    if (obraAlertsEnabled) setObraAlerts(null)
     try {
-      const data = await apiRequest<ExecutionSummary>(`/api/v1/obras/${obra.id}/execution-summary`)
-      setExecutionSummary(data)
+      const summary = await apiRequest<ExecutionSummary>(`/api/v1/obras/${obra.id}/execution-summary`)
+      setExecutionSummary(summary)
+
+      if (obraKpiEnabled) {
+        apiRequest<ObraKpisPayload>(`/api/v1/obras/${obra.id}/kpis`)
+          .then((payload) => setObraKpis(payload))
+          .catch(() => setObraKpis(null))
+      }
+
+      if (obraAlertsEnabled) {
+        apiRequest<ObraAlertsPayload>(`/api/v1/obras/${obra.id}/alerts`)
+          .then((payload) => setObraAlerts(payload))
+          .catch(() => setObraAlerts(null))
+      }
     } catch (err) {
       setExecutionSummary(null)
+      if (obraKpiEnabled) setObraKpis(null)
+      if (obraAlertsEnabled) setObraAlerts(null)
       setSummaryError(err instanceof Error ? err.message : 'Falha ao carregar painel de execução')
     } finally {
       setLoadingSummary(false)
     }
-  }, [obra.id])
+  }, [obra.id, obraKpiEnabled, obraAlertsEnabled])
 
   async function recalculateRisk() {
     try {
@@ -201,6 +223,12 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
     RECALCULATE_RISK: 'Recalcule o risco para atualizar decisões operacionais.',
   }
   const financeiroSaldo = rec - dep
+  const effectiveKpis = obraKpiEnabled ? (obraKpis?.kpis || executionSummary?.kpis || null) : (executionSummary?.kpis || null)
+  const effectiveRisk = obraKpiEnabled ? (obraKpis?.risk || executionSummary?.risk || null) : (executionSummary?.risk || null)
+  const effectiveSaldo = obraKpiEnabled && obraKpis ? obraKpis.kpis.saldo : financeiroSaldo
+  const executionAlerts = obraAlertsEnabled
+    ? (obraAlerts?.alerts || executionSummary?.alerts || [])
+    : (executionSummary?.alerts || [])
 
   async function handleDelete() {
     const ok = await confirm({ title: 'Excluir obra?', description: 'Essa ação não pode ser desfeita. Todos os dados da obra serão perdidos.', confirmLabel: 'Excluir', variant: 'danger' })
@@ -284,28 +312,28 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
             <div className="glass-card rounded-2xl p-3">
               <p className="text-[11px] uppercase tracking-wide text-gray-500">Etapas</p>
               <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-                {executionSummary ? `${executionSummary.kpis.etapasConcluidas}/${executionSummary.kpis.etapasTotal}` : `${etapas.filter((e) => e.status === 'Concluída').length}/${etapas.length}`}
+                {effectiveKpis ? `${effectiveKpis.etapasConcluidas}/${effectiveKpis.etapasTotal}` : `${etapas.filter((e) => e.status === 'Concluída').length}/${etapas.length}`}
               </p>
               <p className="text-xs text-gray-500">Concluídas</p>
             </div>
             <div className="glass-card rounded-2xl p-3">
               <p className="text-[11px] uppercase tracking-wide text-gray-500">Risco</p>
               <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-                {executionSummary ? executionSummary.risk.level.toUpperCase() : '—'}
+                {effectiveRisk ? effectiveRisk.level.toUpperCase() : '—'}
               </p>
-              <p className="text-xs text-gray-500">Score {executionSummary ? executionSummary.risk.score : '—'}</p>
+              <p className="text-xs text-gray-500">Score {effectiveRisk ? effectiveRisk.score : '—'}</p>
             </div>
             <div className="glass-card rounded-2xl p-3">
               <p className="text-[11px] uppercase tracking-wide text-gray-500">Checklists</p>
               <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-                {executionSummary ? executionSummary.kpis.checklistPendentes : initialChecklists.length}
+                {effectiveKpis ? effectiveKpis.checklistPendentes : initialChecklists.length}
               </p>
               <p className="text-xs text-gray-500">Pendentes</p>
             </div>
             <div className="glass-card rounded-2xl p-3">
               <p className="text-[11px] uppercase tracking-wide text-gray-500">Financeiro</p>
-              <p className={`mt-1 text-lg font-semibold ${financeiroSaldo >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                {fmt(financeiroSaldo)}
+              <p className={`mt-1 text-lg font-semibold ${effectiveSaldo >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                {fmt(effectiveSaldo)}
               </p>
               <p className="text-xs text-gray-500">Recebido - gasto</p>
             </div>
@@ -369,9 +397,9 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
                   <span className="text-xs text-gray-500">Risco Operacional</span>
                   {loadingSummary ? (
                     <p className="text-sm text-gray-500 mt-1">Calculando...</p>
-                  ) : executionSummary ? (
+                  ) : effectiveRisk ? (
                     <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
-                      {executionSummary.risk.level.toUpperCase()} ({executionSummary.risk.score})
+                      {effectiveRisk.level.toUpperCase()} ({effectiveRisk.score})
                     </p>
                   ) : (
                     <p className="text-sm text-gray-500 mt-1">Indisponível</p>
@@ -386,9 +414,9 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
                   </button>
                 )}
               </div>
-              {executionSummary && (
+              {effectiveKpis && (
                 <p className="text-xs text-gray-500 mt-2">
-                  Bloqueios: {executionSummary.kpis.etapasBloqueadas} · Pendentes: {executionSummary.kpis.checklistPendentes} · Atrasados: {executionSummary.kpis.checklistAtrasados}
+                  Bloqueios: {effectiveKpis.etapasBloqueadas} · Pendentes: {effectiveKpis.checklistPendentes} · Atrasados: {effectiveKpis.checklistAtrasados}
                 </p>
               )}
             </div>
@@ -402,13 +430,13 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
               <span className="text-[11px] text-gray-500">Ações recomendadas hoje</span>
             </div>
 
-            {!executionSummary?.alerts?.length ? (
+            {executionAlerts.length === 0 ? (
               <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
                 <p className="text-xs text-emerald-700">Sem alertas críticos no momento.</p>
               </div>
             ) : (
               <div className="space-y-2">
-                {executionSummary.alerts.map((alert) => (
+                {executionAlerts.map((alert) => (
                   <div key={alert.code} className={`rounded-xl border px-3 py-2 text-xs font-medium flex items-center gap-2 ${alertStyles[alert.severity]}`}>
                     <AlertTriangle className="w-3.5 h-3.5" />
                     {alert.title}
