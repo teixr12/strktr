@@ -191,13 +191,6 @@ export function PortalClientView({ token }: Props) {
       const slaDueAt = payload?.data?.slaDueAt as string | undefined
       const requiredNextVersion = payload?.data?.requiredNextVersion as number | undefined
       await loadSession()
-      track('portal_approval_decision', {
-        source: 'portal',
-        entity_type: 'portal_approval',
-        entity_id: aprovacaoId,
-        outcome: 'success',
-        decision: action,
-      }).catch(() => undefined)
       if (action === 'approve') {
         setDecisionFeedback({
           tone: 'success',
