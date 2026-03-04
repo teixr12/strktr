@@ -21,12 +21,18 @@ type AnalyticsEventRow = {
 }
 
 function isCronAuthorized(request: Request) {
-  const configuredSecret = process.env.CRON_SECRET
-  if (!configuredSecret) return true
+  const configuredSecrets = [
+    process.env.CRON_SECRET,
+    process.env.ANALYTICS_RECONCILE_TOKEN,
+  ]
+    .map((value) => (value || '').trim())
+    .filter((value) => value.length > 0)
+
+  if (configuredSecrets.length === 0) return true
 
   const auth = request.headers.get('authorization') || ''
   const bearer = auth.startsWith('Bearer ') ? auth.slice(7) : ''
-  return bearer === configuredSecret
+  return configuredSecrets.includes(bearer)
 }
 
 function clampInt(raw: string | null, fallback: number, min: number, max: number) {
@@ -44,7 +50,7 @@ function wasReconciled(payload: Record<string, unknown>) {
   return typeof payload._posthog_reconciled_at === 'string'
 }
 
-export async function POST(request: Request) {
+async function runAnalyticsReconcileCron(request: Request) {
   if (!isCronAuthorized(request)) {
     return fail(request, { code: API_ERROR_CODES.UNAUTHORIZED, message: 'Não autorizado para cron' }, 401)
   }
@@ -133,4 +139,12 @@ export async function POST(request: Request) {
     failed,
     failures,
   })
+}
+
+export async function GET(request: Request) {
+  return runAnalyticsReconcileCron(request)
+}
+
+export async function POST(request: Request) {
+  return runAnalyticsReconcileCron(request)
 }

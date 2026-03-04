@@ -11,7 +11,7 @@ function isCronAuthorized(request: Request) {
   return bearer === configuredSecret
 }
 
-export async function POST(request: Request) {
+async function runDailyAlertsCron(request: Request) {
   if (!isCronAuthorized(request)) {
     return fail(request, { code: API_ERROR_CODES.UNAUTHORIZED, message: 'Não autorizado para cron' }, 401)
   }
@@ -135,4 +135,12 @@ export async function POST(request: Request) {
     organizations: results.length,
     details: results,
   })
+}
+
+export async function GET(request: Request) {
+  return runDailyAlertsCron(request)
+}
+
+export async function POST(request: Request) {
+  return runDailyAlertsCron(request)
 }
