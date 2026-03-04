@@ -4,6 +4,8 @@ import { log } from '@/lib/api/logger'
 import { fail, ok } from '@/lib/api/response'
 import { updateProfileSchema } from '@/shared/schemas/business'
 
+const PROFILE_FIELDS = 'id, nome, email, avatar_url, empresa, cargo, telefone, created_at, updated_at'
+
 export async function GET(request: Request) {
   const { user, supabase, error, requestId, orgId } = await getApiUser(request)
   if (!user || !supabase) {
@@ -16,7 +18,7 @@ export async function GET(request: Request) {
 
   const { data, error: dbError } = await supabase
     .from('profiles')
-    .select('*')
+    .select(PROFILE_FIELDS)
     .eq('id', user.id)
     .single()
 
@@ -71,7 +73,7 @@ export async function PATCH(request: Request) {
       avatar_url: payload.avatar_url === undefined ? undefined : payload.avatar_url || null,
     })
     .eq('id', user.id)
-    .select('*')
+    .select(PROFILE_FIELDS)
     .single()
 
   if (dbError) {
