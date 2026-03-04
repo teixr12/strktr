@@ -17,6 +17,7 @@
     "audit:production": "./scripts/run-production-audits.sh",
     "audit:analytics-drift": "./scripts/audit-analytics-drift.sh",
     "audit:analytics-capture-probe": "./scripts/audit-analytics-capture-probe.sh",
+    "ops:reconcile-analytics-portal": "./scripts/reconcile-analytics-portal.sh",
     "audit:ux-quality": "node scripts/audit-ux-quality.mjs",
     "baseline:tag": "./scripts/create-baseline-tag.sh",
     "ops:post-wave2": "./scripts/post-wave2-closure.sh",

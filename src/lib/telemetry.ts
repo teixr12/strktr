@@ -13,9 +13,20 @@ interface ProductEventInput {
   entityId: string
   payload?: Record<string, unknown>
   mirrorExternal?: boolean
+  eventId?: string | null
+  occurredAt?: string | null
 }
 
+type PosthogMirrorInput = Omit<ProductEventInput, 'supabase' | 'mirrorExternal'>
+
 const POSTHOG_DEFAULT_HOST = 'https://app.posthog.com'
+
+export type MirrorResult = {
+  ok: boolean
+  skipped?: 'flag_disabled' | 'missing_key'
+  status: number | null
+  statusText: string | null
+}
 
 function normalizeEnv(value: string | undefined | null): string | null {
   const normalized = (value || '').trim()
@@ -32,10 +43,32 @@ function resolvePosthogCaptureKey() {
   )
 }
 
-async function mirrorToPosthog(input: ProductEventInput) {
-  const externalEnabled =
+function resolveExternalAnalyticsEnabled() {
+  return (
     isFlagDisabledByDefault(normalizeEnv(process.env.NEXT_PUBLIC_FF_ANALYTICS_EXTERNAL_V1) || undefined) ||
     isFlagDisabledByDefault(normalizeEnv(process.env.FF_ANALYTICS_EXTERNAL_V1) || undefined)
+  )
+}
+
+async function posthogCapture(host: string, body: Record<string, unknown>): Promise<MirrorResult> {
+  const response = await fetch(`${host.replace(/\/$/, '')}/capture/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  }).catch(() => undefined)
+
+  return {
+    ok: Boolean(response?.ok),
+    status: response?.status ?? null,
+    statusText: response?.statusText ?? null,
+  }
+}
+
+async function mirrorToPosthog(input: PosthogMirrorInput): Promise<MirrorResult> {
+  const externalEnabled =
+    resolveExternalAnalyticsEnabled()
   const key = resolvePosthogCaptureKey()
   const host =
     normalizeEnv(process.env.NEXT_PUBLIC_POSTHOG_HOST) ||
@@ -43,24 +76,10 @@ async function mirrorToPosthog(input: ProductEventInput) {
     POSTHOG_DEFAULT_HOST
 
   if (!externalEnabled) {
-    console.warn(
-      JSON.stringify({
-        level: 'warn',
-        message: 'telemetry.posthog.mirror_skipped_flag_disabled',
-        eventType: input.eventType,
-      })
-    )
-    return
+    return { ok: false, skipped: 'flag_disabled', status: null, statusText: null }
   }
   if (!key) {
-    console.warn(
-      JSON.stringify({
-        level: 'warn',
-        message: 'telemetry.posthog.mirror_skipped_missing_key',
-        eventType: input.eventType,
-      })
-    )
-    return
+    return { ok: false, skipped: 'missing_key', status: null, statusText: null }
   }
 
   const distinctId =
@@ -69,53 +88,96 @@ async function mirrorToPosthog(input: ProductEventInput) {
       ? `org:${input.orgId}`
       : `entity:${input.entityType}:${input.entityId}`)
 
-  const response = await fetch(`${host.replace(/\/$/, '')}/capture/`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      api_key: key,
-      event: input.eventType,
-      distinct_id: distinctId,
-      properties: {
-        source: 'server',
-        user_id: input.userId ?? null,
-        org_id: input.orgId ?? null,
-        entity_type: input.entityType,
-        entity_id: input.entityId,
-        ...input.payload,
-      },
-    }),
-  }).catch(() => undefined)
-
-  if (!response || !response.ok) {
-    console.warn(
-      JSON.stringify({
-        level: 'warn',
-        message: 'telemetry.posthog.mirror_failed',
-        eventType: input.eventType,
-        status: response?.status ?? null,
-        statusText: response?.statusText ?? null,
-      })
-    )
+  const eventId =
+    (typeof input.eventId === 'string' && input.eventId.trim()) || `${input.eventType}:${input.entityId}`
+  const properties: Record<string, unknown> = {
+    source: 'server',
+    user_id: input.userId ?? null,
+    org_id: input.orgId ?? null,
+    entity_type: input.entityType,
+    entity_id: input.entityId,
+    ...input.payload,
+    _event_id: eventId,
+    $insert_id: eventId,
   }
+
+  const captureBody: Record<string, unknown> = {
+    api_key: key,
+    token: key,
+    event: input.eventType,
+    distinct_id: distinctId,
+    timestamp: input.occurredAt || new Date().toISOString(),
+    properties,
+  }
+
+  const firstAttempt = await posthogCapture(host, captureBody)
+  if (firstAttempt.ok) return firstAttempt
+
+  // Retry once to reduce transient network drift during spikes.
+  await new Promise((resolve) => setTimeout(resolve, 200))
+  return posthogCapture(host, captureBody)
+}
+
+export async function mirrorProductEventExternal(
+  input: PosthogMirrorInput
+): Promise<MirrorResult> {
+  return mirrorToPosthog(input)
 }
 
 export async function emitProductEvent(input: ProductEventInput) {
   const persistedUserId =
     typeof input.userId === 'string' && input.userId.trim() ? input.userId : null
+
+  let persistedEventId: string | null = input.eventId || null
+  let persistedOccurredAt: string | null = input.occurredAt || null
+
   // If the table is not available yet, do not break runtime flows.
-  await input.supabase.from('eventos_produto').insert({
-    org_id: input.orgId ?? null,
-    user_id: persistedUserId,
-    event_type: input.eventType,
-    entity_type: input.entityType,
-    entity_id: input.entityId,
-    payload: input.payload ?? {},
-  })
+  const { data: insertedEvent } = await input.supabase
+    .from('eventos_produto')
+    .insert({
+      org_id: input.orgId ?? null,
+      user_id: persistedUserId,
+      event_type: input.eventType,
+      entity_type: input.entityType,
+      entity_id: input.entityId,
+      payload: input.payload ?? {},
+    })
+    .select('id, created_at')
+    .single()
+
+  if (insertedEvent) {
+    persistedEventId = (insertedEvent.id as string | null) || persistedEventId
+    persistedOccurredAt = (insertedEvent.created_at as string | null) || persistedOccurredAt
+  }
 
   if (input.mirrorExternal) {
-    await mirrorToPosthog(input)
+    const mirrorResult = await mirrorToPosthog({
+      orgId: input.orgId,
+      userId: input.userId,
+      eventType: input.eventType,
+      entityType: input.entityType,
+      entityId: input.entityId,
+      payload: input.payload,
+      eventId: persistedEventId,
+      occurredAt: persistedOccurredAt,
+    })
+
+    if (!mirrorResult.ok) {
+      console.warn(
+        JSON.stringify({
+          level: 'warn',
+          message:
+            mirrorResult.skipped === 'flag_disabled'
+              ? 'telemetry.posthog.mirror_skipped_flag_disabled'
+              : mirrorResult.skipped === 'missing_key'
+                ? 'telemetry.posthog.mirror_skipped_missing_key'
+                : 'telemetry.posthog.mirror_failed',
+          eventType: input.eventType,
+          eventId: persistedEventId,
+          status: mirrorResult.status,
+          statusText: mirrorResult.statusText,
+        })
+      )
+    }
   }
 }
