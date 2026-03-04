@@ -113,7 +113,6 @@ async function mirrorToPosthog(input: PosthogMirrorInput): Promise<MirrorResult>
 
   const captureBody: Record<string, unknown> = {
     api_key: key,
-    token: key,
     event: input.eventType,
     distinct_id: distinctId,
     properties,
