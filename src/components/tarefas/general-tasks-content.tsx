@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import { apiRequest, apiRequestWithMeta } from '@/lib/api/client'
@@ -12,6 +12,7 @@ import {
   QuickActionBar,
   SectionCard,
 } from '@/components/ui/enterprise'
+import { MobileShellV1 } from '@/platform/ui/mobile-shell-v1'
 import type {
   GeneralTask,
   GeneralTaskAssignee,
@@ -68,6 +69,7 @@ export function GeneralTasksContent() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [newTitle, setNewTitle] = useState('')
+  const newTaskInputRef = useRef<HTMLInputElement | null>(null)
   const [dragTaskId, setDragTaskId] = useState<string | null>(null)
   const [assignees, setAssignees] = useState<GeneralTaskAssignee[]>([])
   const [loadingAssignees, setLoadingAssignees] = useState(false)
@@ -144,6 +146,13 @@ export function GeneralTasksContent() {
     } finally {
       setSaving(false)
     }
+  }
+
+  function focusNewTaskInput() {
+    const target = newTaskInputRef.current
+    if (!target) return
+    target.focus()
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
 
   async function updateTask(taskId: string, updates: Partial<GeneralTask>) {
@@ -227,27 +236,40 @@ export function GeneralTasksContent() {
   }
 
   return (
-    <div aria-busy={loading || saving} className="tailadmin-page space-y-4">
-      <PageHeader
-        title="Tarefas Gerais"
-        subtitle={`${pagination.total} tarefa(s) da organização`}
-        actions={
-          <QuickActionBar
-            actions={[
-              {
-                label: 'Recarregar',
-                icon: <RefreshCw className="h-4 w-4" />,
-                onClick: () => void load(pagination.page || 1),
-                tone: 'neutral',
-              },
-            ]}
-          />
-        }
-      />
+    <MobileShellV1
+      primaryAction={
+        <button
+          type="button"
+          onClick={focusNewTaskInput}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-sand-500 px-4 py-3 text-sm font-semibold text-white hover:bg-sand-600"
+        >
+          <Plus className="h-4 w-4" />
+          Nova Tarefa
+        </button>
+      }
+    >
+      <div aria-busy={loading || saving} className="tailadmin-page space-y-4">
+        <PageHeader
+          title="Tarefas Gerais"
+          subtitle={`${pagination.total} tarefa(s) da organização`}
+          actions={
+            <QuickActionBar
+              actions={[
+                {
+                  label: 'Recarregar',
+                  icon: <RefreshCw className="h-4 w-4" />,
+                  onClick: () => void load(pagination.page || 1),
+                  tone: 'neutral',
+                },
+              ]}
+            />
+          }
+        />
 
       <SectionCard className="p-4">
         <div className="flex flex-wrap items-center gap-2">
           <input
+            ref={newTaskInputRef}
             value={newTitle}
             onChange={(event) => setNewTitle(event.target.value)}
             placeholder="Nova tarefa geral..."
@@ -367,15 +389,16 @@ export function GeneralTasksContent() {
         </div>
       )}
 
-      <PaginationControls
-        page={pagination.page}
-        pageSize={pagination.pageSize}
-        total={pagination.total}
-        hasMore={pagination.hasMore}
-        isLoading={loading}
-        onPrev={() => void load(Math.max(1, pagination.page - 1))}
-        onNext={() => void load(pagination.page + 1)}
-      />
-    </div>
+        <PaginationControls
+          page={pagination.page}
+          pageSize={pagination.pageSize}
+          total={pagination.total}
+          hasMore={pagination.hasMore}
+          isLoading={loading}
+          onPrev={() => void load(Math.max(1, pagination.page - 1))}
+          onNext={() => void load(pagination.page + 1)}
+        />
+      </div>
+    </MobileShellV1>
   )
 }
