@@ -6,6 +6,25 @@ import { getValidPortalSession } from '@/server/services/portal/session-service'
 import { runAutomation } from '@/server/services/automation/automation-service'
 import { rejectDecisionSchema } from '@/shared/schemas/cronograma-portal'
 
+const approvalReturnColumns = [
+  'id',
+  'org_id',
+  'obra_id',
+  'tipo',
+  'compra_id',
+  'orcamento_id',
+  'status',
+  'solicitado_por',
+  'solicitado_em',
+  'decidido_por_portal_cliente_id',
+  'decisao_comentario',
+  'decidido_em',
+  'approval_version',
+  'predecessor_aprovacao_id',
+  'sla_due_at',
+  'sla_alert_sent_at',
+].join(', ')
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -61,7 +80,7 @@ export async function POST(
     })
     .eq('id', approval.id)
     .eq('org_id', session.org_id)
-    .select('*')
+    .select(approvalReturnColumns)
     .single()
 
   if (updateError || !updated) {
