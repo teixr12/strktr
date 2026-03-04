@@ -23,6 +23,7 @@ import {
   SectionCard,
   StatBadge,
 } from '@/components/ui/enterprise'
+import { MobileShellV1 } from '@/platform/ui/mobile-shell-v1'
 import { LeadLaneColumnV2 } from './lead-lane-column-v2'
 import { LeadInteractionsTableV2 } from './lead-interactions-table-v2'
 import type { Lead, LeadStatus } from '@/types/database'
@@ -311,36 +312,51 @@ export function LeadsContent({ initialLeads }: Props) {
     return `https://wa.me/55${phone.replace(/\D/g, '')}`
   }
 
+  const openLeadCtaLabel = useV2 ? 'Adicionar Lead' : 'Novo Lead'
+  const mobilePrimaryAction = (
+    <button
+      type="button"
+      onClick={openNew}
+      className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-sand-500 px-4 py-3 text-sm font-semibold text-white hover:bg-sand-600"
+    >
+      <Plus className="h-4 w-4" />
+      {openLeadCtaLabel}
+    </button>
+  )
+
   if (!isPageLoading && leads.length === 0) {
     return (
-      <div className="tailadmin-page">
-        <EmptyStateAction
-          icon={<Crown className="h-5 w-5 text-sand-600" />}
-          title="Nenhum lead cadastrado"
-          description="Cadastre seu primeiro lead para ativar o funil comercial e acompanhamento de SLA."
-          actionLabel="Criar Lead"
-          onAction={openNew}
-        />
-      </div>
+      <MobileShellV1 primaryAction={mobilePrimaryAction}>
+        <div className="tailadmin-page">
+          <EmptyStateAction
+            icon={<Crown className="h-5 w-5 text-sand-600" />}
+            title="Nenhum lead cadastrado"
+            description="Cadastre seu primeiro lead para ativar o funil comercial e acompanhamento de SLA."
+            actionLabel="Criar Lead"
+            onAction={openNew}
+          />
+        </div>
+      </MobileShellV1>
     )
   }
 
   return (
-    <div className="tailadmin-page space-y-4">
-      <PageHeader
-        title="Leads VIP"
-        subtitle={`${pagination.total || leads.length} leads no pipeline`}
-        actions={
-          <QuickActionBar
-            actions={[{
-              label: useV2 ? 'Adicionar Lead' : 'Novo Lead',
-              icon: <Plus className="h-4 w-4" />,
-              onClick: openNew,
-              tone: 'warning',
-            }]}
-          />
-        }
-      />
+    <MobileShellV1 primaryAction={mobilePrimaryAction}>
+      <div className="tailadmin-page space-y-4">
+        <PageHeader
+          title="Leads VIP"
+          subtitle={`${pagination.total || leads.length} leads no pipeline`}
+          actions={
+            <QuickActionBar
+              actions={[{
+                label: openLeadCtaLabel,
+                icon: <Plus className="h-4 w-4" />,
+                onClick: openNew,
+                tone: 'warning',
+              }]}
+            />
+          }
+        />
 
       {sla && sla.totalParados > 0 ? (
         <div className="grid gap-3 md:grid-cols-2">
@@ -650,7 +666,8 @@ export function LeadsContent({ initialLeads }: Props) {
         </form>
       </ModalSheet>
 
-      {confirmDialog}
-    </div>
+        {confirmDialog}
+      </div>
+    </MobileShellV1>
   )
 }

@@ -21,6 +21,7 @@ import {
   SectionCard,
   VirtualizedList,
 } from '@/components/ui/enterprise'
+import { MobileShellV1 } from '@/platform/ui/mobile-shell-v1'
 import { FormField, FormInput, FormSelect, FormTextarea } from '@/components/ui/form-field'
 
 const LazyBarChart = dynamic(
@@ -261,6 +262,11 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
     reset(defaultValues)
   }
 
+  function openCreateTxForm() {
+    closeForm()
+    setShowForm(true)
+  }
+
   async function onSubmit(data: CreateTransacaoDTO) {
     const payload = {
       ...data,
@@ -319,40 +325,59 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
 
   if (!isPageLoading && transacoes.length === 0) {
     return (
-      <div className="tailadmin-page">
-        <EmptyStateAction
-          icon={<Wallet className="h-5 w-5 text-sand-600" />}
-          title="Nenhuma transação registrada"
-          description="Registre receitas e despesas para acompanhar o fluxo de caixa em tempo real."
-          actionLabel="Nova Transação"
-          onAction={() => {
-            closeForm()
-            setShowForm(true)
-          }}
-        />
-      </div>
+      <MobileShellV1
+        primaryAction={
+          <button
+            type="button"
+            onClick={openCreateTxForm}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-sand-500 px-4 py-3 text-sm font-semibold text-white hover:bg-sand-600"
+          >
+            <Plus className="h-4 w-4" />
+            Nova Transação
+          </button>
+        }
+      >
+        <div className="tailadmin-page">
+          <EmptyStateAction
+            icon={<Wallet className="h-5 w-5 text-sand-600" />}
+            title="Nenhuma transação registrada"
+            description="Registre receitas e despesas para acompanhar o fluxo de caixa em tempo real."
+            actionLabel="Nova Transação"
+            onAction={openCreateTxForm}
+          />
+        </div>
+      </MobileShellV1>
     )
   }
 
   return (
-    <div className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} space-y-5`}>
-      <PageHeader
-        title="Financeiro"
-        subtitle={`${pagination.total || transacoes.length} transações`}
-        actions={
-          <QuickActionBar
-            actions={[{
-              label: 'Nova Transação',
-              icon: <Plus className="h-4 w-4" />,
-              onClick: () => {
-                closeForm()
-                setShowForm(true)
-              },
-              tone: 'warning',
-            }]}
-          />
-        }
-      />
+    <MobileShellV1
+      primaryAction={
+        <button
+          type="button"
+          onClick={openCreateTxForm}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-sand-500 px-4 py-3 text-sm font-semibold text-white hover:bg-sand-600"
+        >
+          <Plus className="h-4 w-4" />
+          Nova Transação
+        </button>
+      }
+    >
+      <div className={`${useV2 ? 'tailadmin-page' : 'p-4 md:p-6'} space-y-5`}>
+        <PageHeader
+          title="Financeiro"
+          subtitle={`${pagination.total || transacoes.length} transações`}
+          actions={
+            <QuickActionBar
+              actions={[{
+                label: 'Nova Transação',
+                icon: <Plus className="h-4 w-4" />,
+                onClick: openCreateTxForm,
+                tone: 'warning',
+              }]}
+            />
+          }
+        />
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -585,7 +610,8 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
         </div>
       )}
 
-      {confirmDialog}
-    </div>
+        {confirmDialog}
+      </div>
+    </MobileShellV1>
   )
 }
