@@ -1,45 +1,64 @@
-select 'obras' as table_name, count(*)::bigint as org_id_nulls
-from public.obras where org_id is null
-union all
-select 'obra_etapas', count(*)::bigint from public.obra_etapas where org_id is null
-union all
-select 'obra_checklists', count(*)::bigint from public.obra_checklists where org_id is null
-union all
-select 'checklist_items', count(*)::bigint from public.checklist_items where org_id is null
-union all
-select 'diario_obra', count(*)::bigint from public.diario_obra where org_id is null
-union all
-select 'transacoes', count(*)::bigint from public.transacoes where org_id is null
-union all
-select 'compras', count(*)::bigint from public.compras where org_id is null
-union all
-select 'leads', count(*)::bigint from public.leads where org_id is null
-union all
-select 'projetos', count(*)::bigint from public.projetos where org_id is null
-union all
-select 'orcamentos', count(*)::bigint from public.orcamentos where org_id is null
-union all
-select 'visitas', count(*)::bigint from public.visitas where org_id is null
-union all
-select 'eventos_produto', count(*)::bigint from public.eventos_produto where org_id is null
-union all
-select 'cronograma_obras', count(*)::bigint from public.cronograma_obras where org_id is null
-union all
-select 'cronograma_itens', count(*)::bigint from public.cronograma_itens where org_id is null
-union all
-select 'cronograma_dependencias', count(*)::bigint from public.cronograma_dependencias where org_id is null
-union all
-select 'cronograma_baselines', count(*)::bigint from public.cronograma_baselines where org_id is null
-union all
-select 'portal_clientes', count(*)::bigint from public.portal_clientes where org_id is null
-union all
-select 'portal_sessions', count(*)::bigint from public.portal_sessions where org_id is null
-union all
-select 'portal_comentarios', count(*)::bigint from public.portal_comentarios where org_id is null
-union all
-select 'aprovacoes_cliente', count(*)::bigint from public.aprovacoes_cliente where org_id is null
-union all
-select 'general_tasks', count(*)::bigint from public.general_tasks where org_id is null
-union all
-select 'cronograma_pdf_exports', count(*)::bigint from public.cronograma_pdf_exports where org_id is null
+create temp table if not exists audit_org_id_nulls_result (
+  table_name text not null,
+  table_exists boolean not null,
+  org_id_nulls bigint null
+) on commit drop;
+
+truncate table audit_org_id_nulls_result;
+
+do $$
+declare
+  table_name text;
+  tracked_tables text[] := array[
+    'obras',
+    'obra_etapas',
+    'obra_checklists',
+    'checklist_items',
+    'diario_obra',
+    'transacoes',
+    'compras',
+    'leads',
+    'projetos',
+    'orcamentos',
+    'visitas',
+    'eventos_produto',
+    'cronograma_obras',
+    'cronograma_itens',
+    'cronograma_dependencias',
+    'cronograma_baselines',
+    'portal_clientes',
+    'portal_sessions',
+    'portal_comentarios',
+    'aprovacoes_cliente',
+    'general_tasks',
+    'sops',
+    'construction_docs_project_links',
+    'construction_docs_visits',
+    'construction_docs_rooms',
+    'construction_docs_photos',
+    'construction_docs_annotations',
+    'construction_docs_templates',
+    'construction_docs_documents',
+    'construction_docs_share_links',
+    'construction_docs_audit_logs',
+    'cronograma_pdf_exports'
+  ];
+begin
+  foreach table_name in array tracked_tables loop
+    if to_regclass(format('public.%I', table_name)) is null then
+      insert into audit_org_id_nulls_result (table_name, table_exists, org_id_nulls)
+      values (table_name, false, null);
+    else
+      execute format(
+        'insert into audit_org_id_nulls_result (table_name, table_exists, org_id_nulls) select %L, true, count(*)::bigint from public.%I where org_id is null',
+        table_name,
+        table_name
+      );
+    end if;
+  end loop;
+end
+$$;
+
+select table_name, table_exists, org_id_nulls
+from audit_org_id_nulls_result
 order by table_name;
