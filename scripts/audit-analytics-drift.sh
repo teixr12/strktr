@@ -37,7 +37,7 @@ if [[ -n "$POSTHOG_PROJECT_ID" && -n "$POSTHOG_API_KEY" ]]; then
 {
   "query": {
     "kind": "HogQLQuery",
-    "query": "SELECT event, count(*) AS total FROM events WHERE timestamp >= now() - INTERVAL 24 hour AND event IN ('PageViewed','core_create','core_move','portal_approval_decision','ChecklistItemToggled') GROUP BY event ORDER BY event"
+    "query": "SELECT event, count(*) AS total FROM events WHERE timestamp >= now() - INTERVAL 24 hour AND ((event = 'PageViewed' AND properties['user_id'] IS NOT NULL) OR (event = 'ChecklistItemToggled' AND properties['source'] = 'server') OR (event IN ('core_create','core_move','portal_approval_decision'))) GROUP BY event ORDER BY event"
   }
 }
 JSON

@@ -7,7 +7,6 @@ import { z } from 'zod'
 import { toast } from '@/hooks/use-toast'
 import { useConfirm } from '@/hooks/use-confirm'
 import { apiRequest } from '@/lib/api/client'
-import { track } from '@/lib/analytics/client'
 import { fmtDate } from '@/lib/utils'
 import { Plus, Trash2, CheckSquare, Square, ChevronDown, ChevronRight, Pencil, CalendarDays, X } from 'lucide-react'
 import type { ObraChecklist, ChecklistTipo } from '@/types/database'
@@ -163,12 +162,6 @@ export function ObraChecklistsTab({ obraId, initialChecklists, onChecklistChange
       await apiRequest(`/api/v1/obras/${obraId}/checklists/items/${itemId}/toggle`, {
         method: 'POST',
       })
-      track('ChecklistItemToggled', {
-        source: 'obras',
-        entity_type: 'checklist_item',
-        entity_id: itemId,
-        outcome: 'success',
-      }).catch(() => undefined)
       onChecklistChanged?.()
       refresh()
     } catch (err) {
