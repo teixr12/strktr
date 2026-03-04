@@ -3,7 +3,11 @@ import { fail, ok } from '@/lib/api/response'
 import { mirrorProductEventExternal, type ProductEventType } from '@/lib/telemetry'
 import { createServiceRoleClient } from '@/lib/supabase/service'
 
-const TARGET_EVENTS: ProductEventType[] = ['portal_invite_sent', 'portal_approval_decision']
+const TARGET_EVENTS: ProductEventType[] = [
+  'portal_invite_sent',
+  'portal_approval_decision',
+  'ChecklistItemToggled',
+]
 
 type AnalyticsEventRow = {
   id: string

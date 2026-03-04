@@ -86,6 +86,7 @@ export async function POST(
     eventType: 'ChecklistItemToggled',
     entityType: 'checklist_item',
     entityId: itemId,
+    mirrorExternal: true,
     payload: { obraId: id, checklistId: checklist.id, concluido: nextDone },
   }).catch(() => undefined)
 
