@@ -12,6 +12,18 @@ counts as (
   from public.eventos_produto e
   where e.created_at >= now() - interval '24 hours'
     and e.event_type in (select event_type from target_events)
+    and (
+      (e.event_type = 'PageViewed' and e.user_id is not null)
+      or (
+        e.event_type = 'ChecklistItemToggled'
+        and coalesce(e.payload ->> 'source', '') = ''
+      )
+      or (
+        e.event_type = 'portal_approval_decision'
+        and coalesce(e.payload ->> 'source', '') = ''
+      )
+      or e.event_type in ('core_create', 'core_move')
+    )
   group by e.event_type
 )
 select
