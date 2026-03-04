@@ -27,6 +27,7 @@ import {
 import type { Profile } from '@/types/database'
 import { featureFlags } from '@/lib/feature-flags'
 import { apiRequest } from '@/lib/api/client'
+import { track } from '@/lib/analytics/client'
 import type {
   UiAvatarSource,
   UiIntegrationStatus,
@@ -73,11 +74,13 @@ interface SidebarProps {
   onClose: () => void
 }
 
+type SidebarProfile = Pick<Profile, 'nome' | 'email' | 'avatar_url'>
+
 export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
-  const [profile, setProfile] = useState<Profile | null>(null)
+  const [profile, setProfile] = useState<SidebarProfile | null>(null)
   const [navCounts, setNavCounts] = useState<UiNavCounts | null>(null)
   const [integrationStatuses, setIntegrationStatuses] = useState<UiIntegrationStatus[] | null>(null)
   const [failedAvatarSrc, setFailedAvatarSrc] = useState<string | null>(null)
@@ -88,8 +91,12 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
         data: { user },
       } = await supabase.auth.getUser()
       if (user) {
-        const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-        if (data) setProfile(data)
+        const { data } = await supabase
+          .from('profiles')
+          .select('nome, email, avatar_url')
+          .eq('id', user.id)
+          .single()
+        if (data) setProfile(data as SidebarProfile)
       }
     }
 
@@ -123,6 +130,11 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   }, [supabase])
 
   async function handleLogout() {
+    await track('auth_logout', {
+      source: 'web',
+      route: pathname || '/app',
+      outcome: 'success',
+    }).catch(() => undefined)
     await supabase.auth.signOut()
     router.push('/login')
     router.refresh()
