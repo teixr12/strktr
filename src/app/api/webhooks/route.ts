@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     const supabase = await createClient()
     const { data: webhooks } = await supabase
       .from('webhooks')
-      .select('*')
+      .select('id, url, secret, eventos, ativo')
       .eq('ativo', true)
       .contains('eventos', [event])
 
