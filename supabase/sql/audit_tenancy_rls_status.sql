@@ -26,6 +26,16 @@ with tracked_tables as (
     ('aprovacoes_cliente'),
     ('portal_admin_settings'),
     ('general_tasks'),
+    ('sops'),
+    ('construction_docs_project_links'),
+    ('construction_docs_visits'),
+    ('construction_docs_rooms'),
+    ('construction_docs_photos'),
+    ('construction_docs_annotations'),
+    ('construction_docs_templates'),
+    ('construction_docs_documents'),
+    ('construction_docs_share_links'),
+    ('construction_docs_audit_logs'),
     ('cronograma_pdf_exports')
   ) t(table_name)
 ),
@@ -48,6 +58,7 @@ policy_counts as (
 )
 select
   tt.table_name,
+  (rs.table_name is not null) as table_exists,
   coalesce(rs.rls_enabled, false) as rls_enabled,
   coalesce(rs.rls_forced, false) as rls_forced,
   coalesce(pc.policy_count, 0) as policy_count
