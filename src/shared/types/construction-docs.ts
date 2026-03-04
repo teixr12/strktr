@@ -42,6 +42,7 @@ export interface ConstructionDocsPhoto {
   room_id: string | null
   storage_key: string
   url: string
+  signed_url?: string | null
   thumbnail_key: string | null
   metadata: Record<string, unknown>
   created_by: string
@@ -153,4 +154,3 @@ export interface ConstructionDocsPdfPayload {
   base64: string | null
   fallback: boolean
 }
-
