@@ -4,10 +4,6 @@
     {
       "path": "/api/cron/alerts/daily",
       "schedule": "0 11 * * *"
-    },
-    {
-      "path": "/api/cron/analytics/reconcile",
-      "schedule": "15 * * * *"
     }
   ]
 }
