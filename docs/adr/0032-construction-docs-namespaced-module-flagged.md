@@ -49,3 +49,9 @@ The platform already has reusable pieces (Supabase service-role storage, Resend 
 2. Redeploy.
 3. Validate `health/ops` shows `flags.constructionDocs=false` and endpoints return 404-safe.
 4. Keep migration/data in place (additive-only), no destructive rollback.
+
+## Addendum (2026-03-04)
+
+1. Outbound channels (`send-email`, `share/whatsapp`) now attempt to auto-create a public tokenized share link when `share_url` is omitted.
+2. Backward-compatible fallback remains unchanged: if share link creation fails, endpoint uses internal authenticated document URL to avoid hard failures.
+3. Audit payload now records `share_url_source` (`explicit`, `auto_public_link`, `internal_fallback`) for operational traceability.
