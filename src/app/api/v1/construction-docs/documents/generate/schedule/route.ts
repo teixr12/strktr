@@ -5,6 +5,7 @@ import { emitProductEvent } from '@/lib/telemetry'
 import { generateDocumentSchema } from '@/shared/schemas/construction-docs'
 import { ensureProjectOwnership } from '@/server/repositories/construction-docs/repository'
 import { appendConstructionAudit } from '@/server/services/construction-docs/audit-service'
+import { ConstructionDocsAiError } from '@/server/services/construction-docs/ai/adapter'
 import { generateScheduleDocument } from '@/server/services/construction-docs/generate-service'
 
 export const POST = withConstructionDocsAuth('can_manage_projects', async (request, { supabase, orgId, user }) => {
@@ -69,6 +70,17 @@ export const POST = withConstructionDocsAuth('can_manage_projects', async (reque
 
     return ok(request, document, getConstructionDocsFlagMeta(), 201)
   } catch (error) {
+    if (error instanceof ConstructionDocsAiError) {
+      return fail(
+        request,
+        {
+          code: API_ERROR_CODES.DB_ERROR,
+          message: error.message,
+        },
+        503
+      )
+    }
+
     return fail(
       request,
       {
