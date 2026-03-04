@@ -1,6 +1,7 @@
 import { getApiUser } from '@/lib/api/auth'
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { fail, ok } from '@/lib/api/response'
+import { requireDomainPermission } from '@/lib/auth/domain-permissions'
 import { emitProductEvent } from '@/lib/telemetry'
 import { updateGeneralTaskSchema } from '@/shared/schemas/general-tasks'
 import type { GeneralTask } from '@/shared/types/general-tasks'
@@ -41,7 +42,7 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { user, supabase, error, orgId } = await getApiUser(request)
+  const { user, supabase, error, orgId, role } = await getApiUser(request)
   if (!user || !supabase) {
     return fail(
       request,
@@ -76,6 +77,15 @@ export async function PATCH(
       },
       400
     )
+  }
+
+  const assigneeMutationRequested =
+    parsed.data.assignee_user_id !== undefined &&
+    parsed.data.assignee_user_id !== currentTask.assignee_user_id
+
+  if (assigneeMutationRequested) {
+    const permissionError = requireDomainPermission(request, role, 'can_manage_team')
+    if (permissionError) return permissionError
   }
 
   if (parsed.data.assignee_user_id) {
