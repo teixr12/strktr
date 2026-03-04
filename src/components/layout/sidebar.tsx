@@ -64,6 +64,7 @@ const NAV_ITEMS = [
   { id: 'notificacoes', label: 'Notificações', icon: 'Bell' as const, href: '/notificacoes' },
   { id: 'tarefas', label: 'Tarefas Gerais', icon: 'ListTodo' as const, href: '/tarefas' },
   { id: 'sops', label: 'SOP Builder', icon: 'ClipboardList' as const, href: '/sops' },
+  { id: 'construction-docs', label: 'Construction Docs', icon: 'FileText' as const, href: '/construction-docs/templates' },
   { id: 'configuracoes', label: 'Configurações', icon: 'Building2' as const, href: '/configuracoes' },
 ]
 
@@ -151,6 +152,7 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const visibleNavItems = NAV_ITEMS.filter((item) => {
     if (item.id === 'tarefas') return featureFlags.generalTasksV1
     if (item.id === 'sops') return featureFlags.sopBuilderV1
+    if (item.id === 'construction-docs') return featureFlags.constructionDocs
     return true
   })
 
