@@ -50,6 +50,15 @@ function resolveExternalAnalyticsEnabled() {
   )
 }
 
+function normalizeEventTimestamp(value: string | null | undefined): string | null {
+  const raw = (value || '').trim()
+  if (!raw) return null
+  const normalizedCandidate = raw.includes('T') ? raw : raw.replace(' ', 'T')
+  const parsed = new Date(normalizedCandidate)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed.toISOString()
+}
+
 async function posthogCapture(host: string, body: Record<string, unknown>): Promise<MirrorResult> {
   const response = await fetch(`${host.replace(/\/$/, '')}/capture/`, {
     method: 'POST',
@@ -100,14 +109,17 @@ async function mirrorToPosthog(input: PosthogMirrorInput): Promise<MirrorResult>
     _event_id: eventId,
     $insert_id: eventId,
   }
+  const normalizedTimestamp = normalizeEventTimestamp(input.occurredAt)
 
   const captureBody: Record<string, unknown> = {
     api_key: key,
     token: key,
     event: input.eventType,
     distinct_id: distinctId,
-    timestamp: input.occurredAt || new Date().toISOString(),
     properties,
+  }
+  if (normalizedTimestamp) {
+    captureBody.timestamp = normalizedTimestamp
   }
 
   const firstAttempt = await posthogCapture(host, captureBody)
