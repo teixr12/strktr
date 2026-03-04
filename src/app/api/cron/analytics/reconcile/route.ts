@@ -41,6 +41,22 @@ function clampInt(raw: string | null, fallback: number, min: number, max: number
   return Math.min(max, Math.max(min, parsed))
 }
 
+function parseBoolean(raw: string | null) {
+  if (!raw) return false
+  const normalized = raw.trim().toLowerCase()
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on'
+}
+
+function parseEventFilter(raw: string | null): ProductEventType[] {
+  if (!raw) return TARGET_EVENTS
+  const candidates = raw
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean) as ProductEventType[]
+  const filtered = candidates.filter((eventType) => TARGET_EVENTS.includes(eventType))
+  return filtered.length > 0 ? filtered : TARGET_EVENTS
+}
+
 function asRecord(payload: unknown): Record<string, unknown> {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return {}
   return payload as Record<string, unknown>
@@ -63,12 +79,14 @@ async function runAnalyticsReconcileCron(request: Request) {
   const url = new URL(request.url)
   const limit = clampInt(url.searchParams.get('limit'), 300, 1, 1000)
   const lookbackHours = clampInt(url.searchParams.get('hours'), 168, 1, 720)
+  const forceReplay = parseBoolean(url.searchParams.get('force'))
+  const targetEvents = parseEventFilter(url.searchParams.get('eventType'))
   const sinceIso = new Date(Date.now() - lookbackHours * 60 * 60 * 1000).toISOString()
 
   const { data, error } = await service
     .from('eventos_produto')
     .select('id, org_id, user_id, event_type, entity_type, entity_id, payload, created_at')
-    .in('event_type', TARGET_EVENTS)
+    .in('event_type', targetEvents)
     .gte('created_at', sinceIso)
     .order('created_at', { ascending: false })
     .limit(limit)
@@ -81,14 +99,18 @@ async function runAnalyticsReconcileCron(request: Request) {
   let mirrored = 0
   let skipped = 0
   let failed = 0
+  let forced = 0
   const failures: Array<{ id: string; eventType: ProductEventType; status: number | null; reason: string }> = []
 
   for (const row of (data || []) as AnalyticsEventRow[]) {
     processed += 1
     const payload = asRecord(row.payload)
-    if (wasReconciled(payload)) {
+    if (!forceReplay && wasReconciled(payload)) {
       skipped += 1
       continue
+    }
+    if (forceReplay && wasReconciled(payload)) {
+      forced += 1
     }
 
     const result = await mirrorProductEventExternal({
@@ -120,6 +142,7 @@ async function runAnalyticsReconcileCron(request: Request) {
       ...payload,
       _posthog_reconciled_at: new Date().toISOString(),
       _posthog_reconcile_source: 'cron',
+      _posthog_reconcile_forced: forceReplay || payload._posthog_reconcile_forced === true,
     }
 
     await service
@@ -133,10 +156,13 @@ async function runAnalyticsReconcileCron(request: Request) {
     lookbackHours,
     sinceIso,
     limit,
+    forceReplay,
+    targetEvents,
     processed,
     mirrored,
     skipped,
     failed,
+    forced,
     failures,
   })
 }
