@@ -30,6 +30,25 @@ export const ANALYTICS_EVENT_TYPES = [
   'sop_created',
   'sop_exported_pdf',
   'sop_shared_whatsapp',
+  'template_created',
+  'template_updated',
+  'visit_created',
+  'visit_updated',
+  'photos_uploaded',
+  'annotation_created',
+  'annotation_updated',
+  'annotation_deleted',
+  'document_generated_inspection',
+  'document_generated_schedule',
+  'document_generated_sop',
+  'document_updated',
+  'document_exported_pdf',
+  'document_exported_csv',
+  'document_exported_xlsx',
+  'document_shared_whatsapp',
+  'document_sent_email',
+  'share_link_created',
+  'share_link_revoked',
 ] as const
 
 export type AnalyticsEventType = (typeof ANALYTICS_EVENT_TYPES)[number]
@@ -42,6 +61,10 @@ export type AnalyticsSource =
   | 'leads'
   | 'obras'
   | 'portal'
+  | 'tasks'
+  | 'sops'
+  | 'construction_docs'
+  | 'api'
   | 'system'
 
 export interface AnalyticsProps {

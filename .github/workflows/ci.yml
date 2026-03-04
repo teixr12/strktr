@@ -47,6 +47,9 @@ jobs:
       - name: Validate API contracts
         run: npm run validate:api-contracts
 
+      - name: Governance hard gates
+        run: npm run governance:all
+
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 

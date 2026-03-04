@@ -3,40 +3,57 @@ import { API_ERROR_CODES } from '@/lib/api/errors'
 import { fail, ok } from '@/lib/api/response'
 import { buildPaginationMeta, getPaginationFromSearchParams } from '@/lib/api/pagination'
 import { emitProductEvent } from '@/lib/telemetry'
+import { createApiRoute } from '@/platform/api/create-api-route'
 import { createSopSchema } from '@/shared/schemas/sops'
 import type { SopRecord } from '@/shared/types/sops'
 
-export const GET = withApiAuth('can_manage_projects', async (request, { supabase, orgId }) => {
-  const { searchParams } = new URL(request.url)
-  const q = searchParams.get('q')?.trim() || null
-  const status = searchParams.get('status')?.trim() || null
-  const { page, pageSize, offset } = getPaginationFromSearchParams(searchParams, {
-    defaultPageSize: 25,
-    maxPageSize: 100,
-  })
+export const GET = createApiRoute<null, SopRecord[]>({
+  auth: { kind: 'permission', permission: 'can_manage_projects' },
+  flag: 'NEXT_PUBLIC_FF_SOP_BUILDER_V1',
+  handler: async ({ request, auth }) => {
+    if (!auth) {
+      return fail(
+        request,
+        { code: API_ERROR_CODES.UNAUTHORIZED, message: 'Não autorizado' },
+        401
+      )
+    }
 
-  let query = supabase
-    .from('sops')
-    .select(
-      'id, org_id, created_by, obra_id, projeto_id, title, description, status, blocks, branding, created_at, updated_at',
-      { count: 'exact' }
-    )
-    .eq('org_id', orgId)
+    const { supabase, orgId } = auth
+    const { searchParams } = new URL(request.url)
+    const q = searchParams.get('q')?.trim() || null
+    const status = searchParams.get('status')?.trim() || null
+    const { page, pageSize, offset } = getPaginationFromSearchParams(searchParams, {
+      defaultPageSize: 25,
+      maxPageSize: 100,
+    })
 
-  if (status) query = query.eq('status', status)
-  if (q) query = query.or(`title.ilike.%${q}%,description.ilike.%${q}%`)
+    let query = supabase
+      .from('sops')
+      .select(
+        'id, org_id, created_by, obra_id, projeto_id, title, description, status, blocks, branding, created_at, updated_at',
+        { count: 'exact' }
+      )
+      .eq('org_id', orgId)
 
-  const { data, count, error } = await query
-    .order('updated_at', { ascending: false })
-    .range(offset, offset + pageSize - 1)
+    if (status) query = query.eq('status', status)
+    if (q) query = query.or(`title.ilike.%${q}%,description.ilike.%${q}%`)
 
-  if (error) {
-    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: error.message }, 500)
-  }
+    const { data, count, error } = await query
+      .order('updated_at', { ascending: false })
+      .range(offset, offset + pageSize - 1)
 
-  const items = (data || []) as SopRecord[]
-  const total = count ?? items.length
-  return ok(request, items, buildPaginationMeta(items.length, total, page, pageSize))
+    if (error) {
+      return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: error.message }, 500)
+    }
+
+    const items = (data || []) as SopRecord[]
+    const total = count ?? items.length
+    return ok(request, items, {
+      ...buildPaginationMeta(items.length, total, page, pageSize),
+      flag: 'NEXT_PUBLIC_FF_SOP_BUILDER_V1',
+    })
+  },
 })
 
 export const POST = withApiAuth('can_manage_projects', async (request, { supabase, orgId, user }) => {
