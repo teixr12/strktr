@@ -122,7 +122,11 @@ jobs:
         run: |
           set -euo pipefail
           PROBE_STRICT=1 ./scripts/audit-analytics-capture-probe.sh
-          AUDIT_DRIFT_STRICT=1 ./scripts/audit-analytics-drift.sh
+          if ! AUDIT_DRIFT_STRICT=1 ./scripts/audit-analytics-drift.sh; then
+            echo "::warning title=Analytics 24h drift retry::Running one forced reconcile retry for portal_approval_decision before failing release gate."
+            FORCE_REPLAY=1 EVENT_TYPE=portal_approval_decision LIMIT=1000 HOURS=168 ./scripts/reconcile-analytics-portal.sh
+            AUDIT_DRIFT_STRICT=1 ./scripts/audit-analytics-drift.sh
+          fi
           if ! DRIFT_7D_STRICT=1 ./scripts/audit-analytics-drift-7d.sh; then
             echo "::warning title=Analytics 7d drift advisory::Out-of-policy rows detected in 7d daily drift. Release remains unblocked because strict release criteria is probe + 24h drift. See uploaded artifact for details."
           fi
@@ -150,5 +154,5 @@ jobs:
             echo "- App URL: https://strktr.vercel.app"
             echo "- Health endpoint: /api/v1/health/ops"
             echo "- Release marker: /api/v1/ops/release"
-            echo "- Analytics gates: probe + drift24h (strict), drift7d (advisory)"
+            echo "- Analytics gates: probe + drift24h (strict, one reconcile retry), drift7d (advisory)"
           } >> "$GITHUB_STEP_SUMMARY"
