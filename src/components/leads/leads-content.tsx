@@ -136,7 +136,7 @@ export function LeadsContent({ initialLeads }: Props) {
   async function refreshLeads(targetPage = 1) {
     if (!usePaginationV1) {
       try {
-        const data = await apiRequest<Lead[]>('/api/v1/leads?limit=200')
+        const data = await apiRequest<Lead[]>('/api/v1/leads?page=1&pageSize=100')
         setLeads(data)
         setLoadError(null)
       } catch {

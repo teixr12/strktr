@@ -26,49 +26,64 @@ export async function GET(request: Request) {
     Math.min(parseInt(searchParams.get('slaHours') || '48', 10), 24 * 30)
   )
   const now = Date.now()
+  const cutoffIso = new Date(now - slaHours * 60 * 60 * 1000).toISOString()
+  const activeStatuses = ['Novo', 'Qualificado', 'Proposta', 'Negociação'] as const
+  const stalledFilter = `ultimo_contato.lt.${cutoffIso},and(ultimo_contato.is.null,updated_at.lt.${cutoffIso})`
 
-  const { data: leads, error: dbError } = await supabase
-    .from('leads')
-    .select('id, nome, status, temperatura, ultimo_contato, valor_potencial, updated_at')
-    .eq('org_id', orgId)
-    .in('status', ['Novo', 'Qualificado', 'Proposta', 'Negociação'])
-    .order('updated_at', { ascending: false })
-    .limit(200)
+  const [totalAtivosRes, stalledCountRes, stalledLeadsRes] = await Promise.all([
+    supabase
+      .from('leads')
+      .select('id', { count: 'exact', head: true })
+      .eq('org_id', orgId)
+      .in('status', activeStatuses),
+    supabase
+      .from('leads')
+      .select('id', { count: 'exact', head: true })
+      .eq('org_id', orgId)
+      .in('status', activeStatuses)
+      .or(stalledFilter),
+    supabase
+      .from('leads')
+      .select('id, nome, status, temperatura, ultimo_contato, valor_potencial, updated_at')
+      .eq('org_id', orgId)
+      .in('status', activeStatuses)
+      .or(stalledFilter)
+      .order('updated_at', { ascending: true })
+      .limit(20),
+  ])
 
-  if (dbError) {
+  if (totalAtivosRes.error || stalledCountRes.error || stalledLeadsRes.error) {
+    const dbError = totalAtivosRes.error || stalledCountRes.error || stalledLeadsRes.error
     log('error', 'leads.sla.failed', {
       requestId,
       orgId,
       userId: user.id,
       route: '/api/v1/leads/sla',
-      error: dbError.message,
+      error: dbError?.message || 'unknown',
     })
     return fail(
       request,
-      { code: API_ERROR_CODES.DB_ERROR, message: dbError.message },
+      { code: API_ERROR_CODES.DB_ERROR, message: dbError?.message || 'Erro ao calcular SLA de leads' },
       500
     )
   }
 
-  const stalled = (leads || []).filter((lead) => {
-    const checkpoint = lead.ultimo_contato || lead.updated_at
-    if (!checkpoint) return true
-    const hours = (now - new Date(checkpoint).getTime()) / (1000 * 60 * 60)
-    return hours >= slaHours
-  })
+  const totalAtivos = totalAtivosRes.count || 0
+  const totalParados = stalledCountRes.count || 0
+  const stalledLeads = stalledLeadsRes.data || []
 
-  const severity = stalled.length >= 10 ? 'high' : stalled.length >= 4 ? 'medium' : 'low'
+  const severity = totalParados >= 10 ? 'high' : totalParados >= 4 ? 'medium' : 'low'
 
-  if (stalled.length > 0) {
+  if (totalParados > 0 && stalledLeads[0]?.id) {
     await emitProductEvent({
       supabase,
       orgId,
       userId: user.id,
       eventType: 'LeadSlaBreached',
       entityType: 'lead',
-      entityId: stalled[0].id,
+      entityId: stalledLeads[0].id,
       payload: {
-        totalStalled: stalled.length,
+        totalStalled: totalParados,
         slaHours,
       },
     }).catch(() => undefined)
@@ -76,9 +91,9 @@ export async function GET(request: Request) {
 
   return ok(request, {
     slaHours,
-    totalAtivos: leads?.length || 0,
-    totalParados: stalled.length,
+    totalAtivos,
+    totalParados,
     severity,
-    leadsParados: stalled.slice(0, 20),
+    leadsParados: stalledLeads,
   })
 }

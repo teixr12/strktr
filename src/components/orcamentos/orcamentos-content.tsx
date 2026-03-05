@@ -106,8 +106,8 @@ export function OrcamentosContent({ initialOrcamentos }: Props) {
     async function loadRelated() {
       try {
         const [leadsData, obrasData] = await Promise.all([
-          apiRequest<Pick<Lead, 'id' | 'nome'>[]>('/api/v1/leads?limit=200'),
-          apiRequest<Pick<Obra, 'id' | 'nome'>[]>('/api/v1/obras?limit=200'),
+          apiRequest<Pick<Lead, 'id' | 'nome'>[]>('/api/v1/leads?page=1&pageSize=100'),
+          apiRequest<Pick<Obra, 'id' | 'nome'>[]>('/api/v1/obras?limit=100'),
         ])
         setLeads(leadsData)
         setObras(obrasData)

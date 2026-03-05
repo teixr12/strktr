@@ -117,7 +117,7 @@ export function ComprasContent({ initialCompras, obras }: Props) {
     if (!usePaginationV1) {
       try {
         setLoadError(null)
-        const data = await apiRequest<Compra[]>('/api/v1/compras?limit=200')
+        const data = await apiRequest<Compra[]>('/api/v1/compras?page=1&pageSize=100')
         setCompras(data)
       } catch (err) {
         const message = err instanceof Error ? `${err.message}. Tentar novamente.` : 'Erro ao recarregar compras. Tentar novamente.'
