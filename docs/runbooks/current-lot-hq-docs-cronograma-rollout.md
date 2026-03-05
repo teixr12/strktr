@@ -17,14 +17,15 @@
 ## Canary
 1. Keep `NEXT_PUBLIC_FF_OBRA_ADDRESS_UX_V2=true` and `NEXT_PUBLIC_FF_OBRA_HQ_ROUTING_V1=true`.
 2. Keep `NEXT_PUBLIC_FF_CRONOGRAMA_UX_V2=false` and `NEXT_PUBLIC_FF_DOCS_WORKSPACE_V1=false` until Wave2 smoke is stable.
-3. Set `FF_OBRA_WAVE2_CANARY_PERCENT=5`.
-4. Redeploy and validate:
+3. Keep `FF_OBRA_WAVE2_CANARY_PERCENT=100` to preserve already-live weather/map/logistics rollout.
+4. Set `FF_OBRA_ADDRESS_HQ_CANARY_PERCENT=5`.
+5. Redeploy and validate:
    - obra detail
    - weather/map/logistics
    - HQ config
-5. Increase `FF_OBRA_WAVE2_CANARY_PERCENT=25`.
-6. Redeploy and repeat smoke.
-7. Set `FF_OBRA_WAVE2_CANARY_PERCENT=100`.
+6. Increase `FF_OBRA_ADDRESS_HQ_CANARY_PERCENT=25`.
+7. Redeploy and repeat smoke.
+8. Set `FF_OBRA_ADDRESS_HQ_CANARY_PERCENT=100`.
 
 ## Global UX Enablement
 1. Set `NEXT_PUBLIC_FF_CRONOGRAMA_UX_V2=true`.
@@ -41,7 +42,8 @@
 2. Set `NEXT_PUBLIC_FF_CRONOGRAMA_UX_V2=false`.
 3. Set `NEXT_PUBLIC_FF_OBRA_ADDRESS_UX_V2=false`.
 4. Set `NEXT_PUBLIC_FF_OBRA_HQ_ROUTING_V1=false`.
-5. Redeploy.
+5. Set `FF_OBRA_ADDRESS_HQ_CANARY_PERCENT=0`.
+6. Redeploy.
 
 ## Smoke Checklist
 - login/dashboard

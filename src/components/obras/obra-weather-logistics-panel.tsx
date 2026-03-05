@@ -4,7 +4,6 @@ import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from '@/hooks/use-toast'
 import { apiRequest } from '@/lib/api/client'
-import { featureFlags } from '@/lib/feature-flags'
 import { track } from '@/lib/analytics/client'
 import type { ObraLocationInput, ObraLocationPayload } from '@/shared/types/obra-location'
 import type { OrgHqLocationPayload } from '@/shared/types/org-hq-location'
@@ -25,6 +24,8 @@ interface ObraWeatherLogisticsPanelProps {
   weatherEnabled?: boolean
   mapEnabled?: boolean
   logisticsEnabled?: boolean
+  addressUxEnabled?: boolean
+  hqRoutingEnabled?: boolean
 }
 
 type AddressFormState = {
@@ -108,10 +109,10 @@ export function ObraWeatherLogisticsPanel({
   weatherEnabled = false,
   mapEnabled = false,
   logisticsEnabled = false,
+  addressUxEnabled = false,
+  hqRoutingEnabled = false,
 }: ObraWeatherLogisticsPanelProps) {
-  const addressUxV2 = featureFlags.obraAddressUxV2
-  const hqRoutingEnabled = featureFlags.obraHqRoutingV1 && logisticsEnabled
-  const addressLogisticsUx = addressUxV2 && hqRoutingEnabled
+  const addressLogisticsUx = addressUxEnabled && hqRoutingEnabled && logisticsEnabled
 
   const [loadingLocation, setLoadingLocation] = useState(false)
   const [savingLocation, setSavingLocation] = useState(false)
@@ -352,7 +353,7 @@ export function ObraWeatherLogisticsPanel({
         <div>
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Clima, mapa e logística</h3>
           <p className="text-[11px] text-gray-500">
-            {addressUxV2 ? 'Fluxo por CEP/endereço com sede da organização' : 'Fluxo legado por latitude/longitude'}
+            {addressUxEnabled ? 'Fluxo por CEP/endereço com sede da organização' : 'Fluxo legado por latitude/longitude'}
           </p>
         </div>
         <span className="text-[11px] text-gray-500">Wave2</span>
@@ -380,7 +381,7 @@ export function ObraWeatherLogisticsPanel({
               <div className="skeleton h-10 rounded-xl" />
               <div className="skeleton h-10 rounded-xl" />
             </div>
-          ) : addressUxV2 ? (
+          ) : addressUxEnabled ? (
             <>
               <div className="grid gap-3 md:grid-cols-2">
                 <input
@@ -494,7 +495,7 @@ export function ObraWeatherLogisticsPanel({
           />
         ) : (
           <div className="flex h-64 items-center justify-center rounded-xl border border-dashed border-gray-300 px-4 text-center text-xs text-gray-500 dark:border-gray-700">
-            {addressUxV2
+            {addressUxEnabled
               ? 'Salve o CEP/endereço da obra para habilitar o mapa visual.'
               : 'Defina latitude/longitude para habilitar o mapa da obra.'}
           </div>

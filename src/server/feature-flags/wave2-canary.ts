@@ -12,6 +12,13 @@ type Wave2CanarySnapshot = {
   configured: boolean
   percent: number
   allowlistCount: number
+  source: 'wave2' | 'addressHq'
+}
+
+type CanaryEnvConfig = {
+  allowlistEnv: string
+  percentEnv: string
+  source: Wave2CanarySnapshot['source']
 }
 
 const WAVE2_FEATURE_ENV: Record<Wave2FeatureKey, string | undefined> = {
@@ -21,6 +28,23 @@ const WAVE2_FEATURE_ENV: Record<Wave2FeatureKey, string | undefined> = {
   weatherAlerts: process.env.NEXT_PUBLIC_FF_OBRA_WEATHER_ALERTS_V1,
   addressV2: process.env.NEXT_PUBLIC_FF_OBRA_ADDRESS_UX_V2,
   hqRouting: process.env.NEXT_PUBLIC_FF_OBRA_HQ_ROUTING_V1,
+}
+
+const DEFAULT_WAVE2_CANARY_ENV: CanaryEnvConfig = {
+  allowlistEnv: 'FF_OBRA_WAVE2_CANARY_ORGS',
+  percentEnv: 'FF_OBRA_WAVE2_CANARY_PERCENT',
+  source: 'wave2',
+}
+
+const ADDRESS_HQ_CANARY_ENV: CanaryEnvConfig = {
+  allowlistEnv: 'FF_OBRA_ADDRESS_HQ_CANARY_ORGS',
+  percentEnv: 'FF_OBRA_ADDRESS_HQ_CANARY_PERCENT',
+  source: 'addressHq',
+}
+
+const FEATURE_CANARY_ENV: Partial<Record<Wave2FeatureKey, CanaryEnvConfig>> = {
+  addressV2: ADDRESS_HQ_CANARY_ENV,
+  hqRouting: ADDRESS_HQ_CANARY_ENV,
 }
 
 function parseOrgAllowlist(raw: string | undefined): Set<string> {
@@ -46,27 +70,41 @@ function hashToBucket(input: string): number {
   return hash % 100
 }
 
-function buildSnapshot(): Wave2CanarySnapshot {
-  const allowlist = parseOrgAllowlist(process.env.FF_OBRA_WAVE2_CANARY_ORGS)
-  const percent = parseCanaryPercent(process.env.FF_OBRA_WAVE2_CANARY_PERCENT)
+function buildSnapshot(config: CanaryEnvConfig): Wave2CanarySnapshot {
+  const allowlist = parseOrgAllowlist(process.env[config.allowlistEnv])
+  const percent = parseCanaryPercent(process.env[config.percentEnv])
   return {
     configured: allowlist.size > 0 || percent > 0,
     percent,
     allowlistCount: allowlist.size,
+    source: config.source,
   }
 }
 
-function isOrgInWave2Canary(orgId: string): boolean {
-  const allowlist = parseOrgAllowlist(process.env.FF_OBRA_WAVE2_CANARY_ORGS)
+function isOrgInCanary(orgId: string, config: CanaryEnvConfig): boolean {
+  const allowlist = parseOrgAllowlist(process.env[config.allowlistEnv])
   if (allowlist.has(orgId)) return true
 
-  const percent = parseCanaryPercent(process.env.FF_OBRA_WAVE2_CANARY_PERCENT)
+  const percent = parseCanaryPercent(process.env[config.percentEnv])
   if (percent <= 0) return false
   return hashToBucket(orgId) < percent
 }
 
 export function getWave2CanarySnapshot(): Wave2CanarySnapshot {
-  return buildSnapshot()
+  return buildSnapshot(DEFAULT_WAVE2_CANARY_ENV)
+}
+
+function resolveCanaryConfig(feature: Wave2FeatureKey): CanaryEnvConfig {
+  const featureConfig = FEATURE_CANARY_ENV[feature]
+  if (!featureConfig) return DEFAULT_WAVE2_CANARY_ENV
+
+  const featureSnapshot = buildSnapshot(featureConfig)
+  if (featureSnapshot.configured) return featureConfig
+  return DEFAULT_WAVE2_CANARY_ENV
+}
+
+export function getAddressHqCanarySnapshot(): Wave2CanarySnapshot {
+  return buildSnapshot(resolveCanaryConfig('addressV2'))
 }
 
 export function isWave2FeatureEnabledForOrg(
@@ -76,9 +114,10 @@ export function isWave2FeatureEnabledForOrg(
   if (!isFlagDisabledByDefault(WAVE2_FEATURE_ENV[feature])) return false
   if (!orgId) return false
 
-  const snapshot = buildSnapshot()
+  const config = resolveCanaryConfig(feature)
+  const snapshot = buildSnapshot(config)
   if (!snapshot.configured) return true
-  return isOrgInWave2Canary(orgId)
+  return isOrgInCanary(orgId, config)
 }
 
 export function isWave2LocationEnabledForOrg(orgId: string | null | undefined): boolean {

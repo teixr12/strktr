@@ -22,6 +22,7 @@ interface Props {
   orgMembro: OrgMembro | null
   orgMembros: OrgMembro[]
   organizacao: Organizacao | null
+  hqRoutingEnabled?: boolean
 }
 
 const inviteFormSchema = z.object({
@@ -89,10 +90,15 @@ function hasHqFormValue(form: HqFormState) {
   return Boolean(form.cep || form.logradouro || form.bairro || form.cidade || form.estado)
 }
 
-export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembros, organizacao: initialOrg }: Props) {
+export function OrgSettingsContent({
+  userId,
+  orgMembro,
+  orgMembros: initialMembros,
+  organizacao: initialOrg,
+  hqRoutingEnabled = false,
+}: Props) {
   const { confirm, dialog: confirmDialog } = useConfirm()
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Configuracoes
-  const hqRoutingEnabled = featureFlags.obraHqRoutingV1
   const [org, setOrg] = useState(initialOrg)
   const [membros, setMembros] = useState(initialMembros)
   const [showCreateOrg, setShowCreateOrg] = useState(false)

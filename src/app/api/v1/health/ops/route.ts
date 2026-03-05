@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { fail, ok } from '@/lib/api/response'
 import { isFlagDisabledByDefault, isFlagEnabledByDefault } from '@/lib/feature-flags'
-import { getWave2CanarySnapshot } from '@/server/feature-flags/wave2-canary'
+import { getAddressHqCanarySnapshot, getWave2CanarySnapshot } from '@/server/feature-flags/wave2-canary'
 
 function normalizeEnv(value: string | undefined | null): string | null {
   const normalized = (value || '').trim()
@@ -50,6 +50,7 @@ export async function GET(request: Request) {
 
     const degraded = checks.some((c) => !c.ok)
     const wave2Canary = getWave2CanarySnapshot()
+    const addressHqCanary = getAddressHqCanarySnapshot()
     return ok(request, {
       status: degraded ? 'degraded' : 'ok',
       ts: new Date().toISOString(),
@@ -57,6 +58,7 @@ export async function GET(request: Request) {
       version: process.env.VERCEL_GIT_COMMIT_SHA || 'local',
       rollout: {
         wave2Canary,
+        addressHqCanary,
       },
       flags: {
         uiTailadminV1: isFlagEnabledByDefault(process.env.NEXT_PUBLIC_FF_UI_TAILADMIN_V1),

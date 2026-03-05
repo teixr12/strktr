@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { OrgSettingsContent } from '@/components/configuracoes/org-settings'
+import { isWave2FeatureEnabledForOrg } from '@/server/feature-flags/wave2-canary'
 
 export const dynamic = 'force-dynamic'
 
@@ -75,6 +76,7 @@ export default async function ConfiguracoesPage() {
       orgMembro={orgMembro}
       orgMembros={orgMembros as never[]}
       organizacao={organizacao}
+      hqRoutingEnabled={Boolean(organizacao?.id) && isWave2FeatureEnabledForOrg('hqRouting', organizacao?.id)}
     />
   )
 }
