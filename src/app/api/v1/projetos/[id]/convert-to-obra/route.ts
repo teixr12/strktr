@@ -2,6 +2,7 @@ import { getApiUser } from '@/lib/api/auth'
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { log } from '@/lib/api/logger'
 import { fail, ok } from '@/lib/api/response'
+import { PROJECT_FOR_CONVERSION_SELECT } from '@/lib/api/select-maps'
 import { requireDomainPermission } from '@/lib/auth/domain-permissions'
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -18,7 +19,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { id } = await params
   const { data: projeto, error: projetoError } = await supabase
     .from('projetos')
-    .select('*')
+    .select(PROJECT_FOR_CONVERSION_SELECT)
     .eq('id', id)
     .eq('org_id', orgId)
     .single()

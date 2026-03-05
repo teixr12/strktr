@@ -2,6 +2,7 @@ import { getApiUser } from '@/lib/api/auth'
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { log } from '@/lib/api/logger'
 import { fail, ok } from '@/lib/api/response'
+import { ORG_MEMBER_SELECT } from '@/lib/api/select-maps'
 import { requireDomainPermission } from '@/lib/auth/domain-permissions'
 import { createOrgSchema, updateOrgSchema } from '@/shared/schemas/business'
 import { createClient } from '@supabase/supabase-js'
@@ -66,7 +67,7 @@ export async function POST(request: Request) {
       role: 'admin',
       status: 'ativo',
     })
-    .select('*')
+    .select(ORG_MEMBER_SELECT)
     .single()
 
   if (membershipError) {

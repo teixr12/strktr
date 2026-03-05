@@ -1,6 +1,7 @@
 import { getApiUser } from '@/lib/api/auth'
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { fail, ok } from '@/lib/api/response'
+import { AUTOMATION_RUN_SELECT } from '@/lib/api/select-maps'
 import { requireDomainPermission } from '@/lib/auth/domain-permissions'
 
 export async function GET(request: Request) {
@@ -21,7 +22,7 @@ export async function GET(request: Request) {
 
   let query = supabase
     .from('automation_runs')
-    .select('*')
+    .select(AUTOMATION_RUN_SELECT)
     .eq('org_id', orgId)
     .order('created_at', { ascending: false })
     .limit(limit)

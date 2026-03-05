@@ -2,6 +2,7 @@ import { getApiUser } from '@/lib/api/auth'
 import { fail, ok } from '@/lib/api/response'
 import { log } from '@/lib/api/logger'
 import { API_ERROR_CODES } from '@/lib/api/errors'
+import { OBRA_SELECT } from '@/lib/api/select-maps'
 import { obraFormSchema } from '@/shared/schemas/execution'
 import { runAutomation } from '@/server/services/automation/automation-service'
 
@@ -20,7 +21,7 @@ export async function GET(request: Request) {
 
   let query = supabase
     .from('obras')
-    .select('*')
+    .select(OBRA_SELECT)
     .eq('org_id', orgId)
     .order('created_at', { ascending: false })
     .limit(limit)

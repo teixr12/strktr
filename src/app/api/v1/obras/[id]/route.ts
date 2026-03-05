@@ -2,6 +2,7 @@ import { getApiUser } from '@/lib/api/auth'
 import { fail, ok } from '@/lib/api/response'
 import { log } from '@/lib/api/logger'
 import { API_ERROR_CODES } from '@/lib/api/errors'
+import { OBRA_SELECT } from '@/lib/api/select-maps'
 import { obraFormSchema } from '@/shared/schemas/execution'
 
 function isSupabaseNotFound(error: { code?: string } | null | undefined) {
@@ -14,7 +15,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!orgId) return fail(request, { code: API_ERROR_CODES.FORBIDDEN, message: 'Usuário sem organização ativa' }, 403)
 
   const { id } = await params
-  const { data, error: dbError } = await supabase.from('obras').select('*').eq('id', id).eq('org_id', orgId).single()
+  const { data, error: dbError } = await supabase.from('obras').select(OBRA_SELECT).eq('id', id).eq('org_id', orgId).single()
   if (dbError) {
     if (isSupabaseNotFound(dbError)) {
       log('warn', 'obras.getById.not_found', {

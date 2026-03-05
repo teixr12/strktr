@@ -2,6 +2,7 @@ import { getApiUser } from '@/lib/api/auth'
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { log } from '@/lib/api/logger'
 import { fail, ok } from '@/lib/api/response'
+import { ORG_MEMBER_SELECT } from '@/lib/api/select-maps'
 import { requireDomainPermission } from '@/lib/auth/domain-permissions'
 import { updateOrgMemberRoleSchema } from '@/shared/schemas/business'
 
@@ -31,7 +32,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .update({ role: parsed.data.role })
     .eq('id', id)
     .eq('org_id', orgId)
-    .select('*')
+    .select(ORG_MEMBER_SELECT)
     .single()
 
   if (dbError) {

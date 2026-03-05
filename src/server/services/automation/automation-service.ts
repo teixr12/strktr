@@ -1,4 +1,5 @@
 import { log } from '@/lib/api/logger'
+import { AUTOMATION_RULE_SELECT } from '@/lib/api/select-maps'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   AutomationPreview,
@@ -328,7 +329,7 @@ async function loadRules(
 ): Promise<RuleRow[]> {
   const { data, error } = await supabase
     .from('automation_rules')
-    .select('*')
+    .select(AUTOMATION_RULE_SELECT)
     .eq('org_id', orgId)
     .eq('trigger', trigger)
     .eq('enabled', true)
@@ -393,7 +394,7 @@ export async function listAutomationRules(
 ): Promise<AutomationRule[]> {
   const { data } = await supabase
     .from('automation_rules')
-    .select('*')
+    .select(AUTOMATION_RULE_SELECT)
     .eq('org_id', orgId)
     .order('created_at', { ascending: false })
 
