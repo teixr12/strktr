@@ -3,16 +3,12 @@ import { getApiUser } from '@/lib/api/auth'
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { fail, ok } from '@/lib/api/response'
 import { requireDomainPermission } from '@/lib/auth/domain-permissions'
-import { fetchObraByOrg } from '@/server/repositories/obras/execution-repository'
-import { isWave2LocationEnabledForOrg } from '@/server/feature-flags/wave2-canary'
-import {
-  fetchObraLocationByOrg,
-  upsertObraLocationByOrg,
-} from '@/server/repositories/obras/location-repository'
+import { fetchOrgHqLocationByOrg, upsertOrgHqLocationByOrg } from '@/server/repositories/config/org-hq-repository'
+import { isWave2FeatureEnabledForOrg } from '@/server/feature-flags/wave2-canary'
 import { AddressResolutionError, resolveAddressLocation } from '@/server/services/obras/address-service'
-import type { ObraLocationPayload } from '@/shared/types/obra-location'
+import type { OrgHqLocationPayload } from '@/shared/types/org-hq-location'
 
-const updateObraLocationSchema = z
+const updateOrgHqLocationSchema = z
   .object({
     lat: z.number().min(-90).max(90).optional().nullable(),
     lng: z.number().min(-180).max(180).optional().nullable(),
@@ -24,7 +20,7 @@ const updateObraLocationSchema = z
     cidade: z.string().trim().optional().nullable(),
     estado: z.string().trim().optional().nullable(),
     formatted_address: z.string().trim().optional().nullable(),
-  source: z.enum(['manual', 'geocoded', 'imported']).default('manual'),
+    source: z.enum(['manual', 'geocoded', 'imported']).default('manual'),
   })
   .superRefine((value, ctx) => {
     const hasLat = typeof value.lat === 'number'
@@ -53,10 +49,10 @@ const updateObraLocationSchema = z
     }
   })
 
-function mapLocationPayload(
-  obra: { id: string; nome: string },
+function mapPayload(
+  org: { id: string; nome: string },
   data: {
-    obra_id: string
+    org_id: string
     lat: number | string
     lng: number | string
     source: 'manual' | 'geocoded' | 'imported'
@@ -70,13 +66,13 @@ function mapLocationPayload(
     estado?: string | null
     formatted_address?: string | null
   } | null
-): ObraLocationPayload {
+): OrgHqLocationPayload {
   return {
-    obra: { id: obra.id, nome: obra.nome },
+    organizacao: org,
     hasLocation: Boolean(data),
     location: data
       ? {
-          obra_id: data.obra_id,
+          org_id: data.org_id,
           lat: Number(data.lat),
           lng: Number(data.lng),
           source: data.source,
@@ -94,64 +90,54 @@ function mapLocationPayload(
   }
 }
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request) {
   const { user, supabase, error, orgId } = await getApiUser(request)
   if (!user || !supabase) {
-    return fail(
-      request,
-      { code: API_ERROR_CODES.UNAUTHORIZED, message: error || 'Não autorizado' },
-      401
-    )
+    return fail(request, { code: API_ERROR_CODES.UNAUTHORIZED, message: error || 'Não autorizado' }, 401)
   }
   if (!orgId) {
-    return fail(
-      request,
-      { code: API_ERROR_CODES.FORBIDDEN, message: 'Usuário sem organização ativa' },
-      403
-    )
+    return fail(request, { code: API_ERROR_CODES.FORBIDDEN, message: 'Usuário sem organização ativa' }, 403)
   }
-  if (!isWave2LocationEnabledForOrg(orgId)) {
+  if (!isWave2FeatureEnabledForOrg('hqRouting', orgId)) {
     return fail(request, { code: API_ERROR_CODES.NOT_FOUND, message: 'Endpoint não disponível' }, 404)
   }
 
-  const { id } = await params
-  const { data: obra } = await fetchObraByOrg(supabase, id, orgId)
-  if (!obra) {
-    return fail(request, { code: API_ERROR_CODES.NOT_FOUND, message: 'Obra não encontrada' }, 404)
+  const { data: org, error: orgError } = await supabase
+    .from('organizacoes')
+    .select('id, nome')
+    .eq('id', orgId)
+    .maybeSingle()
+  if (orgError) {
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: orgError.message }, 500)
+  }
+  if (!org) {
+    return fail(request, { code: API_ERROR_CODES.NOT_FOUND, message: 'Organização não encontrada' }, 404)
   }
 
-  const { data, error: dbError } = await fetchObraLocationByOrg(supabase, id, orgId)
+  const { data, error: dbError } = await fetchOrgHqLocationByOrg(supabase, orgId)
   if (dbError) {
     return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 500)
   }
 
-  return ok(request, mapLocationPayload(obra, data), { flag: 'NEXT_PUBLIC_FF_OBRA_MAP_V1' })
+  return ok(request, mapPayload(org, data), { flag: 'NEXT_PUBLIC_FF_OBRA_HQ_ROUTING_V1' })
 }
 
-export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function PATCH(request: Request) {
   const { user, supabase, error, orgId, role } = await getApiUser(request)
   if (!user || !supabase) {
-    return fail(
-      request,
-      { code: API_ERROR_CODES.UNAUTHORIZED, message: error || 'Não autorizado' },
-      401
-    )
+    return fail(request, { code: API_ERROR_CODES.UNAUTHORIZED, message: error || 'Não autorizado' }, 401)
   }
   if (!orgId) {
-    return fail(
-      request,
-      { code: API_ERROR_CODES.FORBIDDEN, message: 'Usuário sem organização ativa' },
-      403
-    )
+    return fail(request, { code: API_ERROR_CODES.FORBIDDEN, message: 'Usuário sem organização ativa' }, 403)
   }
-  if (!isWave2LocationEnabledForOrg(orgId)) {
+  if (!isWave2FeatureEnabledForOrg('hqRouting', orgId)) {
     return fail(request, { code: API_ERROR_CODES.NOT_FOUND, message: 'Endpoint não disponível' }, 404)
   }
 
-  const permissionError = requireDomainPermission(request, role, 'can_manage_projects')
+  const permissionError = requireDomainPermission(request, role, 'can_manage_team')
   if (permissionError) return permissionError
 
-  const parsed = updateObraLocationSchema.safeParse(await request.json().catch(() => null))
+  const parsed = updateOrgHqLocationSchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) {
     return fail(
       request,
@@ -163,10 +149,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     )
   }
 
-  const { id } = await params
-  const { data: obra } = await fetchObraByOrg(supabase, id, orgId)
-  if (!obra) {
-    return fail(request, { code: API_ERROR_CODES.NOT_FOUND, message: 'Obra não encontrada' }, 404)
+  const { data: org, error: orgError } = await supabase
+    .from('organizacoes')
+    .select('id, nome')
+    .eq('id', orgId)
+    .maybeSingle()
+  if (orgError) {
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: orgError.message }, 500)
+  }
+  if (!org) {
+    return fail(request, { code: API_ERROR_CODES.NOT_FOUND, message: 'Organização não encontrada' }, 404)
   }
 
   let resolvedLocation
@@ -176,27 +168,25 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const message =
       error instanceof AddressResolutionError
         ? error.message
-        : 'Não foi possível resolver a localização da obra.'
+        : 'Não foi possível resolver a localização da sede.'
     return fail(request, { code: API_ERROR_CODES.VALIDATION_ERROR, message }, 400)
   }
 
-  const { data, error: dbError } = await upsertObraLocationByOrg(supabase, {
+  const { data, error: dbError } = await upsertOrgHqLocationByOrg(supabase, {
     orgId,
-    obraId: id,
     lat: resolvedLocation.lat,
     lng: resolvedLocation.lng,
     source: resolvedLocation.source,
     userId: user.id,
     address: resolvedLocation,
   })
-
   if (dbError || !data) {
     return fail(
       request,
-      { code: API_ERROR_CODES.DB_ERROR, message: dbError?.message || 'Falha ao salvar localização' },
+      { code: API_ERROR_CODES.DB_ERROR, message: dbError?.message || 'Falha ao salvar sede' },
       500
     )
   }
 
-  return ok(request, mapLocationPayload(obra, data), { flag: 'NEXT_PUBLIC_FF_OBRA_MAP_V1' })
+  return ok(request, mapPayload(org, data), { flag: 'NEXT_PUBLIC_FF_OBRA_HQ_ROUTING_V1' })
 }

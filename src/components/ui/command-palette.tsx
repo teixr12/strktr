@@ -45,6 +45,7 @@ const NAV_ITEMS: PaletteItem[] = [
   { id: 'equipe', label: 'Equipe', href: '/equipe', icon: Users, section: 'nav' },
   { id: 'calendario', label: 'Agenda', href: '/calendario', icon: CalendarDays, section: 'nav' },
   { id: 'knowledgebase', label: 'Base de Conhecimento', href: '/knowledgebase', icon: BookOpen, section: 'nav' },
+  { id: 'docs', label: 'Docs', href: '/docs', icon: FileText, section: 'nav' },
   { id: 'construction-docs', label: 'Construction Docs', href: '/construction-docs/projects', icon: FileText, section: 'nav' },
   { id: 'configuracoes', label: 'Configura\u00e7\u00f5es', href: '/configuracoes', icon: Building2, section: 'nav' },
 ]
@@ -77,7 +78,10 @@ export function CommandPalette() {
 
   const visibleItems = useMemo(() => {
     return ALL_ITEMS.filter((item) => {
-      if (item.id === 'construction-docs') return featureFlags.constructionDocs
+      if (item.id === 'docs') return featureFlags.docsWorkspaceV1
+      if (item.id === 'construction-docs') {
+        return featureFlags.constructionDocs && !featureFlags.docsWorkspaceV1
+      }
       return true
     })
   }, [])

@@ -19,6 +19,10 @@ export interface ObraWeatherPayload {
   location: {
     lat: number
     lng: number
+    formatted_address?: string | null
+    cidade?: string | null
+    estado?: string | null
+    cep?: string | null
   } | null
   provider: 'open-meteo'
   days: ObraWeatherDay[]
@@ -26,4 +30,3 @@ export interface ObraWeatherPayload {
   generatedAt: string
   unavailableReason?: string
 }
-

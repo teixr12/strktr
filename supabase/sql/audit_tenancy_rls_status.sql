@@ -27,6 +27,7 @@ with tracked_tables as (
     ('portal_admin_settings'),
     ('general_tasks'),
     ('obra_geolocations'),
+    ('org_hq_locations'),
     ('sops'),
     ('construction_docs_project_links'),
     ('construction_docs_visits'),

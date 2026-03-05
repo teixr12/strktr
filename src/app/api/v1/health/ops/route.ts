@@ -95,6 +95,8 @@ export async function GET(request: Request) {
         obraWeatherV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_OBRA_WEATHER_V1),
         obraMapV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_OBRA_MAP_V1),
         obraLogisticsV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_OBRA_LOGISTICS_V1),
+        obraAddressUxV2: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_OBRA_ADDRESS_UX_V2),
+        obraHqRoutingV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_OBRA_HQ_ROUTING_V1),
         obraWeatherAlertsV1: isFlagDisabledByDefault(
           process.env.NEXT_PUBLIC_FF_OBRA_WEATHER_ALERTS_V1
         ),
@@ -104,6 +106,10 @@ export async function GET(request: Request) {
         cronogramaEngine: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_CRONOGRAMA_ENGINE),
         cronogramaViewsV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_CRONOGRAMA_VIEWS_V1),
         cronogramaPdf: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_CRONOGRAMA_PDF),
+        cronogramaUxV2: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_CRONOGRAMA_UX_V2),
+        docsWorkspaceV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_DOCS_WORKSPACE_V1),
+        financeReceiptsV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_FINANCE_RECEIPTS_V1),
+        financeReceiptAiV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_FINANCE_RECEIPT_AI_V1),
         clientPortal: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_CLIENT_PORTAL),
         approvalGate: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_APPROVAL_GATE),
         architectAgenda: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_ARCHITECT_AGENDA),
