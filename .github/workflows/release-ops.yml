@@ -11,6 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Wait for production deployment and validate release marker + health
         env:
           EXPECTED_SHA: ${{ github.sha }}
@@ -75,6 +78,68 @@ jobs:
 
           echo "Smoke checks passed: app=$APP_CODE login=$LOGIN_CODE health=$HEALTH_CODE release=$RELEASE_CODE status=$HEALTH_STATUS version=$RELEASE_VERSION"
 
+      - name: Validate analytics gate secrets
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          POSTHOG_PROJECT_ID: ${{ secrets.POSTHOG_PROJECT_ID }}
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          POSTHOG_PROJECT_TOKEN: ${{ secrets.POSTHOG_PROJECT_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_PROJECT_REF"
+          test -n "$POSTHOG_PROJECT_ID"
+          test -n "$POSTHOG_API_KEY"
+          test -n "$POSTHOG_PROJECT_TOKEN"
+
+      - name: Prepare analytics credentials files
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          POSTHOG_PROJECT_ID: ${{ secrets.POSTHOG_PROJECT_ID }}
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          POSTHOG_PROJECT_TOKEN: ${{ secrets.POSTHOG_PROJECT_TOKEN }}
+          POSTHOG_HOST: ${{ secrets.POSTHOG_HOST }}
+        run: |
+          set -euo pipefail
+          cat > supabase_keys.env.codex.txt <<EOF
+          SUPABASE_ACCESS_TOKEN=${SUPABASE_ACCESS_TOKEN}
+          SUPABASE_PROJECT_REF=${SUPABASE_PROJECT_REF}
+          EOF
+
+          cat > posthog-credentials.txt <<EOF
+          POSTHOG_PROJECT_ID=${POSTHOG_PROJECT_ID}
+          POSTHOG_API_KEY=${POSTHOG_API_KEY}
+          POSTHOG_PROJECT_TOKEN=${POSTHOG_PROJECT_TOKEN}
+          EOF
+
+          if [[ -n "${POSTHOG_HOST}" ]]; then
+            echo "POSTHOG_HOST=${POSTHOG_HOST}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Analytics release gate (capture probe + drift 24h + drift 7d)
+        run: |
+          set -euo pipefail
+          PROBE_STRICT=1 ./scripts/audit-analytics-capture-probe.sh
+          AUDIT_DRIFT_STRICT=1 ./scripts/audit-analytics-drift.sh
+          DRIFT_7D_STRICT=1 ./scripts/audit-analytics-drift-7d.sh
+
+      - name: Upload release analytics gate report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-ops-analytics-report
+          path: |
+            docs/reports/analytics-capture-probe-*.md
+            docs/reports/analytics-drift-*.md
+            docs/reports/analytics-drift-7d-*.md
+          if-no-files-found: warn
+
+      - name: Cleanup temporary credentials
+        if: always()
+        run: rm -f supabase_keys.env.codex.txt posthog-credentials.txt
+
       - name: Release summary
         run: |
           {
@@ -83,4 +148,5 @@ jobs:
             echo "- App URL: https://strktr.vercel.app"
             echo "- Health endpoint: /api/v1/health/ops"
             echo "- Release marker: /api/v1/ops/release"
+            echo "- Analytics gates: probe + drift24h + drift7d (strict)"
           } >> "$GITHUB_STEP_SUMMARY"

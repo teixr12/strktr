@@ -62,12 +62,16 @@ jobs:
       - name: Run analytics drift audit
         run: AUDIT_DRIFT_STRICT=1 ./scripts/audit-analytics-drift.sh
 
+      - name: Run analytics drift 7d daily audit
+        run: DRIFT_7D_STRICT=1 ./scripts/audit-analytics-drift-7d.sh
+
       - name: Upload report artifact
         uses: actions/upload-artifact@v4
         with:
           name: analytics-ops-report
           path: |
             docs/reports/analytics-drift-*.md
+            docs/reports/analytics-drift-7d-*.md
             docs/reports/analytics-capture-probe-*.md
           if-no-files-found: error
 
