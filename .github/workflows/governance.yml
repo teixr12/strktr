@@ -2,6 +2,9 @@ name: Governance
 
 on:
   pull_request:
+  push:
+    branches:
+      - 'codex/**'
 
 jobs:
   pr-governance:
