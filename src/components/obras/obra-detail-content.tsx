@@ -16,6 +16,7 @@ import { DiarioObraTab } from './diario-obra'
 import { ObraChecklistsTab } from './obra-checklists'
 import { ObraCronogramaTab } from './obra-cronograma'
 import { ObraPortalAdminTab } from './obra-portal-admin-tab'
+import { ObraWeatherLogisticsPanel } from './obra-weather-logistics-panel'
 import { apiRequest } from '@/lib/api/client'
 import { track } from '@/lib/analytics/client'
 import { featureFlags } from '@/lib/feature-flags'
@@ -423,6 +424,8 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
 
             {obra.descricao && <div className="pt-3 border-t border-gray-200/50 dark:border-gray-800"><span className="text-xs text-gray-500">Descrição</span><p className="text-sm text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-line">{obra.descricao}</p></div>}
           </div>
+
+          <ObraWeatherLogisticsPanel obraId={obra.id} obraNome={obra.nome} />
 
           <div className="glass-card rounded-2xl p-5 space-y-3">
             <div className="flex items-center justify-between gap-2">

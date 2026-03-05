@@ -2,9 +2,13 @@ import { getApiUser } from '@/lib/api/auth'
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { log } from '@/lib/api/logger'
 import { fail, ok } from '@/lib/api/response'
+import { isFlagDisabledByDefault } from '@/lib/feature-flags'
 import { fetchExecutionContext } from '@/server/repositories/obras/execution-repository'
+import { fetchObraLocationByOrg } from '@/server/repositories/obras/location-repository'
 import { buildExecutionSummary } from '@/server/services/obras/execution-summary-service'
+import { fetchOpenMeteoForecast } from '@/server/services/obras/weather-service'
 import type { ObraAlertItem, ObraAlertsPayload } from '@/shared/types/obra-alerts'
+import type { ObraWeatherDay } from '@/shared/types/obra-weather'
 
 function withCashFlowAlerts(alerts: ObraAlertItem[], saldo: number, despesas: number) {
   const next = [...alerts]
@@ -24,6 +28,89 @@ function withCashFlowAlerts(alerts: ObraAlertItem[], saldo: number, despesas: nu
     })
   }
   return next
+}
+
+async function withWeatherSignals(params: {
+  supabase: NonNullable<Awaited<ReturnType<typeof getApiUser>>['supabase']>
+  orgId: string
+  obraId: string
+  alerts: ObraAlertItem[]
+}) {
+  const weatherAlertsEnabled = isFlagDisabledByDefault(
+    process.env.NEXT_PUBLIC_FF_OBRA_WEATHER_ALERTS_V1
+  )
+  if (!weatherAlertsEnabled) {
+    return {
+      alerts: params.alerts,
+      weatherContext: undefined,
+      logisticsContext: undefined,
+    }
+  }
+
+  const locationRes = await fetchObraLocationByOrg(params.supabase, params.obraId, params.orgId)
+  const location = locationRes.data
+
+  const nextAlerts = [...params.alerts]
+  if (!location) {
+    nextAlerts.push({
+      code: 'LOGISTICS_LOCATION_MISSING',
+      title: 'Defina localização da obra para alertas externos',
+      severity: 'medium',
+      message: 'Sem coordenadas da obra não é possível prever impacto climático e logístico.',
+    })
+    return {
+      alerts: nextAlerts,
+      weatherContext: undefined,
+      logisticsContext: {
+        locationConfigured: false,
+        source: 'obra_geolocation' as const,
+      },
+    }
+  }
+
+  let weatherDays: ObraWeatherDay[] = []
+  try {
+    const weather = await fetchOpenMeteoForecast({
+      lat: Number(location.lat),
+      lng: Number(location.lng),
+      forecastDays: 3,
+    })
+    weatherDays = weather.days
+  } catch {
+    // Keep alerts path resilient; weather provider is best effort.
+  }
+
+  const nextHighRisk = weatherDays.find((day) => day.severity === 'high')
+  const hasMediumRisk = weatherDays.some((day) => day.severity === 'medium')
+  if (nextHighRisk) {
+    nextAlerts.push({
+      code: 'WEATHER_HIGH_RISK',
+      title: 'Risco climático alto nos próximos dias',
+      severity: 'high',
+      message: `Condição crítica prevista para ${nextHighRisk.date}. Reavalie etapas externas.`,
+    })
+  } else if (hasMediumRisk) {
+    nextAlerts.push({
+      code: 'WEATHER_MEDIUM_RISK',
+      title: 'Atenção climática para etapas externas',
+      severity: 'medium',
+      message: 'Condições moderadas previstas. Considere ajustes de logística e cronograma.',
+    })
+  }
+
+  return {
+    alerts: nextAlerts,
+    weatherContext: {
+      generatedAt: new Date().toISOString(),
+      nextHighRiskAt: nextHighRisk?.date || null,
+      hasMediumRisk,
+      days: weatherDays,
+    },
+    logisticsContext: {
+      locationConfigured: true,
+      source: 'obra_geolocation' as const,
+    },
+  }
 }
 
 export async function GET(
@@ -88,7 +175,7 @@ export async function GET(
     lastDiaryDate: diarioRes.data?.created_at || null,
   })
 
-  const alerts = withCashFlowAlerts(
+  const baseAlerts = withCashFlowAlerts(
     (summary.alerts || []).map((alert) => ({
       code: alert.code,
       title: alert.title,
@@ -97,6 +184,14 @@ export async function GET(
     summary.kpis.saldo,
     summary.kpis.despesas
   )
+
+  const weatherSignals = await withWeatherSignals({
+    supabase,
+    orgId,
+    obraId: id,
+    alerts: baseAlerts,
+  })
+  const alerts = weatherSignals.alerts
 
   const payload: ObraAlertsPayload = {
     obra: {
@@ -112,6 +207,13 @@ export async function GET(
       low: alerts.filter((item) => item.severity === 'low').length,
       total: alerts.length,
     },
+    context:
+      weatherSignals.weatherContext || weatherSignals.logisticsContext
+        ? {
+            weather: weatherSignals.weatherContext,
+            logistics: weatherSignals.logisticsContext,
+          }
+        : undefined,
     generatedAt: new Date().toISOString(),
   }
 

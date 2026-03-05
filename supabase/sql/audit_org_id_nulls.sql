@@ -31,6 +31,7 @@ declare
     'portal_comentarios',
     'aprovacoes_cliente',
     'general_tasks',
+    'obra_geolocations',
     'sops',
     'construction_docs_project_links',
     'construction_docs_visits',

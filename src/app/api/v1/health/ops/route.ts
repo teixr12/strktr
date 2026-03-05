@@ -87,6 +87,12 @@ export async function GET(request: Request) {
         generalTasksV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_GENERAL_TASKS_V1),
         taskAssignV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_TASK_ASSIGN_V1),
         mobileUxV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_MOBILE_UX_V1),
+        obraWeatherV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_OBRA_WEATHER_V1),
+        obraMapV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_OBRA_MAP_V1),
+        obraLogisticsV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_OBRA_LOGISTICS_V1),
+        obraWeatherAlertsV1: isFlagDisabledByDefault(
+          process.env.NEXT_PUBLIC_FF_OBRA_WEATHER_ALERTS_V1
+        ),
         constructionDocs: isFlagDisabledByDefault(
           process.env.FEATURE_CONSTRUCTION_DOCS || process.env.NEXT_PUBLIC_FF_CONSTRUCTION_DOCS_V1
         ),
