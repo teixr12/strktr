@@ -5,6 +5,7 @@ import { API_ERROR_CODES } from '@/lib/api/errors'
 import { createTransacaoSchema } from '@/shared/schemas/business'
 import { buildPaginationMeta, getPaginationFromSearchParams } from '@/lib/api/pagination'
 import { linkReceiptIntakeToTransaction } from '@/server/services/finance/receipt-linking'
+import { isFinanceReceiptsEnabledForOrg } from '@/server/feature-flags/wave2-canary'
 
 export const GET = withApiAuth('can_manage_finance', async (request, { supabase, requestId, orgId, user }) => {
   const { searchParams } = new URL(request.url)
@@ -42,6 +43,14 @@ export const POST = withApiAuth('can_manage_finance', async (request, { supabase
   }
   const body = parsed.data
   const { receipt_intake_id: receiptIntakeId, ...transacaoInput } = body
+
+  if (receiptIntakeId && !isFinanceReceiptsEnabledForOrg(orgId)) {
+    return fail(
+      request,
+      { code: API_ERROR_CODES.NOT_FOUND, message: 'Recurso não encontrado' },
+      404
+    )
+  }
 
   const { data, error: dbError } = await supabase
     .from('transacoes')

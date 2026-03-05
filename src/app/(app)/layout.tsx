@@ -1,57 +1,18 @@
-'use client'
+import { AppLayoutClient } from '@/components/layout/app-layout-client'
+import { getServerActiveOrgId } from '@/lib/auth/server-org'
+import { createClient } from '@/lib/supabase/server'
+import { isDocsWorkspaceEnabledForOrg } from '@/server/feature-flags/wave2-canary'
 
-import { useState } from 'react'
-import { Sidebar } from '@/components/layout/sidebar'
-import { Header } from '@/components/layout/header'
-import { Footer } from '@/components/layout/footer'
-import { AppShell } from '@/components/ui/enterprise'
-import { featureFlags } from '@/lib/feature-flags'
-import { ToastProvider } from '@/components/ui/toast-provider'
-import { CommandPalette } from '@/components/ui/command-palette'
-import { PageTransition } from '@/components/ui/page-transition'
+export const dynamic = 'force-dynamic'
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const useEnterpriseShell = featureFlags.uiTailadminV1
-
-  if (!useEnterpriseShell) {
-    return (
-      <>
-        <div className="h-screen flex flex-col md:flex-row">
-          <Sidebar
-            mobileOpen={mobileMenuOpen}
-            onClose={() => setMobileMenuOpen(false)}
-          />
-          <main className="flex-1 flex flex-col min-w-0 bg-gray-50/50 dark:bg-black relative overflow-hidden">
-            <Header onMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)} />
-            <div className="flex-1 overflow-y-auto">
-              <PageTransition>{children}</PageTransition>
-              <Footer />
-            </div>
-          </main>
-        </div>
-        <ToastProvider />
-        <CommandPalette />
-      </>
-    )
-  }
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  const supabase = await createClient()
+  const orgId = await getServerActiveOrgId(supabase)
+  const docsWorkspaceEnabled = isDocsWorkspaceEnabledForOrg(orgId)
 
   return (
-    <>
-      <AppShell
-        sidebar={(
-          <Sidebar
-            mobileOpen={mobileMenuOpen}
-            onClose={() => setMobileMenuOpen(false)}
-          />
-        )}
-        header={<Header onMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)} />}
-        footer={<Footer />}
-      >
-        <PageTransition>{children}</PageTransition>
-      </AppShell>
-      <ToastProvider />
-      <CommandPalette />
-    </>
+    <AppLayoutClient docsWorkspaceEnabled={docsWorkspaceEnabled}>
+      {children}
+    </AppLayoutClient>
   )
 }

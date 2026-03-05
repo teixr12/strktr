@@ -55,7 +55,11 @@ const LazyBarChart = dynamic(
   }
 )
 
-interface Props { initialTransacoes: Transacao[] }
+interface Props {
+  initialTransacoes: Transacao[]
+  receiptsEnabled?: boolean
+  receiptAiEnabled?: boolean
+}
 interface OrcadoVsRealizadoSummary {
   summary: Array<{
     obraId: string
@@ -96,12 +100,17 @@ function isReceiptImage(mimeType: string): boolean {
   return mimeType.startsWith('image/')
 }
 
-export function FinanceiroContent({ initialTransacoes }: Props) {
+export function FinanceiroContent({
+  initialTransacoes,
+  receiptsEnabled: receiptsEnabledProp,
+  receiptAiEnabled: receiptAiEnabledProp,
+}: Props) {
   const { confirm, dialog: confirmDialog } = useConfirm()
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Financeiro
   const usePaginationV1 = featureFlags.uiPaginationV1
-  const receiptsEnabled = featureFlags.financeReceiptsV1
-  const receiptAiEnabled = featureFlags.financeReceiptsV1 && featureFlags.financeReceiptAiV1
+  const receiptsEnabled = receiptsEnabledProp ?? featureFlags.financeReceiptsV1
+  const receiptAiEnabled =
+    receiptAiEnabledProp ?? (featureFlags.financeReceiptsV1 && featureFlags.financeReceiptAiV1)
   const [transacoes, setTransacoes] = useState(initialTransacoes)
   const [pagination, setPagination] = useState<PaginationMeta>({
     count: initialTransacoes.length,

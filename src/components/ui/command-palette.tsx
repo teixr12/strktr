@@ -73,18 +73,23 @@ const SECTION_LABELS: Record<string, string> = {
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export function CommandPalette() {
+interface CommandPaletteProps {
+  docsWorkspaceEnabled?: boolean
+}
+
+export function CommandPalette({ docsWorkspaceEnabled }: CommandPaletteProps) {
   const enabled = featureFlags.cmdPalette
+  const docsWorkspaceVisible = docsWorkspaceEnabled ?? featureFlags.docsWorkspaceV1
 
   const visibleItems = useMemo(() => {
     return ALL_ITEMS.filter((item) => {
-      if (item.id === 'docs') return featureFlags.docsWorkspaceV1
+      if (item.id === 'docs') return docsWorkspaceVisible
       if (item.id === 'construction-docs') {
-        return featureFlags.constructionDocs && !featureFlags.docsWorkspaceV1
+        return featureFlags.constructionDocs && !docsWorkspaceVisible
       }
       return true
     })
-  }, [])
+  }, [docsWorkspaceVisible])
 
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')

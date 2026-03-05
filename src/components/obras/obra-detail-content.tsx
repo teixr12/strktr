@@ -46,6 +46,7 @@ interface Props {
     addressV2: boolean
     hqRouting: boolean
   }
+  cronogramaUxV2Enabled?: boolean
 }
 
 type ExecutionSummary = {
@@ -71,6 +72,7 @@ export function ObraDetailContent({
   initialDiario = [],
   initialChecklists = [],
   wave2Access,
+  cronogramaUxV2Enabled,
 }: Props) {
   const { confirm, dialog: confirmDialog } = useConfirm()
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2ObraTabs
@@ -588,7 +590,7 @@ export function ObraDetailContent({
 
       {/* Financeiro */}
       {tab === 'cronograma' && (
-        <ObraCronogramaTab obraId={obra.id} />
+        <ObraCronogramaTab obraId={obra.id} cronogramaUxV2Enabled={cronogramaUxV2Enabled} />
       )}
 
       {/* Financeiro */}

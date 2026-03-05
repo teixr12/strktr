@@ -7,6 +7,12 @@ test('health endpoint responde', async ({ request }) => {
   const payload = await response.json()
   expect(payload.data.status).toBeTruthy()
   expect(payload.data.ts).toBeTruthy()
+  expect(payload.data.rollout.wave2Canary).toBeTruthy()
+  expect(payload.data.rollout.addressHqCanary).toBeTruthy()
+  expect(payload.data.rollout.financeReceiptsCanary).toBeTruthy()
+  expect(payload.data.rollout.financeReceiptAiCanary).toBeTruthy()
+  expect(payload.data.rollout.cronogramaUxV2Canary).toBeTruthy()
+  expect(payload.data.rollout.docsWorkspaceCanary).toBeTruthy()
 })
 
 test('login renderiza sem erro fatal', async ({ page }) => {
@@ -135,6 +141,35 @@ test('docs workspace respeita gate por feature flag (off=404-safe, on=401 sem to
   expect(response.status(), '/api/v1/docs').toBe(expectedStatus)
   expect(payload?.error?.code, '/api/v1/docs').toBe(expectedCode)
   expect(payload?.requestId, '/api/v1/docs').toBeTruthy()
+})
+
+test('finance receipts respeita gate por feature flag (off=404-safe, on=401 sem token)', async ({ request }) => {
+  const healthResponse = await request.get('/api/v1/health/ops')
+  expect(healthResponse.ok()).toBeTruthy()
+  const healthPayload = await healthResponse.json()
+  const isEnabled = Boolean(healthPayload?.data?.flags?.financeReceiptsV1)
+
+  const checks: Array<{ endpoint: string; method: 'GET' | 'POST' }> = [
+    { endpoint: '/api/v1/transacoes/receipts/00000000-0000-0000-0000-000000000000', method: 'GET' },
+    { endpoint: '/api/v1/transacoes/receipts/intake', method: 'POST' },
+    { endpoint: '/api/v1/transacoes/00000000-0000-0000-0000-000000000000/anexos', method: 'GET' },
+    { endpoint: '/api/v1/transacoes/00000000-0000-0000-0000-000000000000/anexos', method: 'POST' },
+  ]
+
+  for (const check of checks) {
+    const response =
+      check.method === 'GET'
+        ? await request.get(check.endpoint)
+        : await request.post(check.endpoint, { data: {} })
+
+    const payload = await response.json()
+    const expectedStatus = isEnabled ? 401 : 404
+    const expectedCode = isEnabled ? 'UNAUTHORIZED' : 'NOT_FOUND'
+
+    expect(response.status(), check.endpoint).toBe(expectedStatus)
+    expect(payload?.error?.code, check.endpoint).toBe(expectedCode)
+    expect(payload?.requestId, check.endpoint).toBeTruthy()
+  }
 })
 
 test('portal público exige token válido e retorna envelope de erro', async ({ request }) => {

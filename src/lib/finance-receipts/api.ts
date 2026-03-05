@@ -3,6 +3,7 @@ import { fail } from '@/lib/api/response'
 import { withApiAuth, type AuthContext } from '@/lib/api/with-auth'
 import type { DomainPermission } from '@/lib/auth/domain-permissions'
 import { isFinanceReceiptsEnabled } from '@/lib/finance-receipts/feature'
+import { isFinanceReceiptsEnabledForOrg } from '@/server/feature-flags/wave2-canary'
 
 export function requireFinanceReceiptsEnabled(request: Request): Response | null {
   if (isFinanceReceiptsEnabled()) return null
@@ -23,7 +24,19 @@ export function withFinanceReceiptsAuth(
   return async (request: Request) => {
     const gate = requireFinanceReceiptsEnabled(request)
     if (gate) return gate
-    const authHandler = withApiAuth(permission, handler)
+    const authHandler = withApiAuth(permission, async (innerRequest, ctx) => {
+      if (!isFinanceReceiptsEnabledForOrg(ctx.orgId)) {
+        return fail(
+          innerRequest,
+          {
+            code: API_ERROR_CODES.NOT_FOUND,
+            message: 'Recurso não encontrado',
+          },
+          404
+        )
+      }
+      return handler(innerRequest, ctx)
+    })
     return authHandler(request)
   }
 }

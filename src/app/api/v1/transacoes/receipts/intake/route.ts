@@ -2,13 +2,13 @@ import { API_ERROR_CODES } from '@/lib/api/errors'
 import { log } from '@/lib/api/logger'
 import { fail, ok } from '@/lib/api/response'
 import { withFinanceReceiptsAuth } from '@/lib/finance-receipts/api'
-import { isFinanceReceiptAiEnabled } from '@/lib/finance-receipts/feature'
 import {
   uploadFinanceReceipt,
   MAX_RECEIPT_FILE_SIZE_BYTES,
   isAllowedReceiptMimeType,
   deleteFinanceReceiptObject,
 } from '@/server/services/finance/receipt-storage'
+import { isFinanceReceiptAiEnabledForOrg } from '@/server/feature-flags/wave2-canary'
 import {
   buildManualReceiptReviewPayload,
   extractReceiptReviewPayload,
@@ -76,7 +76,7 @@ export const POST = withFinanceReceiptsAuth(
     let aiPayload: unknown = null
     let ocrText: string | null = null
 
-    if (runAi && isFinanceReceiptAiEnabled()) {
+    if (runAi && isFinanceReceiptAiEnabledForOrg(orgId)) {
       try {
         reviewPayload = await extractReceiptReviewPayload({
           fileName: file.name,
@@ -139,7 +139,7 @@ export const POST = withFinanceReceiptsAuth(
     }
 
     return ok(request, await toReceiptIntakeSummary(data), {
-      aiEnabled: isFinanceReceiptAiEnabled(),
+      aiEnabled: isFinanceReceiptAiEnabledForOrg(orgId),
     }, 201)
   }
 )
