@@ -14,7 +14,7 @@ export async function DELETE(
 
       const { data: attachment, error } = await supabase
         .from('transacao_anexos')
-        .select('id, transacao_id, receipt_intake_id, storage_key')
+        .select('id, transacao_id, receipt_intake_id, storage_key, url')
         .eq('id', attachmentId)
         .eq('org_id', orgId)
         .eq('transacao_id', id)
@@ -24,7 +24,9 @@ export async function DELETE(
         return fail(request, { code: API_ERROR_CODES.NOT_FOUND, message: 'Anexo não encontrado.' }, 404)
       }
 
-      const storageRemoved = await deleteFinanceReceiptObject(attachment.storage_key)
+      const storageRemoved = attachment.storage_key
+        ? await deleteFinanceReceiptObject(attachment.storage_key)
+        : true
       if (!storageRemoved) {
         return fail(
           request,

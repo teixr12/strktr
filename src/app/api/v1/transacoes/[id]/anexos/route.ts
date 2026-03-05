@@ -26,7 +26,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       const { data, error } = await supabase
         .from('transacao_anexos')
         .select(
-          'id, org_id, transacao_id, receipt_intake_id, storage_key, original_filename, mime_type, size_bytes, created_at'
+          'id, org_id, transacao_id, receipt_intake_id, storage_key, original_filename, mime_type, size_bytes, created_at, url, nome_arquivo, tipo_arquivo, tamanho_bytes'
         )
         .eq('org_id', orgId)
         .eq('transacao_id', id)

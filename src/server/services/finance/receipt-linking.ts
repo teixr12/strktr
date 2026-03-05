@@ -22,14 +22,18 @@ type ReceiptIntakeRow = {
 
 type AttachmentRow = {
   id: string
-  org_id: string
+  org_id: string | null
   transacao_id: string
   receipt_intake_id: string | null
-  storage_key: string
-  original_filename: string
-  mime_type: string
-  size_bytes: number
-  created_at: string
+  storage_key: string | null
+  original_filename: string | null
+  mime_type: string | null
+  size_bytes: number | null
+  created_at: string | null
+  url?: string | null
+  nome_arquivo?: string | null
+  tipo_arquivo?: string | null
+  tamanho_bytes?: number | null
 }
 
 export async function toReceiptIntakeSummary(
@@ -52,15 +56,19 @@ export async function toReceiptIntakeSummary(
 export async function toAttachmentSummary(
   row: AttachmentRow
 ): Promise<TransacaoAttachmentSummary> {
+  const signedUrl = row.storage_key
+    ? await resolveFinanceReceiptSignedUrl(row.storage_key)
+    : null
+
   return {
     id: row.id,
     transacao_id: row.transacao_id,
     receipt_intake_id: row.receipt_intake_id,
-    original_filename: row.original_filename,
-    mime_type: row.mime_type,
-    size_bytes: row.size_bytes,
-    created_at: row.created_at,
-    signed_url: await resolveFinanceReceiptSignedUrl(row.storage_key),
+    original_filename: row.original_filename || row.nome_arquivo || 'Anexo',
+    mime_type: row.mime_type || row.tipo_arquivo || 'application/octet-stream',
+    size_bytes: row.size_bytes ?? row.tamanho_bytes ?? 0,
+    created_at: row.created_at || new Date(0).toISOString(),
+    signed_url: signedUrl || row.url || null,
   }
 }
 
@@ -93,7 +101,9 @@ export async function linkReceiptIntakeToTransaction(input: {
 
   const { data: existingAttachment } = await input.supabase
     .from('transacao_anexos')
-    .select('id, org_id, transacao_id, receipt_intake_id, storage_key, original_filename, mime_type, size_bytes, created_at')
+    .select(
+      'id, org_id, transacao_id, receipt_intake_id, storage_key, original_filename, mime_type, size_bytes, created_at, url, nome_arquivo, tipo_arquivo, tamanho_bytes'
+    )
     .eq('org_id', input.orgId)
     .eq('transacao_id', input.transacaoId)
     .eq('receipt_intake_id', input.receiptIntakeId)
@@ -117,8 +127,14 @@ export async function linkReceiptIntakeToTransaction(input: {
       mime_type: intake.mime_type,
       size_bytes: intake.size_bytes,
       created_by: input.actorUserId,
+      user_id: input.actorUserId,
+      nome_arquivo: intake.original_filename,
+      tipo_arquivo: intake.mime_type,
+      tamanho_bytes: Math.max(0, Math.trunc(intake.size_bytes)),
     })
-    .select('id, org_id, transacao_id, receipt_intake_id, storage_key, original_filename, mime_type, size_bytes, created_at')
+    .select(
+      'id, org_id, transacao_id, receipt_intake_id, storage_key, original_filename, mime_type, size_bytes, created_at, url, nome_arquivo, tipo_arquivo, tamanho_bytes'
+    )
     .single()
 
   if (attachmentError || !attachment) {
