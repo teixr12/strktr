@@ -3,6 +3,7 @@ import { API_ERROR_CODES } from '@/lib/api/errors'
 import { fail, ok } from '@/lib/api/response'
 import { log } from '@/lib/api/logger'
 import { emitProductEvent } from '@/lib/telemetry'
+import { OBRA_ETAPA_SELECT } from '@/lib/api/select-maps'
 import { requireExecutionPermission } from '@/lib/auth/execution-permissions'
 import { updateEtapaStatusSchema } from '@/shared/schemas/execution'
 
@@ -50,7 +51,7 @@ export async function POST(
     .from('obra_etapas')
     .update({ status: payload.status })
     .eq('id', etapaId)
-    .select('*')
+    .select(OBRA_ETAPA_SELECT)
     .single()
 
   if (updateError) {

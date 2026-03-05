@@ -1,6 +1,7 @@
 import { getApiUser } from '@/lib/api/auth'
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { fail, ok } from '@/lib/api/response'
+import { ROADMAP_ACTION_SELECT } from '@/lib/api/select-maps'
 import { completeRoadmapActionSchema } from '@/shared/schemas/roadmap-automation'
 
 export async function POST(
@@ -41,7 +42,7 @@ export async function POST(
     .eq('id', id)
     .eq('org_id', orgId)
     .eq('user_id', user.id)
-    .select('*')
+    .select(ROADMAP_ACTION_SELECT)
     .single()
 
   if (updateError || !updated) {

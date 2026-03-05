@@ -2,6 +2,12 @@ import { getApiUser } from '@/lib/api/auth'
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { log } from '@/lib/api/logger'
 import { fail, ok } from '@/lib/api/response'
+import {
+  CRONOGRAMA_BASELINE_SELECT,
+  CRONOGRAMA_DEPENDENCIA_SELECT,
+  CRONOGRAMA_ITEM_SELECT,
+  CRONOGRAMA_OBRA_SELECT,
+} from '@/lib/api/select-maps'
 import { requireDomainPermission } from '@/lib/auth/domain-permissions'
 import { ensureCronogramaForObra } from '@/server/repositories/cronograma/cronograma-repository'
 import { recalculateSchedule } from '@/server/services/cronograma/schedule-service'
@@ -57,24 +63,24 @@ export async function GET(
   const [cronogramaRes, itensRes, depsRes, baselineRes] = await Promise.all([
     supabase
       .from('cronograma_obras')
-      .select('*')
+      .select(CRONOGRAMA_OBRA_SELECT)
       .eq('id', cronogramaId)
       .eq('org_id', orgId)
       .single(),
     supabase
       .from('cronograma_itens')
-      .select('*')
+      .select(CRONOGRAMA_ITEM_SELECT)
       .eq('cronograma_id', cronogramaId)
       .eq('org_id', orgId)
       .order('ordem', { ascending: true }),
     supabase
       .from('cronograma_dependencias')
-      .select('*')
+      .select(CRONOGRAMA_DEPENDENCIA_SELECT)
       .eq('cronograma_id', cronogramaId)
       .eq('org_id', orgId),
     supabase
       .from('cronograma_baselines')
-      .select('*')
+      .select(CRONOGRAMA_BASELINE_SELECT)
       .eq('cronograma_id', cronogramaId)
       .eq('org_id', orgId)
       .order('versao', { ascending: false })
@@ -147,7 +153,7 @@ export async function PATCH(
     })
     .eq('id', ensured.data.id)
     .eq('org_id', orgId)
-    .select('*')
+    .select(CRONOGRAMA_OBRA_SELECT)
     .single()
 
   if (updateError || !updated) {

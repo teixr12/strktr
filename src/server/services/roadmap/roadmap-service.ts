@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { UserRole } from '@/types/database'
+import { ROADMAP_ACTION_SELECT } from '@/lib/api/select-maps'
 import type {
   RoadmapAction,
   RoadmapProgress,
@@ -230,7 +231,7 @@ export async function ensureRoadmapForUser(params: {
 
   const { data: roadmapRows } = await supabase
     .from('roadmap_actions')
-    .select('*')
+    .select(ROADMAP_ACTION_SELECT)
     .eq('org_id', orgId)
     .eq('user_id', userId)
     .in('status', ['pending', 'in_progress'])
