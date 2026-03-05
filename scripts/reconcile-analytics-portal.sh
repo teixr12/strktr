@@ -21,7 +21,13 @@ if [[ -n "$EVENT_TYPE" ]]; then
   QUERY="${QUERY}&eventType=${EVENT_TYPE}"
 fi
 
-curl -sS -X POST \
-  "${HOST%/}/api/cron/analytics/reconcile?${QUERY}" \
-  "${AUTH_ARGS[@]}" \
-  -H "Content-Type: application/json" | jq
+if [[ ${#AUTH_ARGS[@]} -gt 0 ]]; then
+  curl -sS -X POST \
+    "${HOST%/}/api/cron/analytics/reconcile?${QUERY}" \
+    "${AUTH_ARGS[@]}" \
+    -H "Content-Type: application/json" | jq
+else
+  curl -sS -X POST \
+    "${HOST%/}/api/cron/analytics/reconcile?${QUERY}" \
+    -H "Content-Type: application/json" | jq
+fi
