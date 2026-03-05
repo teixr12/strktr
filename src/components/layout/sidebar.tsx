@@ -73,11 +73,12 @@ const NAV_ITEMS = [
 interface SidebarProps {
   mobileOpen: boolean
   onClose: () => void
+  docsWorkspaceEnabled?: boolean
 }
 
 type SidebarProfile = Pick<Profile, 'nome' | 'email' | 'avatar_url'>
 
-export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
+export function Sidebar({ mobileOpen, onClose, docsWorkspaceEnabled }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -162,12 +163,14 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
     }
   }
 
+  const docsWorkspaceVisible = docsWorkspaceEnabled ?? featureFlags.docsWorkspaceV1
+
   const visibleNavItems = NAV_ITEMS.filter((item) => {
     if (item.id === 'tarefas') return featureFlags.generalTasksV1
-    if (item.id === 'docs') return featureFlags.docsWorkspaceV1
-    if (item.id === 'sops') return featureFlags.sopBuilderV1 && !featureFlags.docsWorkspaceV1
+    if (item.id === 'docs') return docsWorkspaceVisible
+    if (item.id === 'sops') return featureFlags.sopBuilderV1 && !docsWorkspaceVisible
     if (item.id === 'construction-docs') {
-      return featureFlags.constructionDocs && !featureFlags.docsWorkspaceV1
+      return featureFlags.constructionDocs && !docsWorkspaceVisible
     }
     return true
   })

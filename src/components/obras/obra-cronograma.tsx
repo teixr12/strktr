@@ -82,15 +82,16 @@ const STATUS_LABELS: Record<CronogramaItem['status'], string> = {
 
 interface Props {
   obraId: string
+  cronogramaUxV2Enabled?: boolean
 }
 
 type CreateCronogramaItemFormValues = z.input<typeof createCronogramaItemSchema>
 type InviteClientPortalFormValues = z.input<typeof inviteClientPortalSchema>
 
-export function ObraCronogramaTab({ obraId }: Props) {
+export function ObraCronogramaTab({ obraId, cronogramaUxV2Enabled }: Props) {
   const cronogramaEnabled = featureFlags.cronogramaEngine
   const cronogramaViewsEnabled = featureFlags.cronogramaViewsV1
-  const cronogramaUxV2 = featureFlags.cronogramaUxV2
+  const cronogramaUxV2 = cronogramaUxV2Enabled ?? featureFlags.cronogramaUxV2
   const portalEnabled = featureFlags.clientPortal
   const pdfEnabled = featureFlags.cronogramaPdf
 

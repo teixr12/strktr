@@ -1,6 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { ObraDetailContent } from '@/components/obras/obra-detail-content'
-import { isWave2FeatureEnabledForOrg } from '@/server/feature-flags/wave2-canary'
+import {
+  isCronogramaUxV2EnabledForOrg,
+  isWave2FeatureEnabledForOrg,
+} from '@/server/feature-flags/wave2-canary'
 import { notFound } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
@@ -33,6 +36,7 @@ export default async function ObraDetailPage({ params }: { params: Promise<{ id:
     addressV2: isWave2FeatureEnabledForOrg('addressV2', obraRes.data.org_id || null),
     hqRouting: isWave2FeatureEnabledForOrg('hqRouting', obraRes.data.org_id || null),
   }
+  const cronogramaUxV2Enabled = isCronogramaUxV2EnabledForOrg(obraRes.data.org_id || null)
 
   return (
     <ObraDetailContent
@@ -42,6 +46,7 @@ export default async function ObraDetailPage({ params }: { params: Promise<{ id:
       initialDiario={diarioRes.data ?? []}
       initialChecklists={checklistsRes.data ?? []}
       wave2Access={wave2Access}
+      cronogramaUxV2Enabled={cronogramaUxV2Enabled}
     />
   )
 }

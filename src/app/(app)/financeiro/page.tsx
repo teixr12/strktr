@@ -1,11 +1,17 @@
 import { createClient } from '@/lib/supabase/server'
+import { getServerActiveOrgId } from '@/lib/auth/server-org'
 import { FinanceiroContent } from '@/components/financeiro/financeiro-content'
+import {
+  isFinanceReceiptAiEnabledForOrg,
+  isFinanceReceiptsEnabledForOrg,
+} from '@/server/feature-flags/wave2-canary'
 import type { Transacao } from '@/types/database'
 
 export const dynamic = 'force-dynamic'
 
 export default async function FinanceiroPage() {
   const supabase = await createClient()
+  const orgId = await getServerActiveOrgId(supabase)
   const { data: transacoes } = await supabase
     .from('transacoes')
     .select(
@@ -19,5 +25,11 @@ export default async function FinanceiroPage() {
     obras: Array.isArray(transacao.obras) ? transacao.obras[0] ?? null : transacao.obras ?? null,
   })) as Transacao[]
 
-  return <FinanceiroContent initialTransacoes={normalizedTransacoes} />
+  return (
+    <FinanceiroContent
+      initialTransacoes={normalizedTransacoes}
+      receiptsEnabled={isFinanceReceiptsEnabledForOrg(orgId)}
+      receiptAiEnabled={isFinanceReceiptAiEnabledForOrg(orgId)}
+    />
+  )
 }
