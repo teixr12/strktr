@@ -17,6 +17,7 @@
     "baseline:report": "./scripts/generate-baseline-report.sh",
     "audit:production": "./scripts/run-production-audits.sh",
     "audit:analytics-drift": "./scripts/audit-analytics-drift.sh",
+    "audit:analytics-drift:7d": "./scripts/audit-analytics-drift-7d.sh",
     "audit:analytics-capture-probe": "./scripts/audit-analytics-capture-probe.sh",
     "ops:reconcile-analytics-portal": "./scripts/reconcile-analytics-portal.sh",
     "audit:ux-quality": "node scripts/audit-ux-quality.mjs",
