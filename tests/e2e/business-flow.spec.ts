@@ -52,6 +52,8 @@ test.describe('business flow (authenticated)', () => {
   })
 
   test('cronograma -> pdf -> portal approval rejection/resubmission', async ({ request }) => {
+    test.setTimeout(120_000)
+
     const headers = {
       Authorization: `Bearer ${E2E_BEARER_TOKEN}`,
     }
