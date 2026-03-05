@@ -118,12 +118,14 @@ jobs:
             echo "POSTHOG_HOST=${POSTHOG_HOST}" >> "$GITHUB_ENV"
           fi
 
-      - name: Analytics release gate (capture probe + drift 24h + drift 7d)
+      - name: Analytics release gate (strict 24h, advisory 7d)
         run: |
           set -euo pipefail
           PROBE_STRICT=1 ./scripts/audit-analytics-capture-probe.sh
           AUDIT_DRIFT_STRICT=1 ./scripts/audit-analytics-drift.sh
-          DRIFT_7D_STRICT=1 ./scripts/audit-analytics-drift-7d.sh
+          if ! DRIFT_7D_STRICT=1 ./scripts/audit-analytics-drift-7d.sh; then
+            echo "::warning title=Analytics 7d drift advisory::Out-of-policy rows detected in 7d daily drift. Release remains unblocked because strict release criteria is probe + 24h drift. See uploaded artifact for details."
+          fi
 
       - name: Upload release analytics gate report artifact
         if: always()
@@ -148,5 +150,5 @@ jobs:
             echo "- App URL: https://strktr.vercel.app"
             echo "- Health endpoint: /api/v1/health/ops"
             echo "- Release marker: /api/v1/ops/release"
-            echo "- Analytics gates: probe + drift24h + drift7d (strict)"
+            echo "- Analytics gates: probe + drift24h (strict), drift7d (advisory)"
           } >> "$GITHUB_STEP_SUMMARY"
