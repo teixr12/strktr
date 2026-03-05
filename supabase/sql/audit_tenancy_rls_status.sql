@@ -26,6 +26,7 @@ with tracked_tables as (
     ('aprovacoes_cliente'),
     ('portal_admin_settings'),
     ('general_tasks'),
+    ('obra_geolocations'),
     ('sops'),
     ('construction_docs_project_links'),
     ('construction_docs_visits'),
