@@ -3,6 +3,7 @@ import { getApiUser } from '@/lib/api/auth'
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { fail, ok } from '@/lib/api/response'
 import { fetchObraByOrg } from '@/server/repositories/obras/execution-repository'
+import { isWave2FeatureEnabledForOrg } from '@/server/feature-flags/wave2-canary'
 import { fetchObraLocationByOrg } from '@/server/repositories/obras/location-repository'
 import {
   calculateLogisticsCosts,
@@ -41,6 +42,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       { code: API_ERROR_CODES.FORBIDDEN, message: 'Usuário sem organização ativa' },
       403
     )
+  }
+  if (!isWave2FeatureEnabledForOrg('logistics', orgId)) {
+    return fail(request, { code: API_ERROR_CODES.NOT_FOUND, message: 'Endpoint não disponível' }, 404)
   }
 
   const parsed = estimateSchema.safeParse(await request.json().catch(() => null))
@@ -123,4 +127,3 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     )
   }
 }
-

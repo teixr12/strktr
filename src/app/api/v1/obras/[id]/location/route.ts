@@ -4,6 +4,7 @@ import { API_ERROR_CODES } from '@/lib/api/errors'
 import { fail, ok } from '@/lib/api/response'
 import { requireDomainPermission } from '@/lib/auth/domain-permissions'
 import { fetchObraByOrg } from '@/server/repositories/obras/execution-repository'
+import { isWave2LocationEnabledForOrg } from '@/server/feature-flags/wave2-canary'
 import {
   fetchObraLocationByOrg,
   upsertObraLocationByOrg,
@@ -31,6 +32,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       { code: API_ERROR_CODES.FORBIDDEN, message: 'Usuário sem organização ativa' },
       403
     )
+  }
+  if (!isWave2LocationEnabledForOrg(orgId)) {
+    return fail(request, { code: API_ERROR_CODES.NOT_FOUND, message: 'Endpoint não disponível' }, 404)
   }
 
   const { id } = await params
@@ -76,6 +80,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       { code: API_ERROR_CODES.FORBIDDEN, message: 'Usuário sem organização ativa' },
       403
     )
+  }
+  if (!isWave2LocationEnabledForOrg(orgId)) {
+    return fail(request, { code: API_ERROR_CODES.NOT_FOUND, message: 'Endpoint não disponível' }, 404)
   }
 
   const permissionError = requireDomainPermission(request, role, 'can_manage_projects')
@@ -130,4 +137,3 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   return ok(request, payload, { flag: 'NEXT_PUBLIC_FF_OBRA_MAP_V1' })
 }
-

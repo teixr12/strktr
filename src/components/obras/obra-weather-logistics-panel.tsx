@@ -4,7 +4,6 @@ import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from '@/hooks/use-toast'
 import { apiRequest } from '@/lib/api/client'
-import { featureFlags } from '@/lib/feature-flags'
 import type { ObraLocationPayload } from '@/shared/types/obra-location'
 import type { ObraWeatherPayload } from '@/shared/types/obra-weather'
 import type {
@@ -20,6 +19,9 @@ const ObraLocationMap = dynamic(
 interface ObraWeatherLogisticsPanelProps {
   obraId: string
   obraNome: string
+  weatherEnabled?: boolean
+  mapEnabled?: boolean
+  logisticsEnabled?: boolean
 }
 
 function asNumber(value: string) {
@@ -27,11 +29,13 @@ function asNumber(value: string) {
   return Number.isFinite(parsed) ? parsed : null
 }
 
-export function ObraWeatherLogisticsPanel({ obraId, obraNome }: ObraWeatherLogisticsPanelProps) {
-  const weatherEnabled = featureFlags.obraWeatherV1
-  const mapEnabled = featureFlags.obraMapV1
-  const logisticsEnabled = featureFlags.obraLogisticsV1
-
+export function ObraWeatherLogisticsPanel({
+  obraId,
+  obraNome,
+  weatherEnabled = false,
+  mapEnabled = false,
+  logisticsEnabled = false,
+}: ObraWeatherLogisticsPanelProps) {
   const [loadingLocation, setLoadingLocation] = useState(false)
   const [savingLocation, setSavingLocation] = useState(false)
   const [locationPayload, setLocationPayload] = useState<ObraLocationPayload | null>(null)
@@ -307,4 +311,3 @@ export function ObraWeatherLogisticsPanel({ obraId, obraNome }: ObraWeatherLogis
     </div>
   )
 }
-

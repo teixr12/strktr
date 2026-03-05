@@ -39,6 +39,11 @@ interface Props {
   initialTransacoes: Transacao[]
   initialDiario?: DiarioEntry[]
   initialChecklists?: ObraChecklist[]
+  wave2Access?: {
+    weather: boolean
+    map: boolean
+    logistics: boolean
+  }
 }
 
 type ExecutionSummary = {
@@ -57,7 +62,14 @@ type ExecutionSummary = {
   recommendedActions: RecommendedAction[]
 }
 
-export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, initialDiario = [], initialChecklists = [] }: Props) {
+export function ObraDetailContent({
+  obra,
+  initialEtapas,
+  initialTransacoes,
+  initialDiario = [],
+  initialChecklists = [],
+  wave2Access,
+}: Props) {
   const { confirm, dialog: confirmDialog } = useConfirm()
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2ObraTabs
   const portalAdminEnabled = featureFlags.portalAdminV1 && featureFlags.clientPortal
@@ -230,6 +242,11 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
   const executionAlerts = obraAlertsEnabled
     ? (obraAlerts?.alerts || executionSummary?.alerts || [])
     : (executionSummary?.alerts || [])
+  const wave2FeatureAccess = wave2Access || {
+    weather: featureFlags.obraWeatherV1,
+    map: featureFlags.obraMapV1,
+    logistics: featureFlags.obraLogisticsV1,
+  }
 
   async function handleDelete() {
     const ok = await confirm({ title: 'Excluir obra?', description: 'Essa ação não pode ser desfeita. Todos os dados da obra serão perdidos.', confirmLabel: 'Excluir', variant: 'danger' })
@@ -425,7 +442,13 @@ export function ObraDetailContent({ obra, initialEtapas, initialTransacoes, init
             {obra.descricao && <div className="pt-3 border-t border-gray-200/50 dark:border-gray-800"><span className="text-xs text-gray-500">Descrição</span><p className="text-sm text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-line">{obra.descricao}</p></div>}
           </div>
 
-          <ObraWeatherLogisticsPanel obraId={obra.id} obraNome={obra.nome} />
+          <ObraWeatherLogisticsPanel
+            obraId={obra.id}
+            obraNome={obra.nome}
+            weatherEnabled={wave2FeatureAccess.weather}
+            mapEnabled={wave2FeatureAccess.map}
+            logisticsEnabled={wave2FeatureAccess.logistics}
+          />
 
           <div className="glass-card rounded-2xl p-5 space-y-3">
             <div className="flex items-center justify-between gap-2">

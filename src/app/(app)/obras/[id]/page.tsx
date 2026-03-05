@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { ObraDetailContent } from '@/components/obras/obra-detail-content'
+import { isWave2FeatureEnabledForOrg } from '@/server/feature-flags/wave2-canary'
 import { notFound } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
@@ -18,6 +19,12 @@ export default async function ObraDetailPage({ params }: { params: Promise<{ id:
 
   if (!obraRes.data) notFound()
 
+  const wave2Access = {
+    weather: isWave2FeatureEnabledForOrg('weather', obraRes.data.org_id || null),
+    map: isWave2FeatureEnabledForOrg('map', obraRes.data.org_id || null),
+    logistics: isWave2FeatureEnabledForOrg('logistics', obraRes.data.org_id || null),
+  }
+
   return (
     <ObraDetailContent
       obra={obraRes.data}
@@ -25,6 +32,7 @@ export default async function ObraDetailPage({ params }: { params: Promise<{ id:
       initialTransacoes={txRes.data ?? []}
       initialDiario={diarioRes.data ?? []}
       initialChecklists={checklistsRes.data ?? []}
+      wave2Access={wave2Access}
     />
   )
 }
