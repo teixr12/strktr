@@ -63,7 +63,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
 
   const { id } = await params
-  const body = parsed.data
+  const body = { ...parsed.data }
+  delete body.receipt_intake_id
   const { data, error: dbError } = await supabase
     .from('transacoes')
     .update({

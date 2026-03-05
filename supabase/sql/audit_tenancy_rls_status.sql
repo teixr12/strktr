@@ -29,6 +29,8 @@ with tracked_tables as (
     ('obra_geolocations'),
     ('org_hq_locations'),
     ('sops'),
+    ('transacao_receipt_intakes'),
+    ('transacao_anexos'),
     ('construction_docs_project_links'),
     ('construction_docs_visits'),
     ('construction_docs_rooms'),

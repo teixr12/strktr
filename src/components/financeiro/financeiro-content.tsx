@@ -9,9 +9,29 @@ import { useCrudMutations } from '@/hooks/use-crud-mutations'
 import { apiRequest, apiRequestWithMeta } from '@/lib/api/client'
 import { featureFlags } from '@/lib/feature-flags'
 import { toast } from '@/hooks/use-toast'
+import { track } from '@/lib/analytics/client'
 import { fmt, fmtDate } from '@/lib/utils'
 import { createTransacaoSchema, type CreateTransacaoDTO } from '@/shared/schemas/business'
-import { Plus, X, Trash2, TrendingUp, TrendingDown, Wallet, Hash, Pencil } from 'lucide-react'
+import type {
+  ReceiptReviewPayload,
+  TransacaoAttachmentSummary,
+  TransacaoReceiptIntakeSummary,
+} from '@/shared/types/transacao-receipts'
+import {
+  FileText,
+  Hash,
+  ImageIcon,
+  Loader2,
+  Paperclip,
+  Pencil,
+  Plus,
+  Sparkles,
+  Trash2,
+  TrendingDown,
+  TrendingUp,
+  Wallet,
+  X,
+} from 'lucide-react'
 import type { Transacao, Obra } from '@/types/database'
 import {
   EmptyStateAction,
@@ -61,11 +81,27 @@ interface PaginationMeta {
 }
 
 const PAGE_SIZE = 50
+const RECEIPT_PREFILL_CONFIDENCE = 0.75
+
+function formatConfidence(confidence: number | null): string {
+  if (confidence === null) return 'sem score'
+  return `${Math.round(confidence * 100)}%`
+}
+
+function shouldAutofill(confidence: number | null): boolean {
+  return typeof confidence === 'number' && confidence >= RECEIPT_PREFILL_CONFIDENCE
+}
+
+function isReceiptImage(mimeType: string): boolean {
+  return mimeType.startsWith('image/')
+}
 
 export function FinanceiroContent({ initialTransacoes }: Props) {
   const { confirm, dialog: confirmDialog } = useConfirm()
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Financeiro
   const usePaginationV1 = featureFlags.uiPaginationV1
+  const receiptsEnabled = featureFlags.financeReceiptsV1
+  const receiptAiEnabled = featureFlags.financeReceiptsV1 && featureFlags.financeReceiptAiV1
   const [transacoes, setTransacoes] = useState(initialTransacoes)
   const [pagination, setPagination] = useState<PaginationMeta>({
     count: initialTransacoes.length,
@@ -84,6 +120,11 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
   const [desvioResumo, setDesvioResumo] = useState<OrcadoVsRealizadoSummary | null>(null)
   const [desvioLoading, setDesvioLoading] = useState(true)
   const [desvioError, setDesvioError] = useState<string | null>(null)
+  const [receiptIntake, setReceiptIntake] = useState<TransacaoReceiptIntakeSummary | null>(null)
+  const [receiptUploading, setReceiptUploading] = useState(false)
+  const [receiptDragActive, setReceiptDragActive] = useState(false)
+  const [attachments, setAttachments] = useState<TransacaoAttachmentSummary[]>([])
+  const [attachmentsLoading, setAttachmentsLoading] = useState(false)
 
   const defaultValues: CreateTransacaoDTO = {
     descricao: '',
@@ -95,12 +136,15 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
     forma_pagto: null,
     notas: null,
     obra_id: null,
+    receipt_intake_id: null,
   }
 
   const {
     register,
     handleSubmit,
     reset,
+    getValues,
+    setValue,
     formState: { errors },
   } = useForm<CreateTransacaoDTO>({
     resolver: zodResolver(createTransacaoSchema) as never,
@@ -186,6 +230,158 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usePaginationV1, filtroTipo])
 
+  async function loadAttachments(transacaoId: string) {
+    if (!receiptsEnabled) return
+    setAttachmentsLoading(true)
+    try {
+      const payload = await apiRequest<{ items: TransacaoAttachmentSummary[] }>(
+        `/api/v1/transacoes/${transacaoId}/anexos`
+      )
+      setAttachments(payload.items || [])
+    } catch (error) {
+      setAttachments([])
+      toast(error instanceof Error ? error.message : 'Erro ao carregar anexos', 'error')
+    } finally {
+      setAttachmentsLoading(false)
+    }
+  }
+
+  function applyReceiptSuggestions(reviewPayload: ReceiptReviewPayload | null) {
+    if (!reviewPayload || reviewPayload.status !== 'ready_for_review') return
+
+    const currentValues = getValues()
+    if (
+      reviewPayload.descricao.value &&
+      shouldAutofill(reviewPayload.descricao.confidence) &&
+      !currentValues.descricao
+    ) {
+      setValue('descricao', reviewPayload.descricao.value, { shouldDirty: true })
+    }
+    if (
+      reviewPayload.categoria.value &&
+      shouldAutofill(reviewPayload.categoria.confidence) &&
+      !currentValues.categoria
+    ) {
+      setValue('categoria', reviewPayload.categoria.value, { shouldDirty: true })
+    }
+    if (
+      typeof reviewPayload.valor_total.value === 'number' &&
+      shouldAutofill(reviewPayload.valor_total.confidence) &&
+      !currentValues.valor
+    ) {
+      setValue('valor', reviewPayload.valor_total.value, { shouldDirty: true })
+    }
+    if (
+      reviewPayload.data_emissao.value &&
+      shouldAutofill(reviewPayload.data_emissao.confidence) &&
+      !currentValues.data
+    ) {
+      setValue('data', reviewPayload.data_emissao.value, { shouldDirty: true })
+    }
+    if (
+      reviewPayload.forma_pagamento.value &&
+      shouldAutofill(reviewPayload.forma_pagamento.confidence) &&
+      !currentValues.forma_pagto
+    ) {
+      setValue('forma_pagto', reviewPayload.forma_pagamento.value, { shouldDirty: true })
+    }
+    if (
+      reviewPayload.fornecedor.value &&
+      shouldAutofill(reviewPayload.fornecedor.confidence)
+    ) {
+      const currentNotes = currentValues.notas || ''
+      if (!currentNotes.includes(reviewPayload.fornecedor.value)) {
+        const nextNotes = [currentNotes.trim(), `Fornecedor sugerido: ${reviewPayload.fornecedor.value}`]
+          .filter(Boolean)
+          .join('\n')
+        setValue('notas', nextNotes, { shouldDirty: true })
+      }
+    }
+  }
+
+  async function uploadReceipt(file: File) {
+    if (!receiptsEnabled) return
+
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('run_ai', String(receiptAiEnabled))
+
+    setReceiptUploading(true)
+    try {
+      const intake = await apiRequest<TransacaoReceiptIntakeSummary>(
+        '/api/v1/transacoes/receipts/intake',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      )
+
+      setReceiptIntake(intake)
+      track('receipt_uploaded', {
+        source: 'web',
+        entity_type: 'transacao_receipt',
+        entity_id: intake.id,
+        outcome: 'success',
+        mime_type: intake.mime_type,
+      }).catch(() => undefined)
+
+      if (intake.review_payload?.status === 'ready_for_review') {
+        track('receipt_ai_extracted', {
+          source: 'web',
+          entity_type: 'transacao_receipt',
+          entity_id: intake.id,
+          outcome: 'success',
+        }).catch(() => undefined)
+      }
+
+      applyReceiptSuggestions(intake.review_payload)
+
+      if (editingTx) {
+        await apiRequest(`/api/v1/transacoes/${editingTx.id}/anexos`, {
+          method: 'POST',
+          body: {
+            receipt_intake_id: intake.id,
+          },
+        })
+        await loadAttachments(editingTx.id)
+      }
+
+      toast('Recibo enviado com sucesso', 'success')
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Erro ao enviar recibo', 'error')
+    } finally {
+      setReceiptUploading(false)
+      setReceiptDragActive(false)
+    }
+  }
+
+  async function deleteAttachment(attachmentId: string) {
+    if (!editingTx) return
+    const accepted = await confirm({
+      title: 'Excluir anexo?',
+      description: 'O arquivo será removido do storage privado desta transação.',
+      confirmLabel: 'Excluir anexo',
+      variant: 'danger',
+    })
+    if (!accepted) return
+
+    try {
+      await apiRequest(`/api/v1/transacoes/${editingTx.id}/anexos/${attachmentId}`, {
+        method: 'DELETE',
+      })
+      await loadAttachments(editingTx.id)
+      toast('Anexo removido', 'info')
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Erro ao remover anexo', 'error')
+    }
+  }
+
+  async function handleReceiptFiles(files: FileList | File[] | null) {
+    const file = files?.[0]
+    if (!file) return
+    await uploadReceipt(file)
+  }
+
   const receitas = transacoes.filter((t) => t.tipo === 'Receita').reduce((s, t) => s + t.valor, 0)
   const despesas = transacoes.filter((t) => t.tipo === 'Despesa').reduce((s, t) => s + t.valor, 0)
   const saldo = receitas - despesas
@@ -242,6 +438,7 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
 
   function openEditTx(tx: Transacao) {
     setEditingTx(tx)
+    setReceiptIntake(null)
     reset({
       descricao: tx.descricao,
       tipo: tx.tipo,
@@ -252,13 +449,18 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
       forma_pagto: tx.forma_pagto || null,
       notas: tx.notas || null,
       obra_id: tx.obra_id || null,
+      receipt_intake_id: null,
     })
     setShowForm(true)
+    void loadAttachments(tx.id)
   }
 
   function closeForm() {
     setShowForm(false)
     setEditingTx(null)
+    setReceiptIntake(null)
+    setAttachments([])
+    setReceiptDragActive(false)
     reset(defaultValues)
   }
 
@@ -271,6 +473,7 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
     const payload = {
       ...data,
       obra_id: data.obra_id || null,
+      receipt_intake_id: editingTx ? null : receiptIntake?.id || null,
     }
 
     let ok: boolean
@@ -281,6 +484,14 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
     }
 
     if (ok) {
+      if (receiptIntake?.review_payload?.status === 'ready_for_review') {
+        track('receipt_ai_confirmed', {
+          source: 'web',
+          entity_type: 'transacao_receipt',
+          entity_id: receiptIntake.id,
+          outcome: 'success',
+        }).catch(() => undefined)
+      }
       await loadDesvio()
       closeForm()
     }
@@ -595,11 +806,211 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
                   rows={2}
                 />
               </FormField>
+              {receiptsEnabled ? (
+                <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50/80 p-4 dark:border-gray-700 dark:bg-gray-950/40">
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Paperclip className="h-4 w-4 text-sand-600" />
+                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+                          Recibo ou nota fiscal
+                        </h4>
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {editingTx
+                          ? 'Anexe novos comprovantes à transação existente.'
+                          : 'Envie um comprovante para pré-preencher os campos com revisão manual obrigatória.'}
+                      </p>
+                    </div>
+                    {receiptUploading ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-sand-100 px-2 py-1 text-[11px] font-semibold text-sand-700 dark:bg-sand-900/30 dark:text-sand-300">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Processando
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <label
+                    className={`flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed px-4 py-6 text-center transition-all ${
+                      receiptDragActive
+                        ? 'border-sand-500 bg-sand-50 dark:bg-sand-900/20'
+                        : 'border-gray-300 bg-white hover:border-sand-400 hover:bg-sand-50/40 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-sand-500'
+                    }`}
+                    onDragOver={(event) => {
+                      event.preventDefault()
+                      setReceiptDragActive(true)
+                    }}
+                    onDragLeave={() => setReceiptDragActive(false)}
+                    onDrop={(event) => {
+                      event.preventDefault()
+                      setReceiptDragActive(false)
+                      void handleReceiptFiles(Array.from(event.dataTransfer.files || []))
+                    }}
+                  >
+                    <Sparkles className="mb-2 h-5 w-5 text-sand-600" />
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      Arraste JPG, PNG, WEBP ou PDF aqui
+                    </span>
+                    <span className="mt-1 text-xs text-gray-500">
+                      ou clique para selecionar um arquivo de at\u00e9 15 MB
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,application/pdf"
+                      className="hidden"
+                      disabled={receiptUploading}
+                      onChange={(event) => void handleReceiptFiles(event.target.files)}
+                    />
+                  </label>
+
+                  {receiptIntake ? (
+                    <div className="mt-3 rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800">
+                          {receiptIntake.signed_url && isReceiptImage(receiptIntake.mime_type) ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={receiptIntake.signed_url}
+                              alt="Preview do recibo"
+                              className="h-full w-full object-cover"
+                            />
+                          ) : receiptIntake.mime_type === 'application/pdf' ? (
+                            <FileText className="h-6 w-6 text-red-500" />
+                          ) : (
+                            <ImageIcon className="h-6 w-6 text-sand-600" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                              {receiptIntake.original_filename}
+                            </p>
+                            <span className="rounded-full bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                              {receiptIntake.mime_type}
+                            </span>
+                            <span className="rounded-full bg-sand-100 px-2 py-1 text-[11px] font-medium text-sand-700 dark:bg-sand-900/30 dark:text-sand-300">
+                              {receiptIntake.review_payload?.status === 'ready_for_review'
+                                ? 'Sugestões prontas'
+                                : receiptIntake.review_payload?.status === 'failed'
+                                  ? 'IA indisponível'
+                                  : 'Manual'}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-gray-500">
+                            {(receiptIntake.size_bytes / 1024 / 1024).toFixed(2)} MB
+                            {receiptIntake.signed_url ? ' · preview seguro ativo' : ''}
+                          </p>
+                          {receiptIntake.review_payload?.error_message ? (
+                            <p className="mt-2 text-xs text-amber-600 dark:text-amber-300">
+                              {receiptIntake.review_payload.error_message}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {receiptIntake.review_payload ? (
+                        <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+                          {[
+                            ['Fornecedor', receiptIntake.review_payload.fornecedor.value, receiptIntake.review_payload.fornecedor.confidence],
+                            ['Descrição', receiptIntake.review_payload.descricao.value, receiptIntake.review_payload.descricao.confidence],
+                            [
+                              'Valor',
+                              typeof receiptIntake.review_payload.valor_total.value === 'number'
+                                ? fmt(receiptIntake.review_payload.valor_total.value)
+                                : null,
+                              receiptIntake.review_payload.valor_total.confidence,
+                            ],
+                            ['Data', receiptIntake.review_payload.data_emissao.value, receiptIntake.review_payload.data_emissao.confidence],
+                            ['Categoria', receiptIntake.review_payload.categoria.value, receiptIntake.review_payload.categoria.confidence],
+                            ['Pagamento', receiptIntake.review_payload.forma_pagamento.value, receiptIntake.review_payload.forma_pagamento.confidence],
+                          ].map(([label, value, confidence]) => (
+                            <div
+                              key={String(label)}
+                              className="rounded-xl border border-gray-200 px-3 py-2 text-xs dark:border-gray-800"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-semibold text-gray-700 dark:text-gray-200">
+                                  {label}
+                                </span>
+                                <span className="text-[10px] uppercase tracking-wide text-gray-400">
+                                  {formatConfidence(typeof confidence === 'number' ? confidence : null)}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-sm text-gray-900 dark:text-white">
+                                {typeof value === 'string' || typeof value === 'number'
+                                  ? String(value)
+                                  : '\u2014'}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-xs text-gray-500">
+                      Nenhum recibo anexado nesta sess\u00e3o.
+                    </p>
+                  )}
+
+                  {editingTx ? (
+                    <div className="mt-3 rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
+                      <div className="mb-2 flex items-center justify-between">
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                          Anexos da transação
+                        </p>
+                        {attachmentsLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                        ) : null}
+                      </div>
+                      {attachments.length === 0 ? (
+                        <p className="text-xs text-gray-500">Nenhum anexo vinculado ainda.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {attachments.map((attachment) => (
+                            <div
+                              key={attachment.id}
+                              className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 px-3 py-2 dark:border-gray-800"
+                            >
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
+                                  {attachment.original_filename}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {fmtDate(attachment.created_at)} · {attachment.mime_type}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {attachment.signed_url ? (
+                                  <a
+                                    href={attachment.signed_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="rounded-lg bg-gray-100 px-2 py-1 text-[11px] font-semibold text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200"
+                                  >
+                                    Abrir
+                                  </a>
+                                ) : null}
+                                <button
+                                  type="button"
+                                  onClick={() => void deleteAttachment(attachment.id)}
+                                  className="rounded-lg p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="flex gap-2 pt-2">
-                <button type="button" onClick={() => setShowForm(false)} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">Cancelar</button>
+                <button type="button" onClick={closeForm} className="flex-1 py-3 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all">Cancelar</button>
                 <button
                   type="submit"
-                  disabled={createMutation.isMutating || updateMutation.isMutating}
+                  disabled={createMutation.isMutating || updateMutation.isMutating || receiptUploading}
                   className="flex-1 py-3 bg-sand-500 hover:bg-sand-600 text-white font-medium rounded-2xl btn-press transition-all text-sm disabled:opacity-50"
                 >
                   {(createMutation.isMutating || updateMutation.isMutating) ? 'Salvando...' : editingTx ? 'Salvar' : 'Criar'}
