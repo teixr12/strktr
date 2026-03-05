@@ -4,6 +4,7 @@ import { fail, ok } from '@/lib/api/response'
 import { log } from '@/lib/api/logger'
 import { emitProductEvent } from '@/lib/telemetry'
 import { requireExecutionPermission } from '@/lib/auth/execution-permissions'
+import { CHECKLIST_ITEM_SELECT, CHECKLIST_ITEM_SELECT_WITH_DUE_DATE } from '@/lib/api/select-maps'
 
 export async function POST(
   request: Request,
@@ -45,7 +46,7 @@ export async function POST(
   }
 
   const nextDone = !item.concluido
-  const { data, error: updateError } = await supabase
+  const { data: updated, error: updateError } = await supabase
     .from('checklist_items')
     .update({
       concluido: nextDone,
@@ -53,10 +54,11 @@ export async function POST(
       concluido_em: nextDone ? new Date().toISOString() : null,
     })
     .eq('id', itemId)
-    .select('*')
+    .eq('org_id', orgId)
+    .select('id')
     .single()
 
-  if (updateError) {
+  if (updateError || !updated) {
     log('error', 'obras.checklist.toggle.failed', {
       requestId,
       orgId,
@@ -64,9 +66,37 @@ export async function POST(
       route: '/api/v1/obras/[id]/checklists/items/[itemId]/toggle',
       obraId: id,
       itemId,
-      error: updateError.message,
+      error: updateError?.message,
     })
-    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: updateError.message }, 500)
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: updateError?.message || 'Erro ao atualizar item' }, 500)
+  }
+
+  const fetched = await supabase
+    .from('checklist_items')
+    .select(CHECKLIST_ITEM_SELECT_WITH_DUE_DATE)
+    .eq('id', updated.id)
+    .eq('org_id', orgId)
+    .single()
+
+  let data = fetched.data
+  const fetchUpdatedError = fetched.error
+
+  if (fetchUpdatedError) {
+    const fetchMsg = fetchUpdatedError.message || ''
+    const fetchMissingColumn = fetchMsg.includes('data_limite') || fetchMsg.includes('schema cache')
+    if (!fetchMissingColumn) {
+      return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: fetchUpdatedError.message }, 500)
+    }
+    const fallback = await supabase
+      .from('checklist_items')
+      .select(CHECKLIST_ITEM_SELECT)
+      .eq('id', updated.id)
+      .eq('org_id', orgId)
+      .single()
+    if (fallback.error || !fallback.data) {
+      return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: fallback.error?.message || 'Erro ao carregar item' }, 500)
+    }
+    data = { ...fallback.data, data_limite: null }
   }
 
   await supabase.from('diario_obra').insert({

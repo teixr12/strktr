@@ -4,6 +4,7 @@ import { log } from '@/lib/api/logger'
 import { fail, ok } from '@/lib/api/response'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 import { requireExecutionPermission } from '@/lib/auth/execution-permissions'
+import { CHECKLIST_ITEM_SELECT, CHECKLIST_ITEM_SELECT_WITH_DUE_DATE } from '@/lib/api/select-maps'
 import { updateChecklistItemSchema } from '@/shared/schemas/execution'
 
 export async function PATCH(
@@ -49,17 +50,17 @@ export async function PATCH(
     return fail(request, { code: API_ERROR_CODES.VALIDATION_ERROR, message: 'Payload vazio' }, 400)
   }
 
-  let { data, error: dbError } = await supabase
+  let { data: updated, error: dbError } = await supabase
     .from('checklist_items')
     .update(payload)
     .eq('id', itemId)
     .eq('checklist_id', checklistId)
     .eq('org_id', orgId)
-    .select('*')
+    .select('id')
     .single()
 
   const errMsg = dbError?.message || ''
-  const missingColumn =
+  let missingColumn =
     errMsg.includes('data_limite') || errMsg.includes('schema cache')
 
   if (dbError && dueDateEnabled && missingColumn && Object.prototype.hasOwnProperty.call(payload, 'data_limite')) {
@@ -74,20 +75,20 @@ export async function PATCH(
       error: dbError.message,
     })
     if (Object.keys(payloadWithoutDate).length > 0) {
-      ;({ data, error: dbError } = await supabase
+      ;({ data: updated, error: dbError } = await supabase
         .from('checklist_items')
         .update(payloadWithoutDate)
         .eq('id', itemId)
         .eq('checklist_id', checklistId)
         .eq('org_id', orgId)
-        .select('*')
+        .select('id')
         .single())
     } else {
       return ok(request, { skipped: true }, { warning: 'MISSING_COLUMN:data_limite' })
     }
   }
 
-  if (dbError || !data) {
+  if (dbError || !updated) {
     if ((dbError?.message || '').includes('infinite recursion')) {
       log('error', 'obras.checklist.item.update.failed', {
         requestId,
@@ -99,6 +100,35 @@ export async function PATCH(
       })
     }
     return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError?.message || 'Erro ao atualizar item' }, 500)
+  }
+
+  const fetched = await supabase
+    .from('checklist_items')
+    .select(CHECKLIST_ITEM_SELECT_WITH_DUE_DATE)
+    .eq('id', updated.id)
+    .eq('org_id', orgId)
+    .single()
+
+  let data = fetched.data
+  const fetchError = fetched.error
+
+  if (fetchError) {
+    const fetchMsg = fetchError.message || ''
+    const fetchMissingColumn = fetchMsg.includes('data_limite') || fetchMsg.includes('schema cache')
+    if (!fetchMissingColumn) {
+      return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: fetchError.message }, 500)
+    }
+    missingColumn = true
+    const fallback = await supabase
+      .from('checklist_items')
+      .select(CHECKLIST_ITEM_SELECT)
+      .eq('id', updated.id)
+      .eq('org_id', orgId)
+      .single()
+    if (fallback.error || !fallback.data) {
+      return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: fallback.error?.message || 'Erro ao carregar item' }, 500)
+    }
+    data = { ...fallback.data, data_limite: null }
   }
   const meta = missingColumn ? { warning: 'MISSING_COLUMN:data_limite' } : undefined
   return ok(request, data, meta)
