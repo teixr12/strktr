@@ -91,6 +91,7 @@ test('construction docs respeita gate por feature flag (off=404-safe, on=401 sem
   const isEnabled = Boolean(healthPayload?.data?.flags?.constructionDocs)
 
   const checks: Array<{ endpoint: string; method: 'GET' | 'POST' }> = [
+    { endpoint: '/api/v1/construction-docs/projects', method: 'GET' },
     { endpoint: '/api/v1/construction-docs/templates', method: 'GET' },
     { endpoint: '/api/v1/construction-docs/projects/00000000-0000-0000-0000-000000000000/visits', method: 'GET' },
     { endpoint: '/api/v1/construction-docs/documents/generate/inspection', method: 'POST' },

@@ -65,7 +65,7 @@ const NAV_ITEMS = [
   { id: 'notificacoes', label: 'Notificações', icon: 'Bell' as const, href: '/notificacoes' },
   { id: 'tarefas', label: 'Tarefas Gerais', icon: 'ListTodo' as const, href: '/tarefas' },
   { id: 'sops', label: 'SOP Builder', icon: 'ClipboardList' as const, href: '/sops' },
-  { id: 'construction-docs', label: 'Construction Docs', icon: 'FileText' as const, href: '/construction-docs/templates' },
+  { id: 'construction-docs', label: 'Construction Docs', icon: 'FileText' as const, href: '/construction-docs/projects' },
   { id: 'configuracoes', label: 'Configurações', icon: 'Building2' as const, href: '/configuracoes' },
 ]
 

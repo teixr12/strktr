@@ -29,7 +29,6 @@ export const GET = createApiRoute<null, GeneralTaskAssignee[]>({
       .select('user_id, role')
       .eq('org_id', orgId)
       .eq('status', 'ativo')
-      .limit(200)
 
     if (membersError) {
       return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: membersError.message }, 500)

@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { track } from '@/lib/analytics/client'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Eye, EyeOff } from 'lucide-react'
@@ -53,10 +54,28 @@ export default function RegisterPage() {
     })
 
     if (authError) {
+      void track('auth_sign_up', {
+        source: 'web',
+        route: '/register',
+        entity_type: 'auth_user',
+        entity_id: email.trim().toLowerCase() || 'unknown',
+        outcome: 'fail',
+        method: 'password',
+        reason: authError.message,
+      }).catch(() => undefined)
       setError(authError.message)
       setLoading(false)
       return
     }
+
+    void track('auth_sign_up', {
+      source: 'web',
+      route: '/register',
+      entity_type: 'auth_user',
+      entity_id: email.trim().toLowerCase() || 'unknown',
+      outcome: 'success',
+      method: 'password',
+    }).catch(() => undefined)
 
     setMessage('Conta criada! Verifique seu email para confirmar.')
     setLoading(false)
@@ -70,7 +89,27 @@ export default function RegisterPage() {
         redirectTo: `${window.location.origin}/auth/callback`,
       },
     })
-    if (oauthError) setError(oauthError.message)
+    if (oauthError) {
+      void track('auth_sign_up', {
+        source: 'web',
+        route: '/register',
+        entity_type: 'auth_user',
+        entity_id: email.trim().toLowerCase() || 'oauth_google',
+        outcome: 'fail',
+        method: 'google',
+        reason: oauthError.message,
+      }).catch(() => undefined)
+      setError(oauthError.message)
+      return
+    }
+    void track('auth_sign_up', {
+      source: 'web',
+      route: '/register',
+      entity_type: 'auth_user',
+      entity_id: email.trim().toLowerCase() || 'oauth_google',
+      outcome: 'success',
+      method: 'google',
+    }).catch(() => undefined)
   }
 
   return (

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { track } from '@/lib/analytics/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -27,12 +28,20 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
 
     if (authError) {
+      void track('auth_login', {
+        source: 'web',
+        route: '/login',
+        entity_type: 'auth_session',
+        entity_id: email.trim().toLowerCase() || 'unknown',
+        outcome: 'fail',
+        reason: authError.message,
+      }).catch(() => undefined)
       setError(
         authError.message === 'Invalid login credentials'
           ? 'Email ou senha incorretos'
@@ -41,6 +50,15 @@ export default function LoginPage() {
       setLoading(false)
       return
     }
+
+    void track('auth_login', {
+      source: 'web',
+      route: '/login',
+      entity_type: 'auth_session',
+      entity_id: authData.user?.id || email.trim().toLowerCase() || 'unknown',
+      outcome: 'success',
+      method: 'password',
+    }).catch(() => undefined)
 
     router.push('/dashboard')
     router.refresh()
@@ -54,7 +72,27 @@ export default function LoginPage() {
         redirectTo: `${window.location.origin}/auth/callback`,
       },
     })
-    if (oauthError) setError(oauthError.message)
+    if (oauthError) {
+      void track('auth_login', {
+        source: 'web',
+        route: '/login',
+        entity_type: 'auth_session',
+        entity_id: email.trim().toLowerCase() || 'oauth_google',
+        outcome: 'fail',
+        method: 'google',
+        reason: oauthError.message,
+      }).catch(() => undefined)
+      setError(oauthError.message)
+      return
+    }
+    void track('auth_login', {
+      source: 'web',
+      route: '/login',
+      entity_type: 'auth_session',
+      entity_id: email.trim().toLowerCase() || 'oauth_google',
+      outcome: 'success',
+      method: 'google',
+    }).catch(() => undefined)
   }
 
   return (

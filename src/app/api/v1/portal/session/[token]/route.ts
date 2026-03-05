@@ -1,4 +1,5 @@
 import { API_ERROR_CODES } from '@/lib/api/errors'
+import { buildPaginationMeta, getPaginationFromSearchParams } from '@/lib/api/pagination'
 import { fail, ok } from '@/lib/api/response'
 import { enforceRateLimit } from '@/platform/security/rate-limit'
 import { createServiceRoleClient } from '@/lib/supabase/service'
@@ -44,6 +45,14 @@ export async function GET(
     return fail(request, { code: API_ERROR_CODES.UNAUTHORIZED, message: 'Sessão do portal inválida ou expirada' }, 401)
   }
 
+  const { searchParams } = new URL(request.url)
+  const commentsPagination = getPaginationFromSearchParams(searchParams, {
+    defaultPageSize: 200,
+    maxPageSize: 300,
+  })
+  const commentsRangeStart = commentsPagination.offset
+  const commentsRangeEnd = commentsRangeStart + commentsPagination.pageSize - 1
+
   const [obraRes, cronogramaRes, itensRes, diarioRes, aprovacoesRes, comentariosRes, portalClienteRes] = await Promise.all([
     service
       .from('obras')
@@ -80,11 +89,11 @@ export async function GET(
       .limit(100),
     service
       .from('portal_comentarios')
-      .select('id, origem, mensagem, created_at, portal_cliente_id, user_id, aprovacao_id')
+      .select('id, origem, mensagem, created_at, portal_cliente_id, user_id, aprovacao_id', { count: 'exact' })
       .eq('obra_id', session.obra_id)
       .eq('org_id', session.org_id)
       .order('created_at', { ascending: true })
-      .limit(200),
+      .range(commentsRangeStart, commentsRangeEnd),
     service
       .from('portal_clientes')
       .select('id, nome, email')
@@ -184,6 +193,16 @@ export async function GET(
       aprovacoes,
       comentarios,
     },
-    { flag: 'NEXT_PUBLIC_FF_CLIENT_PORTAL' }
+    {
+      flag: 'NEXT_PUBLIC_FF_CLIENT_PORTAL',
+      pagination: {
+        comments: buildPaginationMeta(
+          comentarios.length,
+          comentariosRes.count ?? comentarios.length,
+          commentsPagination.page,
+          commentsPagination.pageSize
+        ),
+      },
+    }
   )
 }
