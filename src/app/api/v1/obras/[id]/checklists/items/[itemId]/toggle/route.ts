@@ -71,12 +71,15 @@ export async function POST(
     return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: updateError?.message || 'Erro ao atualizar item' }, 500)
   }
 
-  let { data, error: fetchUpdatedError } = await supabase
+  const fetched = await supabase
     .from('checklist_items')
     .select(CHECKLIST_ITEM_SELECT_WITH_DUE_DATE)
     .eq('id', updated.id)
     .eq('org_id', orgId)
     .single()
+
+  let data = fetched.data
+  const fetchUpdatedError = fetched.error
 
   if (fetchUpdatedError) {
     const fetchMsg = fetchUpdatedError.message || ''
