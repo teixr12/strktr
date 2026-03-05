@@ -1,6 +1,7 @@
 import { getApiUser } from '@/lib/api/auth'
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { fail, ok } from '@/lib/api/response'
+import { AUTOMATION_RULE_SELECT } from '@/lib/api/select-maps'
 import { requireDomainPermission } from '@/lib/auth/domain-permissions'
 import { updateAutomationRuleSchema } from '@/shared/schemas/roadmap-automation'
 import { listAutomationTemplates } from '@/server/services/automation/automation-service'
@@ -62,7 +63,7 @@ export async function PATCH(
     .update(updatePayload)
     .eq('id', id)
     .eq('org_id', orgId)
-    .select('*')
+    .select(AUTOMATION_RULE_SELECT)
     .single()
 
   if (updateError || !updated) {

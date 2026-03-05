@@ -1,6 +1,7 @@
 import { getApiUser } from '@/lib/api/auth'
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { fail, ok } from '@/lib/api/response'
+import { AUTOMATION_RULE_SELECT } from '@/lib/api/select-maps'
 import { requireDomainPermission } from '@/lib/auth/domain-permissions'
 import {
   createAutomationRuleSchema,
@@ -74,7 +75,7 @@ export async function POST(request: Request) {
       created_by: user.id,
       metadata: parsed.data.metadata || {},
     })
-    .select('*')
+    .select(AUTOMATION_RULE_SELECT)
     .single()
 
   if (createError || !created) {
