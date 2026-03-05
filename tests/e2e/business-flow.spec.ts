@@ -7,11 +7,19 @@ const E2E_USER_BEARER_TOKEN = process.env.E2E_USER_BEARER_TOKEN || ''
 const E2E_FOREIGN_OBRA_ID = process.env.E2E_FOREIGN_OBRA_ID || ''
 const isCI = process.env.CI === 'true' || process.env.CI === '1'
 const hasRequiredEnv = Boolean(E2E_BEARER_TOKEN && E2E_OBRA_ID)
+const hasRoleMatrixEnv = Boolean(E2E_MANAGER_BEARER_TOKEN && E2E_USER_BEARER_TOKEN)
+const hasTenantIsolationEnv = Boolean(E2E_FOREIGN_OBRA_ID)
 
 test.describe('business flow (authenticated)', () => {
   test.beforeAll(() => {
     if (isCI && !hasRequiredEnv) {
       throw new Error('CI must provide E2E_BEARER_TOKEN and E2E_OBRA_ID to run authenticated business flow tests')
+    }
+    if (isCI && !hasRoleMatrixEnv) {
+      throw new Error('CI must provide E2E_MANAGER_BEARER_TOKEN and E2E_USER_BEARER_TOKEN for role matrix checks')
+    }
+    if (isCI && !hasTenantIsolationEnv) {
+      throw new Error('CI must provide E2E_FOREIGN_OBRA_ID for cross-org tenant isolation checks')
     }
   })
 
@@ -152,7 +160,7 @@ test.describe('business flow (authenticated)', () => {
   })
 
   test('role matrix enforcement across leads/finance/projects/team', async ({ request }) => {
-    test.skip(!E2E_MANAGER_BEARER_TOKEN || !E2E_USER_BEARER_TOKEN, 'Set E2E_MANAGER_BEARER_TOKEN and E2E_USER_BEARER_TOKEN to run role matrix checks')
+    test.skip(!hasRoleMatrixEnv && !isCI, 'Set E2E_MANAGER_BEARER_TOKEN and E2E_USER_BEARER_TOKEN to run role matrix checks')
 
     const managerHeaders = {
       Authorization: `Bearer ${E2E_MANAGER_BEARER_TOKEN}`,
@@ -185,7 +193,7 @@ test.describe('business flow (authenticated)', () => {
   })
 
   test('tenant isolation blocks access to foreign obra', async ({ request }) => {
-    test.skip(!E2E_FOREIGN_OBRA_ID, 'Set E2E_FOREIGN_OBRA_ID to validate cross-org isolation checks')
+    test.skip(!hasTenantIsolationEnv && !isCI, 'Set E2E_FOREIGN_OBRA_ID to validate cross-org isolation checks')
 
     const headers = {
       Authorization: `Bearer ${E2E_BEARER_TOKEN}`,
