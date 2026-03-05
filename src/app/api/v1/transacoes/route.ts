@@ -4,6 +4,7 @@ import { log } from '@/lib/api/logger'
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { createTransacaoSchema } from '@/shared/schemas/business'
 import { buildPaginationMeta, getPaginationFromSearchParams } from '@/lib/api/pagination'
+import { linkReceiptIntakeToTransaction } from '@/server/services/finance/receipt-linking'
 
 export const GET = withApiAuth('can_manage_finance', async (request, { supabase, requestId, orgId, user }) => {
   const { searchParams } = new URL(request.url)
@@ -40,16 +41,17 @@ export const POST = withApiAuth('can_manage_finance', async (request, { supabase
     return fail(request, { code: API_ERROR_CODES.VALIDATION_ERROR, message: parsed.error.issues[0]?.message || 'Payload inválido' }, 400)
   }
   const body = parsed.data
+  const { receipt_intake_id: receiptIntakeId, ...transacaoInput } = body
 
   const { data, error: dbError } = await supabase
     .from('transacoes')
     .insert({
-      ...body,
+      ...transacaoInput,
       user_id: user.id,
       org_id: orgId,
-      obra_id: body.obra_id || null,
-      forma_pagto: body.forma_pagto || 'Não informado',
-      notas: body.notas || null,
+      obra_id: transacaoInput.obra_id || null,
+      forma_pagto: transacaoInput.forma_pagto || 'Não informado',
+      notas: transacaoInput.notas || null,
     })
     .select('*, obras(nome)')
     .single()
@@ -58,5 +60,39 @@ export const POST = withApiAuth('can_manage_finance', async (request, { supabase
     log('error', 'transacoes.create.failed', { requestId, orgId, userId: user.id, route: '/api/v1/transacoes', error: dbError.message })
     return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError.message }, 500)
   }
+
+  if (receiptIntakeId) {
+    const linked = await linkReceiptIntakeToTransaction({
+      supabase,
+      orgId,
+      transacaoId: data.id,
+      receiptIntakeId,
+      actorUserId: user.id,
+    })
+
+    if (!linked.ok) {
+      await supabase.from('transacoes').delete().eq('id', data.id).eq('org_id', orgId)
+      const status =
+        linked.reason === 'already_linked'
+          ? 409
+          : linked.reason === 'not_found'
+            ? 404
+            : 500
+      return fail(
+        request,
+        {
+          code:
+            linked.reason === 'already_linked'
+              ? API_ERROR_CODES.CONFLICT
+              : linked.reason === 'not_found'
+                ? API_ERROR_CODES.NOT_FOUND
+                : API_ERROR_CODES.DB_ERROR,
+          message: linked.message,
+        },
+        status
+      )
+    }
+  }
+
   return ok(request, data, undefined, 201)
 })

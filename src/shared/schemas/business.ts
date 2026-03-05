@@ -47,6 +47,7 @@ export const transacaoStatusSchema = z.enum(['Confirmado', 'Pendente', 'Cancelad
 
 export const createTransacaoSchema = z.object({
   obra_id: z.string().uuid().optional().nullable(),
+  receipt_intake_id: z.string().uuid().optional().nullable(),
   tipo: transacaoTipoSchema,
   categoria: z.string().trim().min(2, 'Categoria é obrigatória'),
   descricao: z.string().trim().min(2, 'Descrição é obrigatória'),

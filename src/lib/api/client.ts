@@ -22,6 +22,10 @@ type ApiRequestOptions = {
   noRetry?: boolean
 }
 
+function isFormDataPayload(value: unknown): value is FormData {
+  return typeof FormData !== 'undefined' && value instanceof FormData
+}
+
 const MAX_RETRIES = 2
 const BASE_DELAY_MS = 500
 
@@ -68,11 +72,19 @@ async function requestApi<T, M = Record<string, unknown>>(
     try {
       response = await fetch(path, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: options.body ? JSON.stringify(options.body) : undefined,
+        headers: isFormDataPayload(options.body)
+          ? {
+              Authorization: `Bearer ${token}`,
+            }
+          : {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+        body: isFormDataPayload(options.body)
+          ? options.body
+          : options.body
+            ? JSON.stringify(options.body)
+            : undefined,
       })
     } catch (err) {
       // Network error (offline, DNS failure, etc.)

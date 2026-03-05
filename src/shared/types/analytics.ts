@@ -54,6 +54,9 @@ export const ANALYTICS_EVENT_TYPES = [
   'logistics_estimated',
   'cronograma_view_changed',
   'docs_workspace_opened',
+  'receipt_uploaded',
+  'receipt_ai_extracted',
+  'receipt_ai_confirmed',
 ] as const
 
 export type AnalyticsEventType = (typeof ANALYTICS_EVENT_TYPES)[number]
