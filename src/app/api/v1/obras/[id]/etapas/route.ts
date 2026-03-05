@@ -2,6 +2,7 @@ import { getApiUser } from '@/lib/api/auth'
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { log } from '@/lib/api/logger'
 import { fail, ok } from '@/lib/api/response'
+import { OBRA_ETAPA_SELECT } from '@/lib/api/select-maps'
 import { canManageExecutionStructure, requireExecutionPermission } from '@/lib/auth/execution-permissions'
 import { createEtapaSchema } from '@/shared/schemas/execution'
 
@@ -20,7 +21,7 @@ export async function GET(
   const { id } = await params
   const { data, error: dbError } = await supabase
     .from('obra_etapas')
-    .select('*')
+    .select(OBRA_ETAPA_SELECT)
     .eq('obra_id', id)
     .eq('org_id', orgId)
     .order('ordem')
@@ -91,7 +92,7 @@ export async function POST(
       status: payload.status || 'Pendente',
       ordem: nextOrder,
     })
-    .select('*')
+    .select(OBRA_ETAPA_SELECT)
     .single()
 
   if (dbError || !data) {

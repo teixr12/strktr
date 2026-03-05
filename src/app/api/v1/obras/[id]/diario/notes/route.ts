@@ -2,6 +2,7 @@ import { getApiUser } from '@/lib/api/auth'
 import { fail, ok } from '@/lib/api/response'
 import { log } from '@/lib/api/logger'
 import { API_ERROR_CODES } from '@/lib/api/errors'
+import { DIARIO_OBRA_SELECT } from '@/lib/api/select-maps'
 import { requireExecutionPermission } from '@/lib/auth/execution-permissions'
 import { createDiarioNoteSchema } from '@/shared/schemas/execution'
 
@@ -55,7 +56,7 @@ export async function POST(
       descricao: payload.descricao.trim(),
       metadata: {},
     })
-    .select('*')
+    .select(DIARIO_OBRA_SELECT)
     .single()
 
   if (insertError) {

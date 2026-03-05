@@ -1,6 +1,7 @@
 import { getApiUser } from '@/lib/api/auth'
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { fail, ok } from '@/lib/api/response'
+import { OBRA_CHECKLIST_SELECT } from '@/lib/api/select-maps'
 import { canManageExecutionStructure, requireExecutionPermission } from '@/lib/auth/execution-permissions'
 import { createChecklistSchema } from '@/shared/schemas/execution'
 
@@ -87,7 +88,7 @@ export async function POST(
       nome: payload.nome,
       ordem: nextOrder,
     })
-    .select('*')
+    .select(OBRA_CHECKLIST_SELECT)
     .single()
 
   if (dbError || !data) {

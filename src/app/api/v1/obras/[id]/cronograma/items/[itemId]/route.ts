@@ -2,6 +2,7 @@ import { getApiUser } from '@/lib/api/auth'
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { log } from '@/lib/api/logger'
 import { fail, ok } from '@/lib/api/response'
+import { CRONOGRAMA_ITEM_SELECT } from '@/lib/api/select-maps'
 import { requireDomainPermission } from '@/lib/auth/domain-permissions'
 import { updateCronogramaItemSchema } from '@/shared/schemas/cronograma-portal'
 
@@ -66,7 +67,7 @@ export async function PATCH(
     })
     .eq('id', itemId)
     .eq('org_id', orgId)
-    .select('*')
+    .select(CRONOGRAMA_ITEM_SELECT)
     .single()
 
   if (updateError || !updated) {
