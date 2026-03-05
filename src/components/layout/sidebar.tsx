@@ -64,6 +64,7 @@ const NAV_ITEMS = [
   { id: 'knowledgebase', label: 'Base de Conhecimento', icon: 'BookOpen' as const, href: '/knowledgebase' },
   { id: 'notificacoes', label: 'Notificações', icon: 'Bell' as const, href: '/notificacoes' },
   { id: 'tarefas', label: 'Tarefas Gerais', icon: 'ListTodo' as const, href: '/tarefas' },
+  { id: 'docs', label: 'Docs', icon: 'FileText' as const, href: '/docs' },
   { id: 'sops', label: 'SOP Builder', icon: 'ClipboardList' as const, href: '/sops' },
   { id: 'construction-docs', label: 'Construction Docs', icon: 'FileText' as const, href: '/construction-docs/projects' },
   { id: 'configuracoes', label: 'Configurações', icon: 'Building2' as const, href: '/configuracoes' },
@@ -163,8 +164,11 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
 
   const visibleNavItems = NAV_ITEMS.filter((item) => {
     if (item.id === 'tarefas') return featureFlags.generalTasksV1
-    if (item.id === 'sops') return featureFlags.sopBuilderV1
-    if (item.id === 'construction-docs') return featureFlags.constructionDocs
+    if (item.id === 'docs') return featureFlags.docsWorkspaceV1
+    if (item.id === 'sops') return featureFlags.sopBuilderV1 && !featureFlags.docsWorkspaceV1
+    if (item.id === 'construction-docs') {
+      return featureFlags.constructionDocs && !featureFlags.docsWorkspaceV1
+    }
     return true
   })
 

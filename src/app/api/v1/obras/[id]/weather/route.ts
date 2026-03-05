@@ -66,6 +66,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       location: {
         lat: Number(location.lat),
         lng: Number(location.lng),
+        formatted_address: location.formatted_address || null,
+        cidade: location.cidade || null,
+        estado: location.estado || null,
+        cep: location.cep || null,
       },
       provider: 'open-meteo',
       days: forecast.days,
@@ -79,6 +83,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       location: {
         lat: Number(location.lat),
         lng: Number(location.lng),
+        formatted_address: location.formatted_address || null,
+        cidade: location.cidade || null,
+        estado: location.estado || null,
+        cep: location.cep || null,
       },
       provider: 'open-meteo',
       days: [],

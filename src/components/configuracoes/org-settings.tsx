@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { apiRequest } from '@/lib/api/client'
+import { track } from '@/lib/analytics/client'
 import { featureFlags } from '@/lib/feature-flags'
 import { toast } from '@/hooks/use-toast'
 import { useConfirm } from '@/hooks/use-confirm'
@@ -14,6 +15,7 @@ import { PageHeader, QuickActionBar, SectionCard } from '@/components/ui/enterpr
 import { ModalSheet } from '@/components/ui/modal-sheet'
 import { FormField, FormInput, FormSelect } from '@/components/ui/form-field'
 import type { UserRole, OrgMembro, Organizacao } from '@/types/database'
+import type { OrgHqLocationPayload } from '@/shared/types/org-hq-location'
 
 interface Props {
   userId: string
@@ -34,15 +36,73 @@ const orgFormSchema = z.object({
 })
 type OrgFormValues = z.infer<typeof orgFormSchema>
 
+type HqFormState = {
+  cep: string
+  logradouro: string
+  numero: string
+  complemento: string
+  bairro: string
+  cidade: string
+  estado: string
+}
+
+const EMPTY_HQ_FORM: HqFormState = {
+  cep: '',
+  logradouro: '',
+  numero: '',
+  complemento: '',
+  bairro: '',
+  cidade: '',
+  estado: '',
+}
+
+function mapHqToForm(payload: OrgHqLocationPayload | null): HqFormState {
+  const location = payload?.location
+  if (!location) return EMPTY_HQ_FORM
+  return {
+    cep: location.cep || '',
+    logradouro: location.logradouro || '',
+    numero: location.numero || '',
+    complemento: location.complemento || '',
+    bairro: location.bairro || '',
+    cidade: location.cidade || '',
+    estado: location.estado || '',
+  }
+}
+
+function formatHqSummary(payload: OrgHqLocationPayload | null) {
+  const location = payload?.location
+  if (!location) return null
+  return (
+    location.formatted_address ||
+    [
+      [location.logradouro, location.numero].filter(Boolean).join(', '),
+      [location.bairro, location.cidade, location.estado].filter(Boolean).join(' · '),
+      location.cep,
+    ]
+      .filter(Boolean)
+      .join(' · ')
+  )
+}
+
+function hasHqFormValue(form: HqFormState) {
+  return Boolean(form.cep || form.logradouro || form.bairro || form.cidade || form.estado)
+}
+
 export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembros, organizacao: initialOrg }: Props) {
   const { confirm, dialog: confirmDialog } = useConfirm()
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Configuracoes
+  const hqRoutingEnabled = featureFlags.obraHqRoutingV1
   const [org, setOrg] = useState(initialOrg)
   const [membros, setMembros] = useState(initialMembros)
   const [showCreateOrg, setShowCreateOrg] = useState(false)
   const [showInvite, setShowInvite] = useState(false)
   const [isBusy, setIsBusy] = useState(false)
   const [lastError, setLastError] = useState<string | null>(null)
+  const [hqPayload, setHqPayload] = useState<OrgHqLocationPayload | null>(null)
+  const [hqForm, setHqForm] = useState<HqFormState>(EMPTY_HQ_FORM)
+  const [hqLoading, setHqLoading] = useState(false)
+  const [hqSaving, setHqSaving] = useState(false)
 
   const { register: registerOrg, handleSubmit: handleOrgSubmit, formState: { errors: orgErrors } } = useForm<OrgFormValues>({
     resolver: zodResolver(orgFormSchema) as never,
@@ -57,6 +117,28 @@ export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembr
   const userRole = orgMembro?.role || 'admin'
   const isAdmin = userRole === 'admin'
   const isManagerOrAbove = canAccess(userRole, 'manager')
+
+  const loadHqLocation = useCallback(async () => {
+    if (!org || !hqRoutingEnabled) return
+    setHqLoading(true)
+    try {
+      const payload = await apiRequest<OrgHqLocationPayload>('/api/v1/config/org/hq-location')
+      setHqPayload(payload)
+      setHqForm(mapHqToForm(payload))
+    } catch (err) {
+      setHqPayload(null)
+      setHqForm(EMPTY_HQ_FORM)
+      toast(err instanceof Error ? err.message : 'Erro ao carregar sede da organização', 'error')
+    } finally {
+      setHqLoading(false)
+    }
+  }, [hqRoutingEnabled, org])
+
+  useEffect(() => {
+    if (org && hqRoutingEnabled) {
+      void loadHqLocation()
+    }
+  }, [loadHqLocation, org, hqRoutingEnabled])
 
   async function onOrgSubmit(values: OrgFormValues) {
     setIsBusy(true)
@@ -160,6 +242,45 @@ export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembr
       toast(message, 'error')
     } finally {
       setIsBusy(false)
+    }
+  }
+
+  async function saveHqLocation() {
+    if (!hasHqFormValue(hqForm)) {
+      toast('Preencha CEP ou endereço da sede para salvar', 'error')
+      return
+    }
+    setHqSaving(true)
+    setLastError(null)
+    try {
+      const payload = await apiRequest<OrgHqLocationPayload>('/api/v1/config/org/hq-location', {
+        method: 'PATCH',
+        body: {
+          cep: hqForm.cep || null,
+          logradouro: hqForm.logradouro || null,
+          numero: hqForm.numero || null,
+          complemento: hqForm.complemento || null,
+          bairro: hqForm.bairro || null,
+          cidade: hqForm.cidade || null,
+          estado: hqForm.estado || null,
+          source: 'manual',
+        },
+      })
+      setHqPayload(payload)
+      setHqForm(mapHqToForm(payload))
+      toast('Sede da organização atualizada', 'success')
+      void track('hq_location_saved', {
+        source: 'web',
+        entity_type: 'organization',
+        entity_id: org?.id || null,
+        outcome: 'success',
+      })
+    } catch (err) {
+      const message = err instanceof Error ? `${err.message}. Tentar novamente.` : 'Erro ao salvar sede. Tentar novamente.'
+      setLastError(message)
+      toast(message, 'error')
+    } finally {
+      setHqSaving(false)
     }
   }
 
@@ -284,6 +405,102 @@ export function OrgSettingsContent({ userId, orgMembro, orgMembros: initialMembr
           </div>
         )}
       </div>
+
+      {hqRoutingEnabled && (
+        <div className="glass-card rounded-2xl p-5 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-900/30 flex items-center justify-center">
+              <Building2 className="w-5 h-5 text-slate-600 dark:text-slate-300" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900 dark:text-white">Base operacional / HQ</h3>
+              <p className="text-xs text-gray-500">
+                {formatHqSummary(hqPayload) || 'Defina a origem padrão para clima, mapa e logística das obras.'}
+              </p>
+            </div>
+          </div>
+
+          {hqLoading ? (
+            <div className="grid gap-2 md:grid-cols-2">
+              <div className="skeleton h-11 rounded-xl" />
+              <div className="skeleton h-11 rounded-xl" />
+              <div className="skeleton h-11 rounded-xl md:col-span-2" />
+            </div>
+          ) : isManagerOrAbove ? (
+            <>
+              <div className="grid gap-3 md:grid-cols-2">
+                <FormField label="CEP">
+                  <FormInput
+                    value={hqForm.cep}
+                    onChange={(event) => setHqForm((prev) => ({ ...prev, cep: event.target.value }))}
+                    placeholder="CEP da sede"
+                  />
+                </FormField>
+                <FormField label="Número">
+                  <FormInput
+                    value={hqForm.numero}
+                    onChange={(event) => setHqForm((prev) => ({ ...prev, numero: event.target.value }))}
+                    placeholder="Número"
+                  />
+                </FormField>
+                <FormField label="Logradouro" className="md:col-span-2">
+                  <FormInput
+                    value={hqForm.logradouro}
+                    onChange={(event) => setHqForm((prev) => ({ ...prev, logradouro: event.target.value }))}
+                    placeholder="Rua, avenida, etc."
+                  />
+                </FormField>
+                <FormField label="Complemento" className="md:col-span-2">
+                  <FormInput
+                    value={hqForm.complemento}
+                    onChange={(event) => setHqForm((prev) => ({ ...prev, complemento: event.target.value }))}
+                    placeholder="Complemento"
+                  />
+                </FormField>
+                <FormField label="Bairro">
+                  <FormInput
+                    value={hqForm.bairro}
+                    onChange={(event) => setHqForm((prev) => ({ ...prev, bairro: event.target.value }))}
+                    placeholder="Bairro"
+                  />
+                </FormField>
+                <FormField label="Cidade">
+                  <FormInput
+                    value={hqForm.cidade}
+                    onChange={(event) => setHqForm((prev) => ({ ...prev, cidade: event.target.value }))}
+                    placeholder="Cidade"
+                  />
+                </FormField>
+                <FormField label="UF">
+                  <FormInput
+                    value={hqForm.estado}
+                    onChange={(event) => setHqForm((prev) => ({ ...prev, estado: event.target.value }))}
+                    placeholder="UF"
+                    maxLength={2}
+                  />
+                </FormField>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => void saveHqLocation()}
+                  disabled={hqSaving}
+                  className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                >
+                  {hqSaving ? 'Salvando...' : 'Salvar sede'}
+                </button>
+                <p className="text-[11px] text-gray-500">
+                  A sede vira a origem padrão das simulações logísticas das obras.
+                </p>
+              </div>
+            </>
+          ) : (
+            <div className="rounded-xl border border-dashed border-gray-300 px-4 py-5 text-sm text-gray-500 dark:border-gray-700">
+              Apenas administradores e gerentes podem editar a sede da organização.
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Your Role */}
       <div className="glass-card rounded-2xl p-5">

@@ -1,13 +1,16 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Plus, RefreshCw, FileDown, Link2 } from 'lucide-react'
 import { z } from 'zod'
 import { apiRequest } from '@/lib/api/client'
 import { track } from '@/lib/analytics/client'
+import { featureFlags } from '@/lib/feature-flags'
 import { toast } from '@/hooks/use-toast'
+import { AsyncStateBoundary } from '@/platform/ui/async-state-boundary'
+import { MobileShellV1 } from '@/platform/ui/mobile-shell-v1'
 import {
   createCronogramaItemSchema,
   inviteClientPortalSchema,
@@ -85,19 +88,21 @@ type CreateCronogramaItemFormValues = z.input<typeof createCronogramaItemSchema>
 type InviteClientPortalFormValues = z.input<typeof inviteClientPortalSchema>
 
 export function ObraCronogramaTab({ obraId }: Props) {
-  const cronogramaEnabled = process.env.NEXT_PUBLIC_FF_CRONOGRAMA_ENGINE === 'true'
-  const cronogramaViewsEnabled =
-    process.env.NEXT_PUBLIC_FF_CRONOGRAMA_VIEWS_V1 === 'true'
-  const portalEnabled = process.env.NEXT_PUBLIC_FF_CLIENT_PORTAL === 'true'
-  const pdfEnabled = process.env.NEXT_PUBLIC_FF_CRONOGRAMA_PDF === 'true'
+  const cronogramaEnabled = featureFlags.cronogramaEngine
+  const cronogramaViewsEnabled = featureFlags.cronogramaViewsV1
+  const cronogramaUxV2 = featureFlags.cronogramaUxV2
+  const portalEnabled = featureFlags.clientPortal
+  const pdfEnabled = featureFlags.cronogramaPdf
 
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [payload, setPayload] = useState<CronogramaPayload | null>(null)
   const [drafts, setDrafts] = useState<Record<string, Partial<CronogramaPayload['itens'][number]>>>({})
   const [inviteResult, setInviteResult] = useState<InviteResult | null>(null)
   const [calendarDays, setCalendarDays] = useState<number[]>([1, 2, 3, 4, 5])
   const [holidayInput, setHolidayInput] = useState('')
   const [viewMode, setViewMode] = useState<CronogramaViewMode>('list')
+  const createFormRef = useRef<HTMLFormElement | null>(null)
 
   const createForm = useForm<CreateCronogramaItemFormValues>({
     resolver: zodResolver(createCronogramaItemSchema),
@@ -126,6 +131,7 @@ export function ObraCronogramaTab({ obraId }: Props) {
 
   const loadCronograma = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       const data = await apiRequest<CronogramaPayload>(`/api/v1/obras/${obraId}/cronograma`)
       setPayload(data)
@@ -148,7 +154,9 @@ export function ObraCronogramaTab({ obraId }: Props) {
       }
       setDrafts(nextDrafts)
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Erro ao carregar cronograma', 'error')
+      const message = err instanceof Error ? err.message : 'Erro ao carregar cronograma'
+      setLoadError(message)
+      toast(message, 'error')
     } finally {
       setLoading(false)
     }
@@ -158,6 +166,17 @@ export function ObraCronogramaTab({ obraId }: Props) {
     if (!cronogramaEnabled) return
     void loadCronograma()
   }, [cronogramaEnabled, loadCronograma])
+
+  useEffect(() => {
+    if (!cronogramaViewsEnabled || !cronogramaUxV2) return
+    void track('cronograma_view_changed', {
+      source: 'obras',
+      entity_type: 'cronograma',
+      entity_id: obraId,
+      outcome: 'success',
+      view_mode: viewMode,
+    })
+  }, [cronogramaUxV2, cronogramaViewsEnabled, obraId, viewMode])
 
   async function createItem(values: CreateCronogramaItemFormValues) {
     try {
@@ -324,6 +343,13 @@ export function ObraCronogramaTab({ obraId }: Props) {
     [payload?.itens]
   )
   const cronogramaItems = useMemo(() => payload?.itens || [], [payload?.itens])
+  const criticalItem = useMemo(
+    () =>
+      cronogramaItems.find((item) => item.status === 'bloqueado') ||
+      cronogramaItems.find((item) => item.atraso_dias > 0) ||
+      null,
+    [cronogramaItems]
+  )
 
   const timelineItems = useMemo(
     () =>
@@ -375,8 +401,245 @@ export function ObraCronogramaTab({ obraId }: Props) {
     return <p className="text-sm text-gray-500">Cronograma avançado está desativado por feature flag.</p>
   }
 
+  const viewContent = (
+    <>
+      {!cronogramaViewsEnabled || viewMode === 'list' ? (
+        <div className="space-y-2">
+          {cronogramaItems.map((item) => {
+            const draft = drafts[item.id] || {}
+            return (
+              <div key={item.id} className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900/40">
+                <div className="grid gap-2 md:grid-cols-6">
+                  <input
+                    value={String(draft.nome ?? '')}
+                    onChange={(event) =>
+                      setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], nome: event.target.value } }))
+                    }
+                    className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs md:col-span-2 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  />
+                  <select
+                    value={String(draft.status ?? 'pendente')}
+                    onChange={(event) =>
+                      setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], status: event.target.value as CronogramaPayload['itens'][number]['status'] } }))
+                    }
+                    className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  >
+                    <option value="pendente">Pendente</option>
+                    <option value="em_andamento">Em andamento</option>
+                    <option value="concluido">Concluído</option>
+                    <option value="bloqueado">Bloqueado</option>
+                  </select>
+                  <input
+                    value={String(draft.empresa_responsavel ?? '')}
+                    onChange={(event) =>
+                      setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], empresa_responsavel: event.target.value } }))
+                    }
+                    placeholder="Empresa"
+                    className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  />
+                  <input
+                    value={String(draft.responsavel ?? '')}
+                    onChange={(event) =>
+                      setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], responsavel: event.target.value } }))
+                    }
+                    placeholder="Responsável"
+                    className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  />
+                  <input
+                    type="number"
+                    value={Number(draft.duracao_dias ?? 1)}
+                    onChange={(event) =>
+                      setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], duracao_dias: Number(event.target.value || 1) } }))
+                    }
+                    placeholder="Dias"
+                    className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  />
+                  <input
+                    type="date"
+                    value={String(draft.data_inicio_planejada ?? '')}
+                    onChange={(event) =>
+                      setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], data_inicio_planejada: event.target.value || null } }))
+                    }
+                    className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  />
+                  <input
+                    type="date"
+                    value={String(draft.data_fim_planejada ?? '')}
+                    onChange={(event) =>
+                      setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], data_fim_planejada: event.target.value || null } }))
+                    }
+                    className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={Number(draft.progresso ?? 0)}
+                    onChange={(event) =>
+                      setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], progresso: Number(event.target.value || 0) } }))
+                    }
+                    placeholder="Progresso"
+                    className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => saveItem(item.id)}
+                    className="rounded-lg bg-gray-900 px-2 py-1.5 text-xs font-semibold text-white hover:bg-gray-700"
+                  >
+                    Salvar
+                  </button>
+                </div>
+                {item.atraso_dias > 0 || item.status === 'bloqueado' ? (
+                  <p className="mt-2 text-[11px] text-red-500">
+                    Atenção: item crítico ({STATUS_LABELS[item.status]}) com atraso de {item.atraso_dias} dia(s)
+                  </p>
+                ) : null}
+              </div>
+            )
+          })}
+        </div>
+      ) : null}
+
+      {cronogramaViewsEnabled && viewMode === 'timeline' ? (
+        <div className="space-y-2">
+          {timelineItems.map((item) => (
+            <div
+              key={`timeline-${item.id}`}
+              className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900/40"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">{item.nome}</p>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-200">
+                    {STATUS_LABELS[item.status]}
+                  </span>
+                  {cronogramaUxV2 ? (
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('list')}
+                      className="rounded-full border border-gray-200 px-2 py-0.5 text-[11px] font-semibold text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                    >
+                      Editar na lista
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                {fmtDate(item.data_inicio_planejada)} → {fmtDate(item.data_fim_planejada)} · duração {item.duracao_dias} dia(s)
+              </p>
+              <div className="mt-2 h-2 w-full rounded-full bg-gray-100 dark:bg-gray-800">
+                <div
+                  className="h-full rounded-full bg-sand-500 transition-[width] duration-200"
+                  style={{ width: `${Math.max(0, Math.min(100, item.progresso || 0))}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {cronogramaViewsEnabled && viewMode === 'calendar' ? (
+        <div className="space-y-3">
+          {calendarBuckets.map((bucket) => (
+            <section
+              key={`calendar-${bucket.monthLabel}`}
+              className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900/40"
+            >
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                {bucket.monthLabel}
+              </p>
+              <div className="mt-2 space-y-2">
+                {bucket.items.map((item) => (
+                  <div key={`calendar-item-${item.id}`} className="rounded-xl bg-gray-50 px-3 py-2 dark:bg-gray-800/60">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">{item.nome}</p>
+                        <p className="text-xs text-gray-500">
+                          {fmtDate(item.data_inicio_planejada)} → {fmtDate(item.data_fim_planejada)} · {STATUS_LABELS[item.status]}
+                        </p>
+                      </div>
+                      {cronogramaUxV2 ? (
+                        <button
+                          type="button"
+                          onClick={() => setViewMode('list')}
+                          className="rounded-full border border-gray-200 px-2 py-0.5 text-[11px] font-semibold text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                        >
+                          Editar
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      ) : null}
+
+      {cronogramaViewsEnabled && viewMode === 'board' ? (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {boardColumns.map((column) => (
+            <section
+              key={`board-${column.status}`}
+              className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900/40"
+            >
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{column.title}</p>
+                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-200">
+                  {column.items.length}
+                </span>
+              </div>
+              <div className="space-y-2">
+                {column.items.length === 0 ? (
+                  <p className="text-xs text-gray-400">Sem itens</p>
+                ) : (
+                  column.items.map((item) => (
+                    <div key={`board-item-${item.id}`} className="rounded-xl bg-gray-50 px-3 py-2 dark:bg-gray-800/60">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">{item.nome}</p>
+                          <p className="text-xs text-gray-500">{fmtDate(item.data_fim_planejada)}</p>
+                        </div>
+                        {cronogramaUxV2 ? (
+                          <button
+                            type="button"
+                            onClick={() => setViewMode('list')}
+                            className="rounded-full border border-gray-200 px-2 py-0.5 text-[11px] font-semibold text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                          >
+                            Editar
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </section>
+          ))}
+        </div>
+      ) : null}
+    </>
+  )
+
+  const mobilePrimaryAction = cronogramaUxV2 ? (
+    <button
+      type="button"
+      onClick={() => {
+        if (viewMode === 'calendar') {
+          void saveCalendar()
+          return
+        }
+        createFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }}
+      className="w-full rounded-2xl bg-sand-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-sand-500/20"
+    >
+      {viewMode === 'calendar' ? 'Salvar calendário' : 'Novo item do cronograma'}
+    </button>
+  ) : undefined
+
   return (
-    <div className="space-y-4">
+    <MobileShellV1 primaryAction={mobilePrimaryAction}>
+      <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={recalculate}
@@ -394,8 +657,52 @@ export function ObraCronogramaTab({ obraId }: Props) {
         )}
       </div>
 
+      {cronogramaUxV2 ? (
+        <div className="grid gap-3 xl:grid-cols-[1.4fr_1fr]">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-950/30">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">O que precisa de ação agora</p>
+            {criticalItem ? (
+              <div className="mt-2 space-y-1">
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">{criticalItem.nome}</p>
+                <p className="text-xs text-slate-600 dark:text-slate-300">
+                  {criticalItem.status === 'bloqueado'
+                    ? 'Item bloqueado exigindo desbloqueio imediato.'
+                    : `Item atrasado em ${criticalItem.atraso_dias} dia(s).`}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('list')}
+                  className="mt-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                >
+                  Abrir edição operacional
+                </button>
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                Nenhum bloqueio crítico neste momento. O cronograma está sob controle operacional.
+              </p>
+            )}
+          </div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900/40">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Legenda rápida</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-700 dark:bg-gray-800 dark:text-gray-200">Pendente</span>
+              <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 dark:bg-blue-950/30 dark:text-blue-300">Em andamento</span>
+              <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">Bloqueado</span>
+              <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">Concluído</span>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {loading ? (
-        <p className="text-sm text-gray-500">Carregando cronograma...</p>
+        <AsyncStateBoundary
+          isLoading={true}
+          error={null}
+          isEmpty={false}
+        >
+          <></>
+        </AsyncStateBoundary>
       ) : (
         <>
           <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900/40">
@@ -480,12 +787,14 @@ export function ObraCronogramaTab({ obraId }: Props) {
                 ))}
               </div>
               <p className="mt-2 text-[11px] text-gray-500">
-                Edição completa de itens disponível no modo Lista.
+                {cronogramaUxV2
+                  ? 'Todas as visualizações convergem para a edição operacional no modo Lista.'
+                  : 'Edição completa de itens disponível no modo Lista.'}
               </p>
             </div>
           ) : null}
 
-          <form onSubmit={createForm.handleSubmit(createItem)} className="rounded-2xl border border-dashed border-sand-300 bg-sand-50/60 p-4">
+          <form ref={createFormRef} onSubmit={createForm.handleSubmit(createItem)} className="rounded-2xl border border-dashed border-sand-300 bg-sand-50/60 p-4">
             <p className="mb-3 text-xs font-semibold text-sand-700">Novo item de cronograma</p>
             <div className="grid gap-2 md:grid-cols-3">
               <input
@@ -528,196 +837,18 @@ export function ObraCronogramaTab({ obraId }: Props) {
             </button>
           </form>
 
-          {!cronogramaViewsEnabled || viewMode === 'list' ? (
-            <div className="space-y-2">
-              {cronogramaItems.length === 0 ? (
-                <p className="text-sm text-gray-500">Nenhum item no cronograma ainda.</p>
-              ) : (
-                cronogramaItems.map((item) => {
-                  const draft = drafts[item.id] || {}
-                  return (
-                    <div key={item.id} className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900/40">
-                      <div className="grid gap-2 md:grid-cols-6">
-                        <input
-                          value={String(draft.nome ?? '')}
-                          onChange={(event) =>
-                            setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], nome: event.target.value } }))
-                          }
-                          className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs md:col-span-2 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                        />
-                        <select
-                          value={String(draft.status ?? 'pendente')}
-                          onChange={(event) =>
-                            setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], status: event.target.value as CronogramaPayload['itens'][number]['status'] } }))
-                          }
-                          className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                        >
-                          <option value="pendente">Pendente</option>
-                          <option value="em_andamento">Em andamento</option>
-                          <option value="concluido">Concluído</option>
-                          <option value="bloqueado">Bloqueado</option>
-                        </select>
-                        <input
-                          value={String(draft.empresa_responsavel ?? '')}
-                          onChange={(event) =>
-                            setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], empresa_responsavel: event.target.value } }))
-                          }
-                          placeholder="Empresa"
-                          className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                        />
-                        <input
-                          value={String(draft.responsavel ?? '')}
-                          onChange={(event) =>
-                            setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], responsavel: event.target.value } }))
-                          }
-                          placeholder="Responsável"
-                          className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                        />
-                        <input
-                          type="number"
-                          value={Number(draft.duracao_dias ?? 1)}
-                          onChange={(event) =>
-                            setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], duracao_dias: Number(event.target.value || 1) } }))
-                          }
-                          placeholder="Dias"
-                          className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                        />
-                        <input
-                          type="date"
-                          value={String(draft.data_inicio_planejada ?? '')}
-                          onChange={(event) =>
-                            setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], data_inicio_planejada: event.target.value || null } }))
-                          }
-                          className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                        />
-                        <input
-                          type="date"
-                          value={String(draft.data_fim_planejada ?? '')}
-                          onChange={(event) =>
-                            setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], data_fim_planejada: event.target.value || null } }))
-                          }
-                          className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                        />
-                        <input
-                          type="number"
-                          min={0}
-                          max={100}
-                          value={Number(draft.progresso ?? 0)}
-                          onChange={(event) =>
-                            setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], progresso: Number(event.target.value || 0) } }))
-                          }
-                          placeholder="Progresso"
-                          className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => saveItem(item.id)}
-                          className="rounded-lg bg-gray-900 px-2 py-1.5 text-xs font-semibold text-white hover:bg-gray-700"
-                        >
-                          Salvar
-                        </button>
-                      </div>
-                      {item.atraso_dias > 0 || item.status === 'bloqueado' ? (
-                        <p className="mt-2 text-[11px] text-red-500">
-                          Atenção: item crítico ({STATUS_LABELS[item.status]}) com atraso de {item.atraso_dias} dia(s)
-                        </p>
-                      ) : null}
-                    </div>
-                  )
-                })
-              )}
-            </div>
-          ) : null}
-
-          {cronogramaViewsEnabled && viewMode === 'timeline' ? (
-            <div className="space-y-2">
-              {timelineItems.length === 0 ? (
-                <p className="text-sm text-gray-500">Nenhum item no cronograma ainda.</p>
-              ) : (
-                timelineItems.map((item) => (
-                  <div
-                    key={`timeline-${item.id}`}
-                    className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900/40"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-gray-900 dark:text-white">{item.nome}</p>
-                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-200">
-                        {STATUS_LABELS[item.status]}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-xs text-gray-500">
-                      {fmtDate(item.data_inicio_planejada)} → {fmtDate(item.data_fim_planejada)} · duração {item.duracao_dias} dia(s)
-                    </p>
-                    <div className="mt-2 h-2 w-full rounded-full bg-gray-100 dark:bg-gray-800">
-                      <div
-                        className="h-full rounded-full bg-sand-500 transition-[width] duration-200"
-                        style={{ width: `${Math.max(0, Math.min(100, item.progresso || 0))}%` }}
-                      />
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          ) : null}
-
-          {cronogramaViewsEnabled && viewMode === 'calendar' ? (
-            <div className="space-y-3">
-              {calendarBuckets.length === 0 ? (
-                <p className="text-sm text-gray-500">Nenhum item com data planejada.</p>
-              ) : (
-                calendarBuckets.map((bucket) => (
-                  <section
-                    key={`calendar-${bucket.monthLabel}`}
-                    className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900/40"
-                  >
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                      {bucket.monthLabel}
-                    </p>
-                    <div className="mt-2 space-y-2">
-                      {bucket.items.map((item) => (
-                        <div key={`calendar-item-${item.id}`} className="rounded-xl bg-gray-50 px-3 py-2 dark:bg-gray-800/60">
-                          <p className="text-sm font-medium text-gray-900 dark:text-white">{item.nome}</p>
-                          <p className="text-xs text-gray-500">
-                            {fmtDate(item.data_inicio_planejada)} → {fmtDate(item.data_fim_planejada)} · {STATUS_LABELS[item.status]}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                ))
-              )}
-            </div>
-          ) : null}
-
-          {cronogramaViewsEnabled && viewMode === 'board' ? (
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {boardColumns.map((column) => (
-                <section
-                  key={`board-${column.status}`}
-                  className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900/40"
-                >
-                  <div className="mb-2 flex items-center justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{column.title}</p>
-                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-200">
-                      {column.items.length}
-                    </span>
-                  </div>
-                  <div className="space-y-2">
-                    {column.items.length === 0 ? (
-                      <p className="text-xs text-gray-400">Sem itens</p>
-                    ) : (
-                      column.items.map((item) => (
-                        <div key={`board-item-${item.id}`} className="rounded-xl bg-gray-50 px-3 py-2 dark:bg-gray-800/60">
-                          <p className="text-sm font-medium text-gray-900 dark:text-white">{item.nome}</p>
-                          <p className="text-xs text-gray-500">{fmtDate(item.data_fim_planejada)}</p>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </section>
-              ))}
-            </div>
-          ) : null}
+          <AsyncStateBoundary
+            isLoading={false}
+            error={loadError}
+            isEmpty={cronogramaItems.length === 0}
+            onRetry={() => void loadCronograma()}
+            loadingVariant="detail"
+            emptyTitle="Nenhum item no cronograma"
+            emptyDescription="Crie o primeiro item para começar a planejar a execução."
+            emptyActionLabel="Atualizar cronograma"
+          >
+            {viewContent}
+          </AsyncStateBoundary>
 
           {portalEnabled && (
             <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-4">
@@ -762,6 +893,7 @@ export function ObraCronogramaTab({ obraId }: Props) {
           ) : null}
         </>
       )}
-    </div>
+      </div>
+    </MobileShellV1>
   )
 }

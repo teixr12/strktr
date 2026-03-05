@@ -49,6 +49,11 @@ export const ANALYTICS_EVENT_TYPES = [
   'document_sent_email',
   'share_link_created',
   'share_link_revoked',
+  'obra_location_saved',
+  'hq_location_saved',
+  'logistics_estimated',
+  'cronograma_view_changed',
+  'docs_workspace_opened',
 ] as const
 
 export type AnalyticsEventType = (typeof ANALYTICS_EVENT_TYPES)[number]

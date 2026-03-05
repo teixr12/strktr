@@ -1,24 +1,18 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AddressFields, ObraLocationSource } from '@/shared/types/obra-location'
 
-export async function fetchObraLocationByOrg(
-  supabase: SupabaseClient,
-  obraId: string,
-  orgId: string
-) {
+export async function fetchOrgHqLocationByOrg(supabase: SupabaseClient, orgId: string) {
   return supabase
-    .from('obra_geolocations')
-    .select('obra_id, lat, lng, source, updated_at, cep, logradouro, numero, complemento, bairro, cidade, estado, formatted_address')
-    .eq('obra_id', obraId)
+    .from('org_hq_locations')
+    .select('org_id, lat, lng, source, updated_at, cep, logradouro, numero, complemento, bairro, cidade, estado, formatted_address')
     .eq('org_id', orgId)
     .maybeSingle()
 }
 
-export async function upsertObraLocationByOrg(
+export async function upsertOrgHqLocationByOrg(
   supabase: SupabaseClient,
   params: {
     orgId: string
-    obraId: string
     lat: number
     lng: number
     source: ObraLocationSource
@@ -26,13 +20,12 @@ export async function upsertObraLocationByOrg(
     address?: Partial<AddressFields>
   }
 ) {
-  const { orgId, obraId, lat, lng, source, userId, address } = params
+  const { orgId, lat, lng, source, userId, address } = params
   return supabase
-    .from('obra_geolocations')
+    .from('org_hq_locations')
     .upsert(
       {
         org_id: orgId,
-        obra_id: obraId,
         lat,
         lng,
         source,
@@ -47,8 +40,8 @@ export async function upsertObraLocationByOrg(
         updated_by: userId,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: 'org_id,obra_id' }
+      { onConflict: 'org_id' }
     )
-    .select('obra_id, lat, lng, source, updated_at, cep, logradouro, numero, complemento, bairro, cidade, estado, formatted_address')
+    .select('org_id, lat, lng, source, updated_at, cep, logradouro, numero, complemento, bairro, cidade, estado, formatted_address')
     .single()
 }
