@@ -108,7 +108,7 @@ export function ProjetosContent({ initialProjetos, leads }: Props) {
     if (!usePaginationV1) {
       try {
         setLoadError(null)
-        const data = await apiRequest<Projeto[]>('/api/v1/projetos?limit=200')
+        const data = await apiRequest<Projeto[]>('/api/v1/projetos?page=1&pageSize=100')
         setProjetos(data)
       } catch (err) {
         const message = err instanceof Error ? `${err.message}. Tentar novamente.` : 'Erro ao recarregar projetos. Tentar novamente.'

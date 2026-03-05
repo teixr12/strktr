@@ -67,8 +67,8 @@ export function CalendarioContent({ initialVisitas }: Props) {
       setLoadError(null)
       try {
         const [obrasData, leadsData] = await Promise.all([
-          apiRequest<Pick<Obra, 'id' | 'nome'>[]>('/api/v1/obras?limit=200'),
-          apiRequest<Pick<Lead, 'id' | 'nome'>[]>('/api/v1/leads?limit=200'),
+          apiRequest<Pick<Obra, 'id' | 'nome'>[]>('/api/v1/obras?limit=100'),
+          apiRequest<Pick<Lead, 'id' | 'nome'>[]>('/api/v1/leads?page=1&pageSize=100'),
         ])
         setObras(obrasData)
         setLeads(leadsData)

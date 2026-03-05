@@ -119,7 +119,7 @@ export function FinanceiroContent({ initialTransacoes }: Props) {
   useEffect(() => {
     async function loadObras() {
       try {
-        const data = await apiRequest<Pick<Obra, 'id' | 'nome'>[]>('/api/v1/obras?limit=200')
+        const data = await apiRequest<Pick<Obra, 'id' | 'nome'>[]>('/api/v1/obras?limit=100')
         setObras(data)
       } catch {
         setObras([])
