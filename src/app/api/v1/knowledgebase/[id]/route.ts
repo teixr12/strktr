@@ -5,6 +5,21 @@ import { fail, ok } from '@/lib/api/response'
 import { requireDomainPermission } from '@/lib/auth/domain-permissions'
 import { updateKnowledgeItemSchema } from '@/shared/schemas/business'
 
+const KNOWLEDGEBASE_SELECT_FIELDS = [
+  'id',
+  'user_id',
+  'org_id',
+  'categoria',
+  'titulo',
+  'conteudo',
+  'unidade',
+  'valor_referencia',
+  'tags',
+  'ativo',
+  'created_at',
+  'updated_at',
+].join(', ')
+
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { user, supabase, error, orgId } = await getApiUser(request)
   if (!user || !supabase) {
@@ -25,7 +40,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params
   const { data, error: dbError } = await supabase
     .from('knowledgebase')
-    .select('*')
+    .select(KNOWLEDGEBASE_SELECT_FIELDS)
     .eq('id', id)
     .eq('org_id', orgId)
     .single()

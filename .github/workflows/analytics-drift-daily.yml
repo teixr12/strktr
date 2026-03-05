@@ -60,7 +60,7 @@ jobs:
         run: PROBE_STRICT=1 ./scripts/audit-analytics-capture-probe.sh
 
       - name: Run analytics drift audit
-        run: ./scripts/audit-analytics-drift.sh
+        run: AUDIT_DRIFT_STRICT=1 ./scripts/audit-analytics-drift.sh
 
       - name: Upload report artifact
         uses: actions/upload-artifact@v4

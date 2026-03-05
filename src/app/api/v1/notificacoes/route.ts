@@ -3,6 +3,17 @@ import { API_ERROR_CODES } from '@/lib/api/errors'
 import { log } from '@/lib/api/logger'
 import { fail, ok } from '@/lib/api/response'
 
+const NOTIFICACAO_SELECT_FIELDS = [
+  'id',
+  'user_id',
+  'tipo',
+  'titulo',
+  'descricao',
+  'lida',
+  'link',
+  'created_at',
+].join(', ')
+
 export async function GET(request: Request) {
   const { user, supabase, error, requestId, orgId } = await getApiUser(request)
   if (!user || !supabase) {
@@ -20,7 +31,7 @@ export async function GET(request: Request) {
 
   let query = supabase
     .from('notificacoes')
-    .select('*')
+    .select(NOTIFICACAO_SELECT_FIELDS)
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .limit(limit)
@@ -43,7 +54,8 @@ export async function GET(request: Request) {
     )
   }
 
+  const notifications = (data ?? []) as unknown as Array<{ lida: boolean }>
   return ok(request, data ?? [], {
-    unreadCount: (data || []).filter((item) => !item.lida).length,
+    unreadCount: notifications.filter((item) => !item.lida).length,
   })
 }

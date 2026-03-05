@@ -5,6 +5,24 @@ import { fail, ok } from '@/lib/api/response'
 import { requireDomainPermission } from '@/lib/auth/domain-permissions'
 import { updateMembroSchema } from '@/shared/schemas/business'
 
+const EQUIPE_SELECT_FIELDS = [
+  'id',
+  'user_id',
+  'org_id',
+  'nome',
+  'cargo',
+  'telefone',
+  'email',
+  'especialidade',
+  'status',
+  'obras_ids',
+  'avaliacao',
+  'valor_hora',
+  'notas',
+  'avatar_url',
+  'created_at',
+].join(', ')
+
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { user, supabase, error, orgId, role } = await getApiUser(request)
   if (!user || !supabase) {
@@ -27,7 +45,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params
   const { data, error: dbError } = await supabase
     .from('equipe')
-    .select('*')
+    .select(EQUIPE_SELECT_FIELDS)
     .eq('id', id)
     .eq('org_id', orgId)
     .single()

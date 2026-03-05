@@ -119,3 +119,7 @@ fi
 } > "$REPORT"
 
 echo "Analytics drift report generated: $REPORT"
+if [[ "${AUDIT_DRIFT_STRICT:-0}" == "1" && "$DRIFT_STATUS" != "pass" ]]; then
+  echo "Analytics drift strict mode failed (status=${DRIFT_STATUS}, max_abs_drift=${MAX_ABS_DRIFT})." >&2
+  exit 2
+fi

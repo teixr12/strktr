@@ -4,6 +4,24 @@ import { log } from '@/lib/api/logger'
 import { fail, ok } from '@/lib/api/response'
 import { createMembroSchema } from '@/shared/schemas/business'
 
+const EQUIPE_SELECT_FIELDS = [
+  'id',
+  'user_id',
+  'org_id',
+  'nome',
+  'cargo',
+  'telefone',
+  'email',
+  'especialidade',
+  'status',
+  'obras_ids',
+  'avaliacao',
+  'valor_hora',
+  'notas',
+  'avatar_url',
+  'created_at',
+].join(', ')
+
 export const GET = withApiAuth('can_manage_team', async (request, { supabase, requestId, orgId, user }) => {
   const { searchParams } = new URL(request.url)
   const status = searchParams.get('status')
@@ -11,7 +29,7 @@ export const GET = withApiAuth('can_manage_team', async (request, { supabase, re
 
   let query = supabase
     .from('equipe')
-    .select('*')
+    .select(EQUIPE_SELECT_FIELDS)
     .eq('org_id', orgId)
     .order('nome')
     .limit(limit)

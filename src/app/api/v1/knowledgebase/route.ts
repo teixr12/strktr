@@ -4,6 +4,21 @@ import { log } from '@/lib/api/logger'
 import { fail, ok } from '@/lib/api/response'
 import { createKnowledgeItemSchema } from '@/shared/schemas/business'
 
+const KNOWLEDGEBASE_SELECT_FIELDS = [
+  'id',
+  'user_id',
+  'org_id',
+  'categoria',
+  'titulo',
+  'conteudo',
+  'unidade',
+  'valor_referencia',
+  'tags',
+  'ativo',
+  'created_at',
+  'updated_at',
+].join(', ')
+
 export const GET = withApiAuth(null, async (request, { supabase, requestId, orgId, user }) => {
   const { searchParams } = new URL(request.url)
   const categoria = searchParams.get('categoria')
@@ -12,7 +27,7 @@ export const GET = withApiAuth(null, async (request, { supabase, requestId, orgI
 
   let query = supabase
     .from('knowledgebase')
-    .select('*')
+    .select(KNOWLEDGEBASE_SELECT_FIELDS)
     .eq('org_id', orgId)
     .order('categoria')
     .order('titulo')

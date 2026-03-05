@@ -4,7 +4,7 @@
       "id": "select-star",
       "pattern": "select\\(\\s*['\\\"]\\*['\\\"]\\s*\\)",
       "include": ["src"],
-      "max": 44
+      "max": 34
     },
     {
       "id": "limit-200",
