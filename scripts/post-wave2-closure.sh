@@ -164,10 +164,11 @@ fi
   echo "- [ ] p95 stable for core pages"
   echo
   echo "## Rollback Drill Evidence"
-  echo '1. Disable module flag `NEXT_PUBLIC_FF_UI_V2_* = false`.'
-  echo "2. Redeploy and validate fallback."
-  echo "3. Re-enable module flag and validate."
-  echo '4. If needed, disable `NEXT_PUBLIC_FF_UI_TAILADMIN_V1=false`.'
+  echo '1. Toggle `NEXT_PUBLIC_FF_OBRA_LOGISTICS_V1`: `true -> false -> true`.'
+  echo '2. Toggle `NEXT_PUBLIC_FF_OBRA_WEATHER_ALERTS_V1`: `true -> false -> true`.'
+  echo '3. Redeploy after each toggle and validate Wave2 smoke (`location/weather/logistics/alerts`).'
+  echo "4. Register TTR (seconds) for each rollback and restoration step."
+  echo '5. If instability persists, disable `NEXT_PUBLIC_FF_OBRA_LOGISTICS_V1=false` and `NEXT_PUBLIC_FF_OBRA_WEATHER_ALERTS_V1=false`.'
   echo
   echo "## Credential Rotation Checklist (D1)"
   echo '- [ ] `VERCEL_TOKEN`'

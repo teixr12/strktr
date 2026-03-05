@@ -9,9 +9,10 @@ export default async function PerfilPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const profileSelect = 'id, nome, email, avatar_url, empresa, cargo, telefone, created_at, updated_at'
   const { data: profile } = await supabase
     .from('profiles')
-    .select('*')
+    .select(profileSelect)
     .eq('id', user.id)
     .single()
 

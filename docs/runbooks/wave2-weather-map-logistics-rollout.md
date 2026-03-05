@@ -69,3 +69,10 @@ When canary config is present (`allowlist` or `percent > 0`), Wave2 APIs/UI are 
    - clear `FF_OBRA_WAVE2_CANARY_ORGS`
 3. Redeploy.
 4. Keep migration in place (additive; no destructive rollback).
+
+## Rollback Drill
+1. Run `npm run ops:wave2:rollback-drill` to generate a timestamped drill report template.
+2. Execute `ON -> OFF -> ON` for:
+   - `NEXT_PUBLIC_FF_OBRA_LOGISTICS_V1`
+   - `NEXT_PUBLIC_FF_OBRA_WEATHER_ALERTS_V1`
+3. Register TTR for both transitions and attach the report to release closeout evidence.

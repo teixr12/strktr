@@ -12,6 +12,7 @@ export default async function ConfiguracoesPage() {
   let organizacao = null
 
   if (user) {
+    const orgMemberSelect = 'id, org_id, user_id, role, convidado_por, status, created_at'
     const { data: profile } = await supabase
       .from('profiles')
       .select('org_id')
@@ -20,12 +21,19 @@ export default async function ConfiguracoesPage() {
 
     const { data: memberships } = await supabase
       .from('org_membros')
-      .select('*, organizacoes(id, nome, cnpj, plano, created_at, updated_at)')
+      .select(`${orgMemberSelect}, organizacoes(id, nome, cnpj, plano, created_at, updated_at)`)
       .eq('user_id', user.id)
       .eq('status', 'ativo')
       .order('created_at', { ascending: true })
 
-    const membro = memberships?.find((membership) => membership.org_id === profile?.org_id) || memberships?.[0] || null
+    const normalizedMemberships = (memberships ?? []).map((membership) => ({
+      ...membership,
+      organizacoes: Array.isArray(membership.organizacoes)
+        ? membership.organizacoes[0] || null
+        : membership.organizacoes || null,
+    }))
+
+    const membro = normalizedMemberships.find((membership) => membership.org_id === profile?.org_id) || normalizedMemberships[0] || null
     orgMembro = membro
 
     if (membro?.org_id) {
@@ -35,7 +43,7 @@ export default async function ConfiguracoesPage() {
       if (membro.role === 'admin' || membro.role === 'manager') {
         const { data: membros } = await supabase
           .from('org_membros')
-          .select('*')
+          .select(orgMemberSelect)
           .eq('org_id', membro.org_id)
           .order('created_at')
 

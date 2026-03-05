@@ -1,5 +1,6 @@
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { fail, ok } from '@/lib/api/response'
+import { enforceRateLimit } from '@/platform/security/rate-limit'
 import { createServiceRoleClient } from '@/lib/supabase/service'
 import { getValidPortalSession } from '@/server/services/portal/session-service'
 
@@ -17,6 +18,26 @@ export async function GET(
   }
 
   const { token } = await params
+  const forwardedFor = request.headers.get('x-forwarded-for') || ''
+  const ip = forwardedFor.split(',')[0]?.trim() || 'anonymous'
+  const rateLimit = enforceRateLimit(`${ip}:${token}`, {
+    id: 'portal_session_access',
+    windowMs: 60 * 1000,
+    max: 90,
+  })
+
+  if (!rateLimit.allowed) {
+    const response = fail(
+      request,
+      { code: API_ERROR_CODES.RATE_LIMITED, message: 'Muitas tentativas. Tente novamente em instantes.' },
+      429
+    )
+    for (const [key, value] of Object.entries(rateLimit.headers)) {
+      response.headers.set(key, value)
+    }
+    return response
+  }
+
   const { session, error } = await getValidPortalSession(service, token)
 
   if (error || !session) {
