@@ -205,25 +205,23 @@ export async function GET(request: Request) {
     }
 
     try {
-      const { data: urgentCompras, error: comprasError } = await supabase
+      const { count: urgentCount, error: comprasError } = await supabase
         .from('compras')
-        .select('id')
+        .select('id', { count: 'exact', head: true })
         .eq('org_id', orgId)
         .in('status', ['Solicitado', 'Aprovado', 'Pedido'])
         .in('urgencia', ['Alta', 'Urgente'])
         .lt('data_solicitacao', today)
-        .limit(200)
 
       if (comprasError) throw comprasError
-      const urgentCount = urgentCompras?.length || 0
-      if (urgentCount > 0) {
+      if ((urgentCount || 0) > 0) {
         alerts.push({
           code: 'URGENT_PURCHASE_DELAY',
-          title: `${urgentCount} compra(s) urgente(s) pendente(s)`,
-          severity: urgentCount >= 4 ? 'high' : 'medium',
+          title: `${urgentCount || 0} compra(s) urgente(s) pendente(s)`,
+          severity: (urgentCount || 0) >= 4 ? 'high' : 'medium',
           module: 'compras',
           href: '/compras',
-          meta: { urgentCount },
+          meta: { urgentCount: urgentCount || 0 },
         })
       }
     } catch (err) {
