@@ -45,7 +45,7 @@ const NAV_ITEMS: PaletteItem[] = [
   { id: 'equipe', label: 'Equipe', href: '/equipe', icon: Users, section: 'nav' },
   { id: 'calendario', label: 'Agenda', href: '/calendario', icon: CalendarDays, section: 'nav' },
   { id: 'knowledgebase', label: 'Base de Conhecimento', href: '/knowledgebase', icon: BookOpen, section: 'nav' },
-  { id: 'construction-docs', label: 'Construction Docs', href: '/construction-docs/templates', icon: FileText, section: 'nav' },
+  { id: 'construction-docs', label: 'Construction Docs', href: '/construction-docs/projects', icon: FileText, section: 'nav' },
   { id: 'configuracoes', label: 'Configura\u00e7\u00f5es', href: '/configuracoes', icon: Building2, section: 'nav' },
 ]
 
