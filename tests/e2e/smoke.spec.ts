@@ -121,6 +121,22 @@ test('construction docs respeita gate por feature flag (off=404-safe, on=401 sem
   expect(publicSharePayload?.requestId, '/api/v1/construction-docs/share/:token').toBeTruthy()
 })
 
+test('docs workspace respeita gate por feature flag (off=404-safe, on=401 sem token)', async ({ request }) => {
+  const healthResponse = await request.get('/api/v1/health/ops')
+  expect(healthResponse.ok()).toBeTruthy()
+  const healthPayload = await healthResponse.json()
+  const isEnabled = Boolean(healthPayload?.data?.flags?.docsWorkspaceV1)
+
+  const response = await request.get('/api/v1/docs')
+  const payload = await response.json()
+  const expectedStatus = isEnabled ? 401 : 404
+  const expectedCode = isEnabled ? 'UNAUTHORIZED' : 'NOT_FOUND'
+
+  expect(response.status(), '/api/v1/docs').toBe(expectedStatus)
+  expect(payload?.error?.code, '/api/v1/docs').toBe(expectedCode)
+  expect(payload?.requestId, '/api/v1/docs').toBeTruthy()
+})
+
 test('portal público exige token válido e retorna envelope de erro', async ({ request }) => {
   const endpoints: Array<{ endpoint: string; method: 'GET' | 'POST'; body?: Record<string, unknown> }> = [
     { endpoint: '/api/v1/portal/session/token-invalido', method: 'GET' },

@@ -22,6 +22,14 @@ const modules = [
   { name: 'Configuracoes', file: 'src/components/configuracoes/org-settings.tsx' },
   { name: 'Orcamentos', file: 'src/components/orcamentos/orcamentos-content.tsx' },
   { name: 'Perfil', file: 'src/components/perfil/perfil-content.tsx' },
+  { name: 'Obra Weather Map Logistics', file: 'src/components/obras/obra-weather-logistics-panel.tsx' },
+  { name: 'SOP Builder', file: 'src/components/sops/sops-content.tsx' },
+  { name: 'Construction Docs Project', file: 'src/components/construction-docs/project-content.tsx' },
+  { name: 'Construction Docs Projects Index', file: 'src/components/construction-docs/projects-index-content.tsx' },
+  { name: 'Construction Docs Visit', file: 'src/components/construction-docs/visit-content.tsx' },
+  { name: 'Construction Docs Guided Visit', file: 'src/components/construction-docs/visit-guided-content.tsx' },
+  { name: 'Construction Docs Document', file: 'src/components/construction-docs/document-content.tsx' },
+  { name: 'Docs Workspace', file: 'src/components/docs/docs-workspace-content.tsx' },
 ]
 
 const checks = {

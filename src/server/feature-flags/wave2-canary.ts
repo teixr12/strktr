@@ -1,6 +1,12 @@
 import { isFlagDisabledByDefault } from '@/lib/feature-flags'
 
-export type Wave2FeatureKey = 'weather' | 'map' | 'logistics' | 'weatherAlerts'
+export type Wave2FeatureKey =
+  | 'weather'
+  | 'map'
+  | 'logistics'
+  | 'weatherAlerts'
+  | 'addressV2'
+  | 'hqRouting'
 
 type Wave2CanarySnapshot = {
   configured: boolean
@@ -13,6 +19,8 @@ const WAVE2_FEATURE_ENV: Record<Wave2FeatureKey, string | undefined> = {
   map: process.env.NEXT_PUBLIC_FF_OBRA_MAP_V1,
   logistics: process.env.NEXT_PUBLIC_FF_OBRA_LOGISTICS_V1,
   weatherAlerts: process.env.NEXT_PUBLIC_FF_OBRA_WEATHER_ALERTS_V1,
+  addressV2: process.env.NEXT_PUBLIC_FF_OBRA_ADDRESS_UX_V2,
+  hqRouting: process.env.NEXT_PUBLIC_FF_OBRA_HQ_ROUTING_V1,
 }
 
 function parseOrgAllowlist(raw: string | undefined): Set<string> {
@@ -78,6 +86,8 @@ export function isWave2LocationEnabledForOrg(orgId: string | null | undefined): 
     isWave2FeatureEnabledForOrg('map', orgId) ||
     isWave2FeatureEnabledForOrg('weather', orgId) ||
     isWave2FeatureEnabledForOrg('logistics', orgId) ||
-    isWave2FeatureEnabledForOrg('weatherAlerts', orgId)
+    isWave2FeatureEnabledForOrg('weatherAlerts', orgId) ||
+    isWave2FeatureEnabledForOrg('addressV2', orgId) ||
+    isWave2FeatureEnabledForOrg('hqRouting', orgId)
   )
 }
