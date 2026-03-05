@@ -30,6 +30,8 @@ export default async function ObraDetailPage({ params }: { params: Promise<{ id:
     weather: isWave2FeatureEnabledForOrg('weather', obraRes.data.org_id || null),
     map: isWave2FeatureEnabledForOrg('map', obraRes.data.org_id || null),
     logistics: isWave2FeatureEnabledForOrg('logistics', obraRes.data.org_id || null),
+    addressV2: isWave2FeatureEnabledForOrg('addressV2', obraRes.data.org_id || null),
+    hqRouting: isWave2FeatureEnabledForOrg('hqRouting', obraRes.data.org_id || null),
   }
 
   return (

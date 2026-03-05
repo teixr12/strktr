@@ -43,6 +43,8 @@ interface Props {
     weather: boolean
     map: boolean
     logistics: boolean
+    addressV2: boolean
+    hqRouting: boolean
   }
 }
 
@@ -246,6 +248,8 @@ export function ObraDetailContent({
     weather: featureFlags.obraWeatherV1,
     map: featureFlags.obraMapV1,
     logistics: featureFlags.obraLogisticsV1,
+    addressV2: featureFlags.obraAddressUxV2,
+    hqRouting: featureFlags.obraHqRoutingV1,
   }
 
   async function handleDelete() {
@@ -448,6 +452,8 @@ export function ObraDetailContent({
             weatherEnabled={wave2FeatureAccess.weather}
             mapEnabled={wave2FeatureAccess.map}
             logisticsEnabled={wave2FeatureAccess.logistics}
+            addressUxEnabled={wave2FeatureAccess.addressV2}
+            hqRoutingEnabled={wave2FeatureAccess.hqRouting}
           />
 
           <div className="glass-card rounded-2xl p-5 space-y-3">
