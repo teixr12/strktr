@@ -3,6 +3,9 @@ name: Governance
 on:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   pr-governance:
     runs-on: ubuntu-latest
