@@ -2,6 +2,7 @@ import { getApiUser } from '@/lib/api/auth'
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { log } from '@/lib/api/logger'
 import { fail, ok } from '@/lib/api/response'
+import { CRONOGRAMA_ITEM_SELECT } from '@/lib/api/select-maps'
 import { requireDomainPermission } from '@/lib/auth/domain-permissions'
 import { ensureCronogramaForObra } from '@/server/repositories/cronograma/cronograma-repository'
 import { createCronogramaItemSchema } from '@/shared/schemas/cronograma-portal'
@@ -61,7 +62,7 @@ export async function POST(
       ordem: body.ordem ?? 0,
       metadata: body.metadata || {},
     })
-    .select('*')
+    .select(CRONOGRAMA_ITEM_SELECT)
     .single()
 
   if (createError || !created) {

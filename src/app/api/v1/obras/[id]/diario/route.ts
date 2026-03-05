@@ -1,6 +1,7 @@
 import { getApiUser } from '@/lib/api/auth'
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { fail, ok } from '@/lib/api/response'
+import { DIARIO_OBRA_SELECT } from '@/lib/api/select-maps'
 
 export async function GET(
   request: Request,
@@ -24,7 +25,7 @@ export async function GET(
 
   let query = supabase
     .from('diario_obra')
-    .select('*')
+    .select(DIARIO_OBRA_SELECT)
     .eq('obra_id', id)
     .eq('org_id', orgId)
     .order('created_at', { ascending: false })
