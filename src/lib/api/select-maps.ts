@@ -25,6 +25,12 @@ export const OBRA_ETAPA_SELECT =
 export const OBRA_CHECKLIST_SELECT =
   'id, obra_id, user_id, org_id, tipo, nome, ordem, created_at'
 
+export const CHECKLIST_ITEM_SELECT =
+  'id, checklist_id, org_id, descricao, concluido, concluido_por, concluido_em, ordem, created_at'
+
+export const CHECKLIST_ITEM_SELECT_WITH_DUE_DATE =
+  `${CHECKLIST_ITEM_SELECT}, data_limite`
+
 export const CRONOGRAMA_OBRA_SELECT =
   'id, org_id, obra_id, user_id, nome, calendario, data_inicio_planejada, data_fim_planejada, created_at, updated_at'
 

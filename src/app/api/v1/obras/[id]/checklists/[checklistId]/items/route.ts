@@ -4,6 +4,7 @@ import { log } from '@/lib/api/logger'
 import { fail, ok } from '@/lib/api/response'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 import { requireExecutionPermission } from '@/lib/auth/execution-permissions'
+import { CHECKLIST_ITEM_SELECT, CHECKLIST_ITEM_SELECT_WITH_DUE_DATE } from '@/lib/api/select-maps'
 import { createChecklistItemSchema } from '@/shared/schemas/execution'
 
 export async function POST(
@@ -60,14 +61,14 @@ export async function POST(
     ? { ...basePayload, data_limite: payloadInput?.data_limite || null }
     : basePayload
 
-  let { data, error: dbError } = await supabase
+  let { data: created, error: dbError } = await supabase
     .from('checklist_items')
     .insert(payload)
-    .select('*')
+    .select('id')
     .single()
 
   const errMsg = dbError?.message || ''
-  const missingColumn =
+  let missingColumn =
     errMsg.includes('data_limite') || errMsg.includes('schema cache')
   if (dbError && dueDateEnabled && missingColumn) {
     log('warn', 'obras.checklist.item.create.fallback', {
@@ -78,14 +79,14 @@ export async function POST(
       itemPayload: 'without_data_limite',
       error: dbError.message,
     })
-    ;({ data, error: dbError } = await supabase
+    ;({ data: created, error: dbError } = await supabase
       .from('checklist_items')
       .insert(basePayload)
-      .select('*')
+      .select('id')
       .single())
   }
 
-  if (dbError || !data) {
+  if (dbError || !created) {
     if ((dbError?.message || '').includes('infinite recursion')) {
       log('error', 'obras.checklist.item.create.failed', {
         requestId,
@@ -96,6 +97,35 @@ export async function POST(
       })
     }
     return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: dbError?.message || 'Erro ao criar item' }, 500)
+  }
+
+  const fetched = await supabase
+    .from('checklist_items')
+    .select(CHECKLIST_ITEM_SELECT_WITH_DUE_DATE)
+    .eq('id', created.id)
+    .eq('org_id', orgId)
+    .single()
+
+  let data = fetched.data
+  const fetchError = fetched.error
+
+  if (fetchError) {
+    const fetchMsg = fetchError.message || ''
+    const fetchMissingColumn = fetchMsg.includes('data_limite') || fetchMsg.includes('schema cache')
+    if (!fetchMissingColumn) {
+      return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: fetchError.message }, 500)
+    }
+    missingColumn = true
+    const fallback = await supabase
+      .from('checklist_items')
+      .select(CHECKLIST_ITEM_SELECT)
+      .eq('id', created.id)
+      .eq('org_id', orgId)
+      .single()
+    if (fallback.error || !fallback.data) {
+      return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: fallback.error?.message || 'Erro ao carregar item' }, 500)
+    }
+    data = { ...fallback.data, data_limite: null }
   }
 
   const meta = missingColumn ? { warning: 'MISSING_COLUMN:data_limite' } : undefined
