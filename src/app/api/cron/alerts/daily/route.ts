@@ -2,6 +2,8 @@ import { API_ERROR_CODES } from '@/lib/api/errors'
 import { fail, ok } from '@/lib/api/response'
 import { createServiceRoleClient } from '@/lib/supabase/service'
 
+const REJECTED_SLA_ALERT_SCAN_LIMIT = 120
+
 function isCronAuthorized(request: Request) {
   const configuredSecret = process.env.CRON_SECRET
   if (!configuredSecret) return true
@@ -64,7 +66,7 @@ async function runDailyAlertsCron(request: Request) {
         .not('sla_due_at', 'is', null)
         .lt('sla_due_at', new Date().toISOString())
         .is('sla_alert_sent_at', null)
-        .limit(200),
+        .limit(REJECTED_SLA_ALERT_SCAN_LIMIT),
       service
         .from('obra_checklists')
         .select('id')

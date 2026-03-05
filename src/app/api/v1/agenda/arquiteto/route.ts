@@ -121,7 +121,7 @@ export async function GET(request: Request) {
       .neq('status', 'concluido')
       .lt('data_fim_planejada', today)
       .order('atraso_dias', { ascending: false })
-      .limit(200)
+      .limit(120)
 
     if (delayedError) throw delayedError
 

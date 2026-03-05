@@ -10,7 +10,7 @@
       "id": "limit-200",
       "pattern": "\\.limit\\(\\s*200\\s*\\)|limit=200",
       "include": ["src"],
-      "max": 14
+      "max": 11
     }
   ]
 }
