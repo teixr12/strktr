@@ -2,7 +2,7 @@ import { getApiUser } from '@/lib/api/auth'
 import { API_ERROR_CODES } from '@/lib/api/errors'
 import { log } from '@/lib/api/logger'
 import { fail, ok } from '@/lib/api/response'
-import { isFlagDisabledByDefault } from '@/lib/feature-flags'
+import { isWave2FeatureEnabledForOrg } from '@/server/feature-flags/wave2-canary'
 import { fetchExecutionContext } from '@/server/repositories/obras/execution-repository'
 import { fetchObraLocationByOrg } from '@/server/repositories/obras/location-repository'
 import { buildExecutionSummary } from '@/server/services/obras/execution-summary-service'
@@ -36,10 +36,7 @@ async function withWeatherSignals(params: {
   obraId: string
   alerts: ObraAlertItem[]
 }) {
-  const weatherAlertsEnabled = isFlagDisabledByDefault(
-    process.env.NEXT_PUBLIC_FF_OBRA_WEATHER_ALERTS_V1
-  )
-  if (!weatherAlertsEnabled) {
+  if (!isWave2FeatureEnabledForOrg('weatherAlerts', params.orgId)) {
     return {
       alerts: params.alerts,
       weatherContext: undefined,
