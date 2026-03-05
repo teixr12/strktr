@@ -4,13 +4,13 @@
       "id": "select-star",
       "pattern": "select\\(\\s*['\\\"]\\*['\\\"]\\s*\\)",
       "include": ["src"],
-      "max": 34
+      "max": 0
     },
     {
       "id": "limit-200",
       "pattern": "\\.limit\\(\\s*200\\s*\\)|limit=200",
       "include": ["src"],
-      "max": 2
+      "max": 0
     }
   ]
 }
