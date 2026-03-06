@@ -9,6 +9,8 @@ const isCI = process.env.CI === 'true' || process.env.CI === '1'
 const hasRequiredEnv = Boolean(E2E_BEARER_TOKEN && E2E_OBRA_ID)
 const hasRoleMatrixEnv = Boolean(E2E_MANAGER_BEARER_TOKEN && E2E_USER_BEARER_TOKEN)
 const hasTenantIsolationEnv = Boolean(E2E_FOREIGN_OBRA_ID)
+const RECEIPT_PNG_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4//8/AwAI/AL+KDv1WQAAAABJRU5ErkJggg=='
 
 test.describe('business flow (authenticated)', () => {
   test.beforeAll(() => {
@@ -159,6 +161,104 @@ test.describe('business flow (authenticated)', () => {
         item.orcamento?.id === orcamentoId && item.status === 'pendente' && Number(item.approval_version || 0) >= 2
     )
     expect(pendingApproval?.id).toBeTruthy()
+  })
+
+  test('finance receipts upload -> link -> list -> delete flow', async ({ request }) => {
+    const headers = {
+      Authorization: `Bearer ${E2E_BEARER_TOKEN}`,
+    }
+
+    const healthResponse = await request.get('/api/v1/health/ops')
+    expect(healthResponse.status()).toBe(200)
+    const healthPayload = await healthResponse.json()
+    const financeReceiptsEnabled = Boolean(healthPayload?.data?.flags?.financeReceiptsV1)
+
+    const uploadResponse = await request.post('/api/v1/transacoes/receipts/intake', {
+      headers,
+      multipart: {
+        run_ai: 'false',
+        file: {
+          name: 'receipt-e2e.png',
+          mimeType: 'image/png',
+          buffer: Buffer.from(RECEIPT_PNG_BASE64, 'base64'),
+        },
+      },
+    })
+
+    if (!financeReceiptsEnabled) {
+      expect(uploadResponse.status()).toBe(404)
+      const disabledPayload = await uploadResponse.json()
+      expect(disabledPayload?.error?.code).toBe('NOT_FOUND')
+      expect(disabledPayload?.requestId).toBeTruthy()
+      return
+    }
+
+    expect([201, 404], 'upload should succeed for canary orgs or be hidden outside rollout').toContain(
+      uploadResponse.status()
+    )
+
+    if (uploadResponse.status() === 404) {
+      const rolloutHiddenPayload = await uploadResponse.json()
+      expect(rolloutHiddenPayload?.error?.code).toBe('NOT_FOUND')
+      expect(rolloutHiddenPayload?.requestId).toBeTruthy()
+      return
+    }
+
+    const uploadPayload = await uploadResponse.json()
+    const intake = uploadPayload.data
+    expect(intake?.id).toBeTruthy()
+    expect(intake?.signed_url).toBeTruthy()
+    expect(intake?.mime_type).toBe('image/png')
+
+    const createResponse = await request.post('/api/v1/transacoes', {
+      headers,
+      data: {
+        obra_id: E2E_OBRA_ID,
+        receipt_intake_id: intake.id,
+        tipo: 'Despesa',
+        categoria: 'Materiais',
+        descricao: `Recibo E2E ${Date.now()}`,
+        valor: 19.9,
+        data: new Date().toISOString().slice(0, 10),
+        status: 'Confirmado',
+        forma_pagto: 'PIX',
+        notas: 'Fluxo E2E receipts',
+      },
+    })
+    expect(createResponse.status()).toBe(201)
+    const createdTransaction = (await createResponse.json()).data
+    expect(createdTransaction?.id).toBeTruthy()
+
+    const intakeResponse = await request.get(`/api/v1/transacoes/receipts/${intake.id}`, { headers })
+    expect(intakeResponse.status()).toBe(200)
+    const intakePayload = await intakeResponse.json()
+    expect(intakePayload?.data?.transacao_id).toBe(createdTransaction.id)
+
+    const attachmentsResponse = await request.get(`/api/v1/transacoes/${createdTransaction.id}/anexos`, { headers })
+    expect(attachmentsResponse.status()).toBe(200)
+    const attachmentsPayload = await attachmentsResponse.json()
+    expect(Array.isArray(attachmentsPayload?.data?.items)).toBeTruthy()
+    expect(attachmentsPayload.data.items).toHaveLength(1)
+    expect(attachmentsPayload.data.items[0]?.receipt_intake_id).toBe(intake.id)
+
+    const deleteAttachmentResponse = await request.delete(
+      `/api/v1/transacoes/${createdTransaction.id}/anexos/${attachmentsPayload.data.items[0].id}`,
+      { headers }
+    )
+    expect(deleteAttachmentResponse.status()).toBe(200)
+
+    const attachmentsAfterDeleteResponse = await request.get(
+      `/api/v1/transacoes/${createdTransaction.id}/anexos`,
+      { headers }
+    )
+    expect(attachmentsAfterDeleteResponse.status()).toBe(200)
+    const attachmentsAfterDeletePayload = await attachmentsAfterDeleteResponse.json()
+    expect(attachmentsAfterDeletePayload?.data?.items || []).toHaveLength(0)
+
+    const deleteTransactionResponse = await request.delete(`/api/v1/transacoes/${createdTransaction.id}`, {
+      headers,
+    })
+    expect(deleteTransactionResponse.status()).toBe(200)
   })
 
   test('role matrix enforcement across leads/finance/projects/team', async ({ request }) => {
