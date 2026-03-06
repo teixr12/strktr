@@ -543,7 +543,7 @@ export function FinanceiroContent({
     )
   }
 
-  if (!isPageLoading && transacoes.length === 0) {
+  if (!isPageLoading && transacoes.length === 0 && !showForm) {
     return (
       <MobileShellV1
         primaryAction={
