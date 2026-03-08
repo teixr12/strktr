@@ -14,6 +14,7 @@ const SHARED_HOTSPOTS = new Set([
 const TRAIN_A_EXACT = new Set([
   '.gitignore',
   'package.json',
+  'scripts/audit-analytics-drift-7d.sh',
   'scripts/report-release-train-scope.mjs',
   'src/app/api/v1/health/ops/route.ts',
   'src/app/api/v1/ops/program/route.ts',
