@@ -51,8 +51,25 @@ JSON
     -H "Content-Type: application/json" \
     --data @"$TMP_DIR/posthog_payload.resolved.json" \
     > "$TMP_DIR/posthog_raw.json"; then
-    jq '[.results[]? | { day: .[0], event_type: .[1], external_total_day: (.[2] | tonumber) }]' "$TMP_DIR/posthog_raw.json" > "$EXTERNAL_OUT"
-    EXTERNAL_STATUS="ok"
+    if jq -e '
+      type == "object"
+      and (.results? | type == "array")
+    ' "$TMP_DIR/posthog_raw.json" > /dev/null 2>&1; then
+      jq '[
+        .results[]?
+        | select(type == "array" and length >= 3)
+        | {
+            day: (.[0] | tostring),
+            event_type: (.[1] | tostring),
+            external_total_day: ((.[2] | tonumber?) // 0)
+          }
+      ]' "$TMP_DIR/posthog_raw.json" > "$EXTERNAL_OUT"
+      EXTERNAL_STATUS="ok"
+    else
+      echo "PostHog daily query returned an unexpected payload shape; treating external source as unavailable." >&2
+      echo '[]' > "$EXTERNAL_OUT"
+      EXTERNAL_STATUS="failed"
+    fi
   else
     echo "PostHog daily query failed; treating external source as unavailable." >&2
     echo '[]' > "$EXTERNAL_OUT"
@@ -65,7 +82,22 @@ fi
 jq -n \
   --argjson internal "$(cat "$INTERNAL_OUT")" \
   --argjson external "$(cat "$EXTERNAL_OUT")" '
-    ($external | map({ key: (.day + "|" + .event_type), value: .external_total_day }) | from_entries) as $ext_map
+    (
+      if ($external | type) == "array" then
+        $external
+        | map(
+            select(
+              type == "object"
+              and (.day? | type == "string")
+              and (.event_type? | type == "string")
+            )
+          )
+        | map({ key: (.day + "|" + .event_type), value: (.external_total_day // 0) })
+        | from_entries
+      else
+        {}
+      end
+    ) as $ext_map
     | $internal
     | map(
         . as $i

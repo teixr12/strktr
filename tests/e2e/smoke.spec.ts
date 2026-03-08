@@ -13,6 +13,10 @@ test('health endpoint responde', async ({ request }) => {
   expect(payload.data.rollout.financeReceiptAiCanary).toBeTruthy()
   expect(payload.data.rollout.cronogramaUxV2Canary).toBeTruthy()
   expect(payload.data.rollout.docsWorkspaceCanary).toBeTruthy()
+  expect(payload.data.program).toBeTruthy()
+  expect(payload.data.program.horizonDays).toBe(90)
+  expect(payload.data.program.releaseTrains).toBeTruthy()
+  expect(Array.isArray(payload.data.program.releaseTrains)).toBeTruthy()
 })
 
 test('login renderiza sem erro fatal', async ({ page }) => {
@@ -41,6 +45,7 @@ test('novos endpoints protegidos retornam envelope canônico sem token', async (
     { endpoint: '/api/v1/knowledgebase', method: 'GET' },
     { endpoint: '/api/v1/notificacoes', method: 'GET' },
     { endpoint: '/api/v1/perfil', method: 'GET' },
+    { endpoint: '/api/v1/ops/program', method: 'GET' },
     { endpoint: '/api/v1/config/org', method: 'POST' },
     { endpoint: '/api/v1/config/org-members', method: 'POST' },
     { endpoint: '/api/v1/notificacoes/read-all', method: 'POST' },

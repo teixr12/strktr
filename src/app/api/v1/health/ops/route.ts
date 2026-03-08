@@ -10,6 +10,7 @@ import {
   getFinanceReceiptsCanarySnapshot,
   getWave2CanarySnapshot,
 } from '@/server/feature-flags/wave2-canary'
+import { getProgramHealthSummary } from '@/server/program/program-status'
 
 function normalizeEnv(value: string | undefined | null): string | null {
   const normalized = (value || '').trim()
@@ -62,6 +63,7 @@ export async function GET(request: Request) {
     const financeReceiptAiCanary = getFinanceReceiptAiCanarySnapshot()
     const cronogramaUxV2Canary = getCronogramaUxV2CanarySnapshot()
     const docsWorkspaceCanary = getDocsWorkspaceCanarySnapshot()
+    const program = getProgramHealthSummary()
     return ok(request, {
       status: degraded ? 'degraded' : 'ok',
       ts: new Date().toISOString(),
@@ -75,6 +77,7 @@ export async function GET(request: Request) {
         cronogramaUxV2Canary,
         docsWorkspaceCanary,
       },
+      program,
       flags: {
         uiTailadminV1: isFlagEnabledByDefault(process.env.NEXT_PUBLIC_FF_UI_TAILADMIN_V1),
         uiV2Obras: isFlagEnabledByDefault(process.env.NEXT_PUBLIC_FF_UI_V2_OBRAS),
