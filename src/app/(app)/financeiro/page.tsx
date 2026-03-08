@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getServerActiveOrgId } from '@/lib/auth/server-org'
 import { FinanceiroContent } from '@/components/financeiro/financeiro-content'
 import {
+  isFinanceDepthV1EnabledForOrg,
   isFinanceReceiptAiEnabledForOrg,
   isFinanceReceiptsEnabledForOrg,
 } from '@/server/feature-flags/wave2-canary'
@@ -28,6 +29,7 @@ export default async function FinanceiroPage() {
   return (
     <FinanceiroContent
       initialTransacoes={normalizedTransacoes}
+      financeDepthEnabled={isFinanceDepthV1EnabledForOrg(orgId)}
       receiptsEnabled={isFinanceReceiptsEnabledForOrg(orgId)}
       receiptAiEnabled={isFinanceReceiptAiEnabledForOrg(orgId)}
     />

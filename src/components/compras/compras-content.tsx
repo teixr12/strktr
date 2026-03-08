@@ -37,6 +37,7 @@ const CATEGORIA_OPTIONS = ['Material', 'Equipamento', 'Ferramenta', 'Servico', '
 interface Props {
   initialCompras: Compra[]
   obras: { id: string; nome: string }[]
+  supplierManagementEnabled?: boolean
 }
 
 interface PaginationMeta {
@@ -49,7 +50,7 @@ interface PaginationMeta {
 
 const PAGE_SIZE = 50
 
-export function ComprasContent({ initialCompras, obras }: Props) {
+export function ComprasContent({ initialCompras, obras, supplierManagementEnabled = false }: Props) {
   const { confirm, dialog: confirmDialog } = useConfirm()
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Compras
   const usePaginationV1 = featureFlags.uiPaginationV1
@@ -241,12 +242,24 @@ export function ComprasContent({ initialCompras, obras }: Props) {
         subtitle={`${pagination.total || compras.length} compras registradas`}
         actions={
           <QuickActionBar
-            actions={[{
-              label: 'Nova Compra',
-              icon: <Plus className="h-4 w-4" />,
-              onClick: () => openForm(),
-              tone: 'warning',
-            }]}
+            actions={[
+              {
+                label: 'Nova Compra',
+                icon: <Plus className="h-4 w-4" />,
+                onClick: () => openForm(),
+                tone: 'warning',
+              },
+              ...(supplierManagementEnabled
+                ? [
+                    {
+                      label: 'Fornecedores',
+                      icon: <ShoppingCart className="h-4 w-4" />,
+                      href: '/fornecedores',
+                      tone: 'neutral' as const,
+                    },
+                  ]
+                : []),
+            ]}
           />
         }
       />
