@@ -87,6 +87,30 @@ function collectFailures(suites = [], failures = []) {
   return failures
 }
 
+async function stopServer(serverProcess, serverState, timeoutMs = 5_000) {
+  if (!serverProcess || serverState?.exited) return
+
+  try {
+    serverProcess.kill('SIGTERM')
+  } catch {}
+
+  const startedAt = Date.now()
+  while (!serverState?.exited && Date.now() - startedAt < timeoutMs) {
+    await new Promise((resolve) => setTimeout(resolve, 200))
+  }
+
+  if (serverState?.exited) return
+
+  try {
+    serverProcess.kill('SIGKILL')
+  } catch {}
+
+  const killStartedAt = Date.now()
+  while (!serverState?.exited && Date.now() - killStartedAt < 2_000) {
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+}
+
 async function waitForBaseUrl({ baseURL, timeoutMs, serverState }) {
   const startedAt = Date.now()
   let lastError = null
@@ -257,7 +281,7 @@ if (!workingEnv.PLAYWRIGHT_BASE_URL) {
     reportLines.push('## Server stderr tail')
     reportLines.push(...asTextBlock(serverStderr.join('')))
     writeReport(reportLines)
-    serverProcess.kill('SIGTERM')
+    await stopServer(serverProcess, serverState)
     console.error(`Auth E2E strict failed: ${reportPath}`)
     process.exit(1)
   }
@@ -280,7 +304,7 @@ const run = spawnSync(
 )
 
 if (serverProcess) {
-  serverProcess.kill('SIGTERM')
+  await stopServer(serverProcess, serverState)
 }
 
 const rawJson = String(run.stdout || '').trim()
