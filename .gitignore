@@ -25,6 +25,12 @@
 # misc
 .DS_Store
 *.pem
+.claude/
+
+# generated local reports
+docs/reports/*.md
+!docs/reports/README.md
+!docs/reports/.gitkeep
 
 # debug
 npm-debug.log*

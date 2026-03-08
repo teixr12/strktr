@@ -21,6 +21,7 @@
     "audit:analytics-capture-probe": "./scripts/audit-analytics-capture-probe.sh",
     "ops:reconcile-analytics-portal": "./scripts/reconcile-analytics-portal.sh",
     "audit:ux-quality": "node scripts/audit-ux-quality.mjs",
+    "governance:release-trains": "node scripts/report-release-train-scope.mjs",
     "governance:boundaries": "node scripts/check-dependency-boundaries.mjs",
     "governance:analytics": "node scripts/check-analytics-taxonomy.mjs",
     "governance:performance": "node scripts/check-performance-budget.mjs",
