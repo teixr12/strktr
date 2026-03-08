@@ -38,9 +38,9 @@ export interface ProgramModuleStatus {
   riskLevel: ProgramRiskLevel
   deliveryState: ProgramDeliveryState
   requiresComplianceGate: boolean
-  featureFlagKey: string
+  featureFlagName: string
   featureEnabled: boolean
-  canaryKey: string | null
+  rolloutName: string | null
   rolloutState: ProgramRolloutState
   rollout: {
     configured: boolean

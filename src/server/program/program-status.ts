@@ -351,9 +351,9 @@ function buildModuleStatus(definition: ProgramModuleDefinition): ProgramModuleSt
     riskLevel: definition.riskLevel,
     deliveryState: definition.deliveryState,
     requiresComplianceGate: definition.requiresComplianceGate,
-    featureFlagKey: definition.flagName,
+    featureFlagName: definition.flagName,
     featureEnabled,
-    canaryKey: definition.rolloutName || null,
+    rolloutName: definition.rolloutName || null,
     rolloutState: resolveRolloutState(featureEnabled, rollout),
     rollout: rollout
       ? {
