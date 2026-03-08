@@ -1,0 +1,8 @@
+title = "STRKTR Gitleaks Config"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Program rollout manifest uses static feature names that trip generic secret heuristics."
+paths = ['''src/server/program/program-status\.ts''']
