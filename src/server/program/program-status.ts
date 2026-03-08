@@ -18,19 +18,19 @@ import type {
 } from '@/shared/types/program-status'
 
 type ProgramModuleDefinition = {
-  moduleId: ProgramModuleKey
+  moduleId: ProgramModuleKey // gitleaks:allow
   title: string
   pod: ProgramPodKey
   order: number
   riskLevel: ProgramModuleStatus['riskLevel']
   deliveryState: ProgramDeliveryState
   requiresComplianceGate: boolean
-  flagName: FeatureFlagKey
+  flagName: FeatureFlagKey // gitleaks:allow
   rolloutName?: OrgRolloutFeatureKey
 }
 
 type ProgramReleaseTrainDefinition = {
-  trainId: ProgramReleaseTrainKey
+  trainId: ProgramReleaseTrainKey // gitleaks:allow
   title: string
   order: number
   stage: ProgramReleaseTrainStatus['stage']
@@ -50,208 +50,208 @@ const POD_TITLES: Record<ProgramPodKey, string> = {
 
 const PROGRAM_MODULES: ProgramModuleDefinition[] = [
   {
-    moduleId: 'financeReceipts',
+    moduleId: 'financeReceipts', // gitleaks:allow
     title: 'Finance Receipts',
     pod: 'podA',
     order: 1,
     riskLevel: 'high',
     deliveryState: 'implemented',
     requiresComplianceGate: false,
-    flagName: 'financeReceiptsV1',
-    rolloutName: 'financeReceipts',
+    flagName: 'financeReceiptsV1', // gitleaks:allow
+    rolloutName: 'financeReceipts', // gitleaks:allow
   },
   {
-    moduleId: 'financeReceiptAi',
+    moduleId: 'financeReceiptAi', // gitleaks:allow
     title: 'Finance Receipt AI',
     pod: 'podA',
     order: 2,
     riskLevel: 'high',
     deliveryState: 'implemented',
     requiresComplianceGate: false,
-    flagName: 'financeReceiptAiV1',
-    rolloutName: 'financeReceiptAi',
+    flagName: 'financeReceiptAiV1', // gitleaks:allow
+    rolloutName: 'financeReceiptAi', // gitleaks:allow
   },
   {
-    moduleId: 'cronogramaUxV2',
+    moduleId: 'cronogramaUxV2', // gitleaks:allow
     title: 'Cronograma UX V2',
     pod: 'podA',
     order: 3,
     riskLevel: 'medium',
     deliveryState: 'implemented',
     requiresComplianceGate: false,
-    flagName: 'cronogramaUxV2',
-    rolloutName: 'cronogramaUxV2',
+    flagName: 'cronogramaUxV2', // gitleaks:allow
+    rolloutName: 'cronogramaUxV2', // gitleaks:allow
   },
   {
-    moduleId: 'docsWorkspace',
+    moduleId: 'docsWorkspace', // gitleaks:allow
     title: 'Docs Workspace',
     pod: 'podA',
     order: 4,
     riskLevel: 'medium',
     deliveryState: 'implemented',
     requiresComplianceGate: false,
-    flagName: 'docsWorkspaceV1',
-    rolloutName: 'docsWorkspace',
+    flagName: 'docsWorkspaceV1', // gitleaks:allow
+    rolloutName: 'docsWorkspace', // gitleaks:allow
   },
   {
-    moduleId: 'portalAdminV2',
+    moduleId: 'portalAdminV2', // gitleaks:allow
     title: 'Portal Admin V2',
     pod: 'podB',
     order: 1,
     riskLevel: 'medium',
     deliveryState: 'in_progress',
     requiresComplianceGate: false,
-    flagName: 'portalAdminV2',
-    rolloutName: 'portalAdminV2',
+    flagName: 'portalAdminV2', // gitleaks:allow
+    rolloutName: 'portalAdminV2', // gitleaks:allow
   },
   {
-    moduleId: 'obraIntelligenceV1',
+    moduleId: 'obraIntelligenceV1', // gitleaks:allow
     title: 'Obra Intelligence',
     pod: 'podB',
     order: 2,
     riskLevel: 'medium',
     deliveryState: 'in_progress',
     requiresComplianceGate: false,
-    flagName: 'obraIntelligenceV1',
-    rolloutName: 'obraIntelligenceV1',
+    flagName: 'obraIntelligenceV1', // gitleaks:allow
+    rolloutName: 'obraIntelligenceV1', // gitleaks:allow
   },
   {
-    moduleId: 'financeDepthV1',
+    moduleId: 'financeDepthV1', // gitleaks:allow
     title: 'Finance Depth',
     pod: 'podB',
     order: 3,
     riskLevel: 'high',
     deliveryState: 'in_progress',
     requiresComplianceGate: false,
-    flagName: 'financeDepthV1',
-    rolloutName: 'financeDepthV1',
+    flagName: 'financeDepthV1', // gitleaks:allow
+    rolloutName: 'financeDepthV1', // gitleaks:allow
   },
   {
-    moduleId: 'supplierManagementV1',
+    moduleId: 'supplierManagementV1', // gitleaks:allow
     title: 'Supplier Management',
     pod: 'podB',
     order: 4,
     riskLevel: 'medium',
     deliveryState: 'in_progress',
     requiresComplianceGate: false,
-    flagName: 'supplierManagementV1',
-    rolloutName: 'supplierManagementV1',
+    flagName: 'supplierManagementV1', // gitleaks:allow
+    rolloutName: 'supplierManagementV1', // gitleaks:allow
   },
   {
-    moduleId: 'bureaucracyV1',
+    moduleId: 'bureaucracyV1', // gitleaks:allow
     title: 'Bureaucracy',
     pod: 'podB',
     order: 5,
     riskLevel: 'medium',
     deliveryState: 'in_progress',
     requiresComplianceGate: false,
-    flagName: 'bureaucracyV1',
-    rolloutName: 'bureaucracyV1',
+    flagName: 'bureaucracyV1', // gitleaks:allow
+    rolloutName: 'bureaucracyV1', // gitleaks:allow
   },
   {
-    moduleId: 'emailTriageV1',
+    moduleId: 'emailTriageV1', // gitleaks:allow
     title: 'Email Triage',
     pod: 'podB',
     order: 6,
     riskLevel: 'medium',
     deliveryState: 'in_progress',
     requiresComplianceGate: false,
-    flagName: 'emailTriageV1',
-    rolloutName: 'emailTriageV1',
+    flagName: 'emailTriageV1', // gitleaks:allow
+    rolloutName: 'emailTriageV1', // gitleaks:allow
   },
   {
-    moduleId: 'billingV1',
+    moduleId: 'billingV1', // gitleaks:allow
     title: 'Billing',
     pod: 'podC',
     order: 1,
     riskLevel: 'high',
     deliveryState: 'in_progress',
     requiresComplianceGate: true,
-    flagName: 'billingV1',
-    rolloutName: 'billingV1',
+    flagName: 'billingV1', // gitleaks:allow
+    rolloutName: 'billingV1', // gitleaks:allow
   },
   {
-    moduleId: 'referralV1',
+    moduleId: 'referralV1', // gitleaks:allow
     title: 'Referral',
     pod: 'podC',
     order: 2,
     riskLevel: 'medium',
     deliveryState: 'in_progress',
     requiresComplianceGate: false,
-    flagName: 'referralV1',
-    rolloutName: 'referralV1',
+    flagName: 'referralV1', // gitleaks:allow
+    rolloutName: 'referralV1', // gitleaks:allow
   },
   {
-    moduleId: 'publicApiV1',
+    moduleId: 'publicApiV1', // gitleaks:allow
     title: 'Public API',
     pod: 'podC',
     order: 3,
     riskLevel: 'high',
     deliveryState: 'in_progress',
     requiresComplianceGate: true,
-    flagName: 'publicApiV1',
-    rolloutName: 'publicApiV1',
+    flagName: 'publicApiV1', // gitleaks:allow
+    rolloutName: 'publicApiV1', // gitleaks:allow
   },
   {
-    moduleId: 'integrationsHubV1',
+    moduleId: 'integrationsHubV1', // gitleaks:allow
     title: 'Integrations Hub',
     pod: 'podC',
     order: 4,
     riskLevel: 'medium',
     deliveryState: 'in_progress',
     requiresComplianceGate: false,
-    flagName: 'integrationsHubV1',
-    rolloutName: 'integrationsHubV1',
+    flagName: 'integrationsHubV1', // gitleaks:allow
+    rolloutName: 'integrationsHubV1', // gitleaks:allow
   },
   {
-    moduleId: 'superAdminV1',
+    moduleId: 'superAdminV1', // gitleaks:allow
     title: 'Super Admin',
     pod: 'podC',
     order: 5,
     riskLevel: 'high',
     deliveryState: 'in_progress',
     requiresComplianceGate: true,
-    flagName: 'superAdminV1',
-    rolloutName: 'superAdminV1',
+    flagName: 'superAdminV1', // gitleaks:allow
+    rolloutName: 'superAdminV1', // gitleaks:allow
   },
   {
-    moduleId: 'agentReadyV1',
+    moduleId: 'agentReadyV1', // gitleaks:allow
     title: 'Agent Ready',
     pod: 'podC',
     order: 6,
     riskLevel: 'high',
     deliveryState: 'in_progress',
     requiresComplianceGate: true,
-    flagName: 'agentReadyV1',
-    rolloutName: 'agentReadyV1',
+    flagName: 'agentReadyV1', // gitleaks:allow
+    rolloutName: 'agentReadyV1', // gitleaks:allow
   },
   {
-    moduleId: 'bigDataV1',
+    moduleId: 'bigDataV1', // gitleaks:allow
     title: 'Big Data',
     pod: 'podC',
     order: 7,
     riskLevel: 'high',
     deliveryState: 'in_progress',
     requiresComplianceGate: true,
-    flagName: 'bigDataV1',
-    rolloutName: 'bigDataV1',
+    flagName: 'bigDataV1', // gitleaks:allow
+    rolloutName: 'bigDataV1', // gitleaks:allow
   },
   {
-    moduleId: 'openBankingV1',
+    moduleId: 'openBankingV1', // gitleaks:allow
     title: 'Open Banking',
     pod: 'podC',
     order: 8,
     riskLevel: 'high',
     deliveryState: 'in_progress',
     requiresComplianceGate: true,
-    flagName: 'openBankingV1',
-    rolloutName: 'openBankingV1',
+    flagName: 'openBankingV1', // gitleaks:allow
+    rolloutName: 'openBankingV1', // gitleaks:allow
   },
 ]
 
 const PROGRAM_RELEASE_TRAINS: ProgramReleaseTrainDefinition[] = [
   {
-    trainId: 'trainA',
+    trainId: 'trainA', // gitleaks:allow
     title: 'Train A - Foundation',
     order: 1,
     stage: 'current',
@@ -278,7 +278,7 @@ const PROGRAM_RELEASE_TRAINS: ProgramReleaseTrainDefinition[] = [
     },
   },
   {
-    trainId: 'trainB',
+    trainId: 'trainB', // gitleaks:allow
     title: 'Train B - Pod B Foundations',
     order: 2,
     stage: 'next',
@@ -301,7 +301,7 @@ const PROGRAM_RELEASE_TRAINS: ProgramReleaseTrainDefinition[] = [
     resolveBlockers: () => ['Depende do corte e deploy do Train A com tudo novo OFF.'],
   },
   {
-    trainId: 'trainC',
+    trainId: 'trainC', // gitleaks:allow
     title: 'Train C - Pod C Foundations',
     order: 3,
     stage: 'later',
@@ -353,7 +353,7 @@ function buildModuleStatus(definition: ProgramModuleDefinition): ProgramModuleSt
     requiresComplianceGate: definition.requiresComplianceGate,
     featureFlagName: definition.flagName,
     featureEnabled,
-    rolloutName: definition.rolloutName || null,
+    rolloutName: definition.rolloutName || null, // gitleaks:allow
     rolloutState: resolveRolloutState(featureEnabled, rollout),
     rollout: rollout
       ? {
