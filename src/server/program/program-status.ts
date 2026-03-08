@@ -18,19 +18,19 @@ import type {
 } from '@/shared/types/program-status'
 
 type ProgramModuleDefinition = {
-  key: ProgramModuleKey
+  moduleId: ProgramModuleKey
   title: string
   pod: ProgramPodKey
   order: number
   riskLevel: ProgramModuleStatus['riskLevel']
   deliveryState: ProgramDeliveryState
   requiresComplianceGate: boolean
-  featureFlagKey: FeatureFlagKey
-  canaryKey?: OrgRolloutFeatureKey
+  flagName: FeatureFlagKey
+  rolloutName?: OrgRolloutFeatureKey
 }
 
 type ProgramReleaseTrainDefinition = {
-  key: ProgramReleaseTrainKey
+  trainId: ProgramReleaseTrainKey
   title: string
   order: number
   stage: ProgramReleaseTrainStatus['stage']
@@ -50,208 +50,208 @@ const POD_TITLES: Record<ProgramPodKey, string> = {
 
 const PROGRAM_MODULES: ProgramModuleDefinition[] = [
   {
-    key: 'financeReceipts',
+    moduleId: 'financeReceipts',
     title: 'Finance Receipts',
     pod: 'podA',
     order: 1,
     riskLevel: 'high',
     deliveryState: 'implemented',
     requiresComplianceGate: false,
-    featureFlagKey: 'financeReceiptsV1',
-    canaryKey: 'financeReceipts',
+    flagName: 'financeReceiptsV1',
+    rolloutName: 'financeReceipts',
   },
   {
-    key: 'financeReceiptAi',
+    moduleId: 'financeReceiptAi',
     title: 'Finance Receipt AI',
     pod: 'podA',
     order: 2,
     riskLevel: 'high',
     deliveryState: 'implemented',
     requiresComplianceGate: false,
-    featureFlagKey: 'financeReceiptAiV1',
-    canaryKey: 'financeReceiptAi',
+    flagName: 'financeReceiptAiV1',
+    rolloutName: 'financeReceiptAi',
   },
   {
-    key: 'cronogramaUxV2',
+    moduleId: 'cronogramaUxV2',
     title: 'Cronograma UX V2',
     pod: 'podA',
     order: 3,
     riskLevel: 'medium',
     deliveryState: 'implemented',
     requiresComplianceGate: false,
-    featureFlagKey: 'cronogramaUxV2',
-    canaryKey: 'cronogramaUxV2',
+    flagName: 'cronogramaUxV2',
+    rolloutName: 'cronogramaUxV2',
   },
   {
-    key: 'docsWorkspace',
+    moduleId: 'docsWorkspace',
     title: 'Docs Workspace',
     pod: 'podA',
     order: 4,
     riskLevel: 'medium',
     deliveryState: 'implemented',
     requiresComplianceGate: false,
-    featureFlagKey: 'docsWorkspaceV1',
-    canaryKey: 'docsWorkspace',
+    flagName: 'docsWorkspaceV1',
+    rolloutName: 'docsWorkspace',
   },
   {
-    key: 'portalAdminV2',
+    moduleId: 'portalAdminV2',
     title: 'Portal Admin V2',
     pod: 'podB',
     order: 1,
     riskLevel: 'medium',
     deliveryState: 'in_progress',
     requiresComplianceGate: false,
-    featureFlagKey: 'portalAdminV2',
-    canaryKey: 'portalAdminV2',
+    flagName: 'portalAdminV2',
+    rolloutName: 'portalAdminV2',
   },
   {
-    key: 'obraIntelligenceV1',
+    moduleId: 'obraIntelligenceV1',
     title: 'Obra Intelligence',
     pod: 'podB',
     order: 2,
     riskLevel: 'medium',
     deliveryState: 'in_progress',
     requiresComplianceGate: false,
-    featureFlagKey: 'obraIntelligenceV1',
-    canaryKey: 'obraIntelligenceV1',
+    flagName: 'obraIntelligenceV1',
+    rolloutName: 'obraIntelligenceV1',
   },
   {
-    key: 'financeDepthV1',
+    moduleId: 'financeDepthV1',
     title: 'Finance Depth',
     pod: 'podB',
     order: 3,
     riskLevel: 'high',
     deliveryState: 'in_progress',
     requiresComplianceGate: false,
-    featureFlagKey: 'financeDepthV1',
-    canaryKey: 'financeDepthV1',
+    flagName: 'financeDepthV1',
+    rolloutName: 'financeDepthV1',
   },
   {
-    key: 'supplierManagementV1',
+    moduleId: 'supplierManagementV1',
     title: 'Supplier Management',
     pod: 'podB',
     order: 4,
     riskLevel: 'medium',
     deliveryState: 'in_progress',
     requiresComplianceGate: false,
-    featureFlagKey: 'supplierManagementV1',
-    canaryKey: 'supplierManagementV1',
+    flagName: 'supplierManagementV1',
+    rolloutName: 'supplierManagementV1',
   },
   {
-    key: 'bureaucracyV1',
+    moduleId: 'bureaucracyV1',
     title: 'Bureaucracy',
     pod: 'podB',
     order: 5,
     riskLevel: 'medium',
     deliveryState: 'in_progress',
     requiresComplianceGate: false,
-    featureFlagKey: 'bureaucracyV1',
-    canaryKey: 'bureaucracyV1',
+    flagName: 'bureaucracyV1',
+    rolloutName: 'bureaucracyV1',
   },
   {
-    key: 'emailTriageV1',
+    moduleId: 'emailTriageV1',
     title: 'Email Triage',
     pod: 'podB',
     order: 6,
     riskLevel: 'medium',
     deliveryState: 'in_progress',
     requiresComplianceGate: false,
-    featureFlagKey: 'emailTriageV1',
-    canaryKey: 'emailTriageV1',
+    flagName: 'emailTriageV1',
+    rolloutName: 'emailTriageV1',
   },
   {
-    key: 'billingV1',
+    moduleId: 'billingV1',
     title: 'Billing',
     pod: 'podC',
     order: 1,
     riskLevel: 'high',
     deliveryState: 'in_progress',
     requiresComplianceGate: true,
-    featureFlagKey: 'billingV1',
-    canaryKey: 'billingV1',
+    flagName: 'billingV1',
+    rolloutName: 'billingV1',
   },
   {
-    key: 'referralV1',
+    moduleId: 'referralV1',
     title: 'Referral',
     pod: 'podC',
     order: 2,
     riskLevel: 'medium',
     deliveryState: 'in_progress',
     requiresComplianceGate: false,
-    featureFlagKey: 'referralV1',
-    canaryKey: 'referralV1',
+    flagName: 'referralV1',
+    rolloutName: 'referralV1',
   },
   {
-    key: 'publicApiV1',
+    moduleId: 'publicApiV1',
     title: 'Public API',
     pod: 'podC',
     order: 3,
     riskLevel: 'high',
     deliveryState: 'in_progress',
     requiresComplianceGate: true,
-    featureFlagKey: 'publicApiV1',
-    canaryKey: 'publicApiV1',
+    flagName: 'publicApiV1',
+    rolloutName: 'publicApiV1',
   },
   {
-    key: 'integrationsHubV1',
+    moduleId: 'integrationsHubV1',
     title: 'Integrations Hub',
     pod: 'podC',
     order: 4,
     riskLevel: 'medium',
     deliveryState: 'in_progress',
     requiresComplianceGate: false,
-    featureFlagKey: 'integrationsHubV1',
-    canaryKey: 'integrationsHubV1',
+    flagName: 'integrationsHubV1',
+    rolloutName: 'integrationsHubV1',
   },
   {
-    key: 'superAdminV1',
+    moduleId: 'superAdminV1',
     title: 'Super Admin',
     pod: 'podC',
     order: 5,
     riskLevel: 'high',
     deliveryState: 'in_progress',
     requiresComplianceGate: true,
-    featureFlagKey: 'superAdminV1',
-    canaryKey: 'superAdminV1',
+    flagName: 'superAdminV1',
+    rolloutName: 'superAdminV1',
   },
   {
-    key: 'agentReadyV1',
+    moduleId: 'agentReadyV1',
     title: 'Agent Ready',
     pod: 'podC',
     order: 6,
     riskLevel: 'high',
     deliveryState: 'in_progress',
     requiresComplianceGate: true,
-    featureFlagKey: 'agentReadyV1',
-    canaryKey: 'agentReadyV1',
+    flagName: 'agentReadyV1',
+    rolloutName: 'agentReadyV1',
   },
   {
-    key: 'bigDataV1',
+    moduleId: 'bigDataV1',
     title: 'Big Data',
     pod: 'podC',
     order: 7,
     riskLevel: 'high',
     deliveryState: 'in_progress',
     requiresComplianceGate: true,
-    featureFlagKey: 'bigDataV1',
-    canaryKey: 'bigDataV1',
+    flagName: 'bigDataV1',
+    rolloutName: 'bigDataV1',
   },
   {
-    key: 'openBankingV1',
+    moduleId: 'openBankingV1',
     title: 'Open Banking',
     pod: 'podC',
     order: 8,
     riskLevel: 'high',
     deliveryState: 'in_progress',
     requiresComplianceGate: true,
-    featureFlagKey: 'openBankingV1',
-    canaryKey: 'openBankingV1',
+    flagName: 'openBankingV1',
+    rolloutName: 'openBankingV1',
   },
 ]
 
 const PROGRAM_RELEASE_TRAINS: ProgramReleaseTrainDefinition[] = [
   {
-    key: 'trainA',
+    trainId: 'trainA',
     title: 'Train A - Foundation',
     order: 1,
     stage: 'current',
@@ -278,7 +278,7 @@ const PROGRAM_RELEASE_TRAINS: ProgramReleaseTrainDefinition[] = [
     },
   },
   {
-    key: 'trainB',
+    trainId: 'trainB',
     title: 'Train B - Pod B Foundations',
     order: 2,
     stage: 'next',
@@ -301,7 +301,7 @@ const PROGRAM_RELEASE_TRAINS: ProgramReleaseTrainDefinition[] = [
     resolveBlockers: () => ['Depende do corte e deploy do Train A com tudo novo OFF.'],
   },
   {
-    key: 'trainC',
+    trainId: 'trainC',
     title: 'Train C - Pod C Foundations',
     order: 3,
     stage: 'later',
@@ -340,20 +340,20 @@ function resolveRolloutState(
 }
 
 function buildModuleStatus(definition: ProgramModuleDefinition): ProgramModuleStatus {
-  const featureEnabled = featureFlags[definition.featureFlagKey]
-  const rollout = definition.canaryKey ? getFeatureCanarySnapshot(definition.canaryKey) : null
+  const featureEnabled = featureFlags[definition.flagName]
+  const rollout = definition.rolloutName ? getFeatureCanarySnapshot(definition.rolloutName) : null
 
   return {
-    key: definition.key,
+    key: definition.moduleId,
     title: definition.title,
     pod: definition.pod,
     order: definition.order,
     riskLevel: definition.riskLevel,
     deliveryState: definition.deliveryState,
     requiresComplianceGate: definition.requiresComplianceGate,
-    featureFlagKey: definition.featureFlagKey,
+    featureFlagKey: definition.flagName,
     featureEnabled,
-    canaryKey: definition.canaryKey || null,
+    canaryKey: definition.rolloutName || null,
     rolloutState: resolveRolloutState(featureEnabled, rollout),
     rollout: rollout
       ? {
@@ -394,7 +394,7 @@ function buildReleaseTrainStatus(
   modules: ProgramModuleStatus[]
 ): ProgramReleaseTrainStatus {
   return {
-    key: definition.key,
+    key: definition.trainId,
     title: definition.title,
     order: definition.order,
     stage: definition.stage,
