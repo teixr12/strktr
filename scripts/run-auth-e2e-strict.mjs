@@ -71,7 +71,11 @@ async function stopServer(serverProcess, serverState, timeoutMs = 5_000) {
   if (!serverProcess || serverState?.exited) return
 
   try {
-    serverProcess.kill('SIGTERM')
+    if (serverProcess.pid) {
+      process.kill(-serverProcess.pid, 'SIGTERM')
+    } else {
+      serverProcess.kill('SIGTERM')
+    }
   } catch {}
 
   const startedAt = Date.now()
@@ -82,13 +86,22 @@ async function stopServer(serverProcess, serverState, timeoutMs = 5_000) {
   if (serverState?.exited) return
 
   try {
-    serverProcess.kill('SIGKILL')
+    if (serverProcess.pid) {
+      process.kill(-serverProcess.pid, 'SIGKILL')
+    } else {
+      serverProcess.kill('SIGKILL')
+    }
   } catch {}
 
   const killStartedAt = Date.now()
   while (!serverState?.exited && Date.now() - killStartedAt < 2_000) {
     await new Promise((resolve) => setTimeout(resolve, 100))
   }
+
+  try {
+    serverProcess.stdout?.destroy()
+    serverProcess.stderr?.destroy()
+  } catch {}
 }
 
 async function waitForBaseUrl({ baseURL, timeoutMs, serverState }) {
@@ -384,6 +397,7 @@ if (!workingEnv.PLAYWRIGHT_BASE_URL) {
     cwd: process.cwd(),
     env: { ...workingEnv, CI: '1', PORT: String(port) },
     stdio: ['ignore', 'pipe', 'pipe'],
+    detached: true,
   })
 
   serverProcess.stdout?.on('data', (chunk) => {
