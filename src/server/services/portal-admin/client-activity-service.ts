@@ -86,9 +86,6 @@ export async function getPortalAdminClientActivity({
     totalDecisionsRes,
     approvedDecisionsRes,
     rejectedDecisionsRes,
-    pendingApprovalsRes,
-    pendingApprovalsCountRes,
-    overduePendingApprovalsCountRes,
   ] = await Promise.all([
     supabase
       .from('portal_sessions')
@@ -147,31 +144,6 @@ export async function getPortalAdminClientActivity({
       .eq('obra_id', obraId)
       .eq('decidido_por_portal_cliente_id', clientId)
       .eq('status', 'rejeitado'),
-    supabase
-      .from('aprovacoes_cliente')
-      .select('id, tipo, status, solicitado_em, sla_due_at, decisao_comentario')
-      .eq('org_id', orgId)
-      .eq('obra_id', obraId)
-      .eq('portal_cliente_id', clientId)
-      .eq('status', 'pendente')
-      .order('sla_due_at', { ascending: true })
-      .limit(8),
-    supabase
-      .from('aprovacoes_cliente')
-      .select('id', { count: 'exact', head: true })
-      .eq('org_id', orgId)
-      .eq('obra_id', obraId)
-      .eq('portal_cliente_id', clientId)
-      .eq('status', 'pendente'),
-    supabase
-      .from('aprovacoes_cliente')
-      .select('id', { count: 'exact', head: true })
-      .eq('org_id', orgId)
-      .eq('obra_id', obraId)
-      .eq('portal_cliente_id', clientId)
-      .eq('status', 'pendente')
-      .not('sla_due_at', 'is', null)
-      .lt('sla_due_at', new Date().toISOString()),
   ])
 
   const firstError =
@@ -182,10 +154,7 @@ export async function getPortalAdminClientActivity({
     decisionsRes.error ||
     totalDecisionsRes.error ||
     approvedDecisionsRes.error ||
-    rejectedDecisionsRes.error ||
-    pendingApprovalsRes.error ||
-    pendingApprovalsCountRes.error ||
-    overduePendingApprovalsCountRes.error
+    rejectedDecisionsRes.error
 
   if (firstError) {
     throw new Error(firstError.message)
@@ -194,7 +163,7 @@ export async function getPortalAdminClientActivity({
   const sessions = ((sessionsRes.data || []) as unknown) as PortalSessionRow[]
   const recentComments = ((commentsRes.data || []) as unknown) as CommentRow[]
   const recentDecisions = ((decisionsRes.data || []) as unknown) as ApprovalRow[]
-  const recentPendingApprovals = ((pendingApprovalsRes.data || []) as unknown) as PendingApprovalRow[]
+  const recentPendingApprovals: PendingApprovalRow[] = []
 
   let activeSessions = 0
   let expiredSessions = 0
@@ -258,14 +227,14 @@ export async function getPortalAdminClientActivity({
       totalDecisions: totalDecisionsRes.count || 0,
       approvedDecisions: approvedDecisionsRes.count || 0,
       rejectedDecisions: rejectedDecisionsRes.count || 0,
-      pendingAssignedApprovals: pendingApprovalsCountRes.count || 0,
-      overduePendingApprovals: overduePendingApprovalsCountRes.count || 0,
+      pendingAssignedApprovals: 0,
+      overduePendingApprovals: 0,
       followUpState: resolveFollowUpState(recentComments[0]?.origem || null),
       latestAccessAt,
       latestCommentAt: recentComments[0]?.created_at || null,
       latestCommentOrigin: recentComments[0]?.origem || null,
       latestDecisionAt: recentDecisions[0]?.decidido_em || null,
-      nextPendingSlaAt: recentPendingApprovals[0]?.sla_due_at || null,
+      nextPendingSlaAt: null,
     },
     recentSessions,
     recentComments,

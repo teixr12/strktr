@@ -8,6 +8,8 @@ import {
   getDocsWorkspaceCanarySnapshot,
   getFinanceReceiptAiCanarySnapshot,
   getFinanceReceiptsCanarySnapshot,
+  getObraIntelligenceV1CanarySnapshot,
+  getPortalAdminV2CanarySnapshot,
   getWave2CanarySnapshot,
 } from '@/server/feature-flags/wave2-canary'
 import { getReleaseMetadata } from '@/server/ops/release-metadata'
@@ -65,6 +67,8 @@ export async function GET(request: Request) {
     const financeReceiptAiCanary = getFinanceReceiptAiCanarySnapshot()
     const cronogramaUxV2Canary = getCronogramaUxV2CanarySnapshot()
     const docsWorkspaceCanary = getDocsWorkspaceCanarySnapshot()
+    const portalAdminV2Canary = getPortalAdminV2CanarySnapshot()
+    const obraIntelligenceV1Canary = getObraIntelligenceV1CanarySnapshot()
     const program = getProgramHealthSummary()
     return ok(request, {
       status: degraded ? 'degraded' : 'ok',
@@ -81,6 +85,8 @@ export async function GET(request: Request) {
         financeReceiptAiCanary,
         cronogramaUxV2Canary,
         docsWorkspaceCanary,
+        portalAdminV2Canary,
+        obraIntelligenceV1Canary,
       },
       program,
       flags: {
@@ -138,13 +144,17 @@ export async function GET(request: Request) {
         portalAdminV2: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_PORTAL_ADMIN_V2),
         obraIntelligenceV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_OBRA_INTELLIGENCE_V1),
         financeDepthV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_FINANCE_DEPTH_V1),
-        supplierManagementV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_SUPPLIER_MANAGEMENT_V1),
+        supplierManagementV1: isFlagDisabledByDefault(
+          process.env.NEXT_PUBLIC_FF_SUPPLIER_MANAGEMENT_V1
+        ),
         bureaucracyV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_BUREAUCRACY_V1),
         emailTriageV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_EMAIL_TRIAGE_V1),
         billingV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_BILLING_V1),
         referralV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_REFERRAL_V1),
         publicApiV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_PUBLIC_API_V1),
-        integrationsHubV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_INTEGRATIONS_HUB_V1),
+        integrationsHubV1: isFlagDisabledByDefault(
+          process.env.NEXT_PUBLIC_FF_INTEGRATIONS_HUB_V1
+        ),
         superAdminV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_SUPER_ADMIN_V1),
         agentReadyV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_AGENT_READY_V1),
         bigDataV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_BIG_DATA_V1),
