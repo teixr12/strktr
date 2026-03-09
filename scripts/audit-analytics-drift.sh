@@ -50,9 +50,26 @@ JSON
     -H "Content-Type: application/json" \
     --data @"$TMP_DIR/posthog_payload.resolved.json" \
     > "$TMP_DIR/posthog_raw.json"; then
-    jq '[.results[]? | { event_type: .[0], external_total_24h: (.[1] | tonumber) }]' "$TMP_DIR/posthog_raw.json" > "$EXTERNAL_OUT"
-    EXTERNAL_STATUS="ok"
+    if jq -e '
+      type == "object"
+      and (.results? | type == "array")
+    ' "$TMP_DIR/posthog_raw.json" > /dev/null 2>&1; then
+      jq '[
+        .results[]?
+        | select(type == "array" and length >= 2)
+        | {
+            event_type: (.[0] | tostring),
+            external_total_24h: ((.[1] | tonumber?) // 0)
+          }
+      ]' "$TMP_DIR/posthog_raw.json" > "$EXTERNAL_OUT"
+      EXTERNAL_STATUS="ok"
+    else
+      echo "PostHog 24h query returned an unexpected payload shape; treating external source as unavailable." >&2
+      echo '[]' > "$EXTERNAL_OUT"
+      EXTERNAL_STATUS="failed"
+    fi
   else
+    echo "PostHog 24h query failed; treating external source as unavailable." >&2
     EXTERNAL_STATUS="failed"
     echo '[]' > "$EXTERNAL_OUT"
   fi
