@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { ObraDetailContent } from '@/components/obras/obra-detail-content'
 import {
+  isObraIntelligenceEnabledForOrg,
+  isPortalAdminV2EnabledForOrg,
   isCronogramaUxV2EnabledForOrg,
   isWave2FeatureEnabledForOrg,
 } from '@/server/feature-flags/wave2-canary'
@@ -37,6 +39,8 @@ export default async function ObraDetailPage({ params }: { params: Promise<{ id:
     hqRouting: isWave2FeatureEnabledForOrg('hqRouting', obraRes.data.org_id || null),
   }
   const cronogramaUxV2Enabled = isCronogramaUxV2EnabledForOrg(obraRes.data.org_id || null)
+  const obraIntelligenceEnabled = isObraIntelligenceEnabledForOrg(obraRes.data.org_id || null)
+  const portalAdminV2Enabled = isPortalAdminV2EnabledForOrg(obraRes.data.org_id || null)
 
   return (
     <ObraDetailContent
@@ -47,6 +51,8 @@ export default async function ObraDetailPage({ params }: { params: Promise<{ id:
       initialChecklists={checklistsRes.data ?? []}
       wave2Access={wave2Access}
       cronogramaUxV2Enabled={cronogramaUxV2Enabled}
+      obraIntelligenceEnabled={obraIntelligenceEnabled}
+      portalAdminV2Enabled={portalAdminV2Enabled}
     />
   )
 }

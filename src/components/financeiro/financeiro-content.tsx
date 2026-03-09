@@ -12,6 +12,7 @@ import { toast } from '@/hooks/use-toast'
 import { track } from '@/lib/analytics/client'
 import { fmt, fmtDate } from '@/lib/utils'
 import { createTransacaoSchema, type CreateTransacaoDTO } from '@/shared/schemas/business'
+import type { FinanceDepthCategoryPoint, FinanceDepthPayload } from '@/shared/types/finance-depth'
 import type {
   ReceiptReviewPayload,
   TransacaoAttachmentSummary,
@@ -57,6 +58,7 @@ const LazyBarChart = dynamic(
 
 interface Props {
   initialTransacoes: Transacao[]
+  financeDepthEnabled?: boolean
   receiptsEnabled?: boolean
   receiptAiEnabled?: boolean
 }
@@ -102,6 +104,7 @@ function isReceiptImage(mimeType: string): boolean {
 
 export function FinanceiroContent({
   initialTransacoes,
+  financeDepthEnabled = false,
   receiptsEnabled: receiptsEnabledProp,
   receiptAiEnabled: receiptAiEnabledProp,
 }: Props) {
@@ -129,6 +132,9 @@ export function FinanceiroContent({
   const [desvioResumo, setDesvioResumo] = useState<OrcadoVsRealizadoSummary | null>(null)
   const [desvioLoading, setDesvioLoading] = useState(true)
   const [desvioError, setDesvioError] = useState<string | null>(null)
+  const [financeDepth, setFinanceDepth] = useState<FinanceDepthPayload | null>(null)
+  const [financeDepthLoading, setFinanceDepthLoading] = useState(false)
+  const [financeDepthError, setFinanceDepthError] = useState<string | null>(null)
   const [receiptIntake, setReceiptIntake] = useState<TransacaoReceiptIntakeSummary | null>(null)
   const [receiptUploading, setReceiptUploading] = useState(false)
   const [receiptDragActive, setReceiptDragActive] = useState(false)
@@ -229,9 +235,32 @@ export function FinanceiroContent({
     }
   }, [])
 
+  const loadFinanceDepth = useCallback(async () => {
+    if (!financeDepthEnabled) {
+      setFinanceDepth(null)
+      setFinanceDepthError(null)
+      return
+    }
+    setFinanceDepthLoading(true)
+    setFinanceDepthError(null)
+    try {
+      const data = await apiRequest<FinanceDepthPayload>('/api/v1/financeiro/dre?months=6')
+      setFinanceDepth(data)
+    } catch (err) {
+      setFinanceDepth(null)
+      setFinanceDepthError(err instanceof Error ? err.message : 'Erro ao carregar análise financeira')
+    } finally {
+      setFinanceDepthLoading(false)
+    }
+  }, [financeDepthEnabled])
+
   useEffect(() => {
     void loadDesvio()
   }, [loadDesvio])
+
+  useEffect(() => {
+    void loadFinanceDepth()
+  }, [loadFinanceDepth])
 
   useEffect(() => {
     if (!usePaginationV1) return
@@ -502,6 +531,7 @@ export function FinanceiroContent({
         }).catch(() => undefined)
       }
       await loadDesvio()
+      await loadFinanceDepth()
       closeForm()
     }
   }
@@ -513,7 +543,23 @@ export function FinanceiroContent({
     const success = await deleteMutation.mutate(undefined, id)
     if (success) {
       await loadDesvio()
+      await loadFinanceDepth()
     }
+  }
+
+  function renderExpenseCategory(item: FinanceDepthCategoryPoint) {
+    return (
+      <div
+        key={item.categoria}
+        className="flex items-center justify-between rounded-xl border border-gray-200 px-3 py-2 text-xs dark:border-gray-800"
+      >
+        <div>
+          <p className="font-medium text-gray-900 dark:text-white">{item.categoria}</p>
+          <p className="text-[11px] text-gray-500">{item.count} lançamento(s)</p>
+        </div>
+        <span className="font-semibold text-red-500">{fmt(item.total)}</span>
+      </div>
+    )
   }
 
   function renderTransactionRow(t: Transacao) {
@@ -630,6 +676,133 @@ export function FinanceiroContent({
           <LazyBarChart data={chartData} options={chartOpts as never} />
         </div>
       </SectionCard>
+
+      {financeDepthEnabled ? (
+        financeDepthLoading ? (
+          <div className="grid gap-4 xl:grid-cols-[1.35fr_1fr]">
+            <div className="skeleton h-[240px] rounded-2xl" />
+            <div className="skeleton h-[240px] rounded-2xl" />
+          </div>
+        ) : financeDepthError ? (
+          <SectionCard className="p-4 md:p-5">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-red-600 dark:text-red-400">{financeDepthError}</p>
+              <button
+                type="button"
+                onClick={() => void loadFinanceDepth()}
+                className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+              >
+                Tentar novamente
+              </button>
+            </div>
+          </SectionCard>
+        ) : financeDepth ? (
+          <div className="grid gap-4 xl:grid-cols-[1.35fr_1fr]">
+            <SectionCard className="p-4 md:p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Finance Depth V1
+                  </div>
+                  <h3 className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
+                    DRE resumido e fluxo líquido
+                  </h3>
+                </div>
+                <div className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${financeDepth.summary.saldo >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                  {financeDepth.summary.saldo >= 0 ? 'Saudável' : 'Atenção'}
+                </div>
+              </div>
+              <div className="mt-4 grid gap-3 md:grid-cols-4">
+                <div className="rounded-2xl border border-gray-200 p-3 dark:border-gray-800">
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500">Receitas</p>
+                  <p className="mt-2 text-lg font-semibold text-emerald-600">{fmt(financeDepth.summary.receitas)}</p>
+                </div>
+                <div className="rounded-2xl border border-gray-200 p-3 dark:border-gray-800">
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500">Despesas</p>
+                  <p className="mt-2 text-lg font-semibold text-red-500">{fmt(financeDepth.summary.despesas)}</p>
+                </div>
+                <div className="rounded-2xl border border-gray-200 p-3 dark:border-gray-800">
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500">Saldo líquido</p>
+                  <p className={`mt-2 text-lg font-semibold ${financeDepth.summary.saldo >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                    {fmt(financeDepth.summary.saldo)}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-gray-200 p-3 dark:border-gray-800">
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500">Média mensal</p>
+                  <p className={`mt-2 text-lg font-semibold ${financeDepth.summary.averageMonthlyNet >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                    {fmt(financeDepth.summary.averageMonthlyNet)}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 space-y-2">
+                {financeDepth.monthly.map((month) => (
+                  <div key={month.month} className="grid grid-cols-[64px_1fr_auto] items-center gap-3 rounded-xl border border-gray-200 px-3 py-2 text-xs dark:border-gray-800">
+                    <span className="font-semibold text-gray-900 dark:text-white">{month.label}</span>
+                    <div className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                      <div
+                        className={`h-full rounded-full ${month.saldo >= 0 ? 'bg-emerald-500' : 'bg-red-500'}`}
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            Math.max(
+                              8,
+                              (Math.abs(month.saldo) /
+                                Math.max(
+                                  1,
+                                  ...financeDepth.monthly.map((entry) => Math.abs(entry.saldo))
+                                )) *
+                                100
+                            )
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                    <span className={month.saldo >= 0 ? 'font-semibold text-emerald-600' : 'font-semibold text-red-500'}>
+                      {fmt(month.saldo)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
+
+            <SectionCard className="p-4 md:p-5">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Concentração de despesas</h3>
+              <p className="mt-1 text-xs text-gray-500">
+                Principais categorias do período de {financeDepth.summary.monthsAnalyzed} meses.
+              </p>
+              <div className="mt-4 space-y-2">
+                {financeDepth.topExpenseCategories.length > 0 ? (
+                  financeDepth.topExpenseCategories.map((item) => renderExpenseCategory(item))
+                ) : (
+                  <div className="rounded-xl border border-dashed border-gray-300 px-4 py-5 text-sm text-gray-500">
+                    Ainda não há despesas suficientes para compor categorias.
+                  </div>
+                )}
+              </div>
+              {financeDepth.alerts.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {financeDepth.alerts.map((alert) => (
+                    <div
+                      key={alert.code}
+                      className={`rounded-xl border px-3 py-2 text-xs ${
+                        alert.severity === 'high'
+                          ? 'border-red-200 bg-red-50 text-red-700'
+                          : alert.severity === 'medium'
+                            ? 'border-amber-200 bg-amber-50 text-amber-700'
+                            : 'border-blue-200 bg-blue-50 text-blue-700'
+                      }`}
+                    >
+                      <p className="font-semibold">{alert.title}</p>
+                      {alert.message && <p className="mt-1 opacity-80">{alert.message}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </SectionCard>
+          </div>
+        ) : null
+      ) : null}
 
       {desvioLoading ? (
         <div className="skeleton h-[140px] w-full rounded-2xl" />

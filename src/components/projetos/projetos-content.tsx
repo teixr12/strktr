@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -11,7 +12,7 @@ import { useCrudMutations } from '@/hooks/use-crud-mutations'
 import { fmt, fmtDate } from '@/lib/utils'
 import { PROJETO_STATUS_COLORS } from '@/lib/constants'
 import { createProjetoSchema, type CreateProjetoDTO } from '@/shared/schemas/business'
-import { Plus, Search, FolderKanban, ArrowRight, X } from 'lucide-react'
+import { Plus, Search, FolderKanban, ArrowRight, ShieldCheck, X } from 'lucide-react'
 import {
   EmptyStateAction,
   PageHeader,
@@ -44,6 +45,7 @@ export function ProjetosContent({ initialProjetos, leads }: Props) {
   const { confirm, dialog: confirmDialog } = useConfirm()
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2Projetos
   const usePaginationV1 = featureFlags.uiPaginationV1
+  const portalAdminV2Enabled = featureFlags.portalAdminV2
   const [projetos, setProjetos] = useState(initialProjetos)
   const [pagination, setPagination] = useState<PaginationMeta>({
     count: initialProjetos.length,
@@ -302,6 +304,15 @@ export function ProjetosContent({ initialProjetos, leads }: Props) {
                   </div>
                 </div>
                 <div className="flex items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                  {portalAdminV2Enabled ? (
+                    <Link
+                      href={`/portal-admin/projetos/${p.id}`}
+                      title="Abrir Portal Admin do projeto"
+                      className="p-1.5 hover:bg-sky-50 dark:hover:bg-sky-900/20 rounded-lg text-sky-500 transition-colors"
+                    >
+                      <ShieldCheck className="w-4 h-4" />
+                    </Link>
+                  ) : null}
                   {!p.obra_id && (
                     <button onClick={() => convertToObra(p)} title="Converter em Obra" className="p-1.5 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg text-emerald-500 transition-colors">
                       <ArrowRight className="w-4 h-4" />

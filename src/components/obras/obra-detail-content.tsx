@@ -16,6 +16,7 @@ import { DiarioObraTab } from './diario-obra'
 import { ObraChecklistsTab } from './obra-checklists'
 import { ObraCronogramaTab } from './obra-cronograma'
 import { ObraPortalAdminTab } from './obra-portal-admin-tab'
+import { ObraIntelligencePanel } from './obra-intelligence-panel'
 import { ObraWeatherLogisticsPanel } from './obra-weather-logistics-panel'
 import { apiRequest } from '@/lib/api/client'
 import { track } from '@/lib/analytics/client'
@@ -25,6 +26,7 @@ import { createEtapaSchema, type CreateEtapaDTO } from '@/shared/schemas/executi
 import type { ExecutionAlert, RecommendedAction } from '@/shared/types/execution'
 import type { ObraKpisPayload } from '@/shared/types/obra-kpis'
 import type { ObraAlertsPayload } from '@/shared/types/obra-alerts'
+import type { ObraIntelligencePayload } from '@/shared/types/obra-intelligence'
 
 const etapaStatusInfo: Record<string, { c: string; Icon: React.ComponentType<{ className?: string }> }> = {
   Concluída: { c: 'text-emerald-600', Icon: CheckCircle },
@@ -47,6 +49,8 @@ interface Props {
     hqRouting: boolean
   }
   cronogramaUxV2Enabled?: boolean
+  obraIntelligenceEnabled?: boolean
+  portalAdminV2Enabled?: boolean
 }
 
 type ExecutionSummary = {
@@ -73,6 +77,8 @@ export function ObraDetailContent({
   initialChecklists = [],
   wave2Access,
   cronogramaUxV2Enabled,
+  obraIntelligenceEnabled = false,
+  portalAdminV2Enabled = false,
 }: Props) {
   const { confirm, dialog: confirmDialog } = useConfirm()
   const useV2 = featureFlags.uiTailadminV1 && featureFlags.uiV2ObraTabs
@@ -87,8 +93,11 @@ export function ObraDetailContent({
   const [executionSummary, setExecutionSummary] = useState<ExecutionSummary | null>(null)
   const [obraKpis, setObraKpis] = useState<ObraKpisPayload | null>(null)
   const [obraAlerts, setObraAlerts] = useState<ObraAlertsPayload | null>(null)
+  const [obraIntelligence, setObraIntelligence] = useState<ObraIntelligencePayload | null>(null)
   const [loadingSummary, setLoadingSummary] = useState(false)
   const [summaryError, setSummaryError] = useState<string | null>(null)
+  const [loadingIntelligence, setLoadingIntelligence] = useState(false)
+  const [intelligenceError, setIntelligenceError] = useState<string | null>(null)
   const etapaForm = useForm<CreateEtapaDTO>({
     resolver: zodResolver(createEtapaSchema),
     defaultValues: { nome: '', responsavel: '', status: 'Pendente' },
@@ -141,6 +150,33 @@ export function ObraDetailContent({
     }
   }, [obra.id, obraKpiEnabled, obraAlertsEnabled])
 
+  const loadObraIntelligence = useCallback(async () => {
+    if (!obraIntelligenceEnabled) {
+      setObraIntelligence(null)
+      setIntelligenceError(null)
+      return
+    }
+
+    setLoadingIntelligence(true)
+    setIntelligenceError(null)
+    try {
+      const payload = await apiRequest<ObraIntelligencePayload>(`/api/v1/obras/${obra.id}/intelligence`)
+      setObraIntelligence(payload)
+    } catch (err) {
+      setObraIntelligence(null)
+      setIntelligenceError(err instanceof Error ? err.message : 'Falha ao carregar inteligência da obra')
+    } finally {
+      setLoadingIntelligence(false)
+    }
+  }, [obra.id, obraIntelligenceEnabled])
+
+  const reloadOverview = useCallback(() => {
+    void loadExecutionSummary()
+    if (obraIntelligenceEnabled) {
+      void loadObraIntelligence()
+    }
+  }, [loadExecutionSummary, loadObraIntelligence, obraIntelligenceEnabled])
+
   async function recalculateRisk() {
     try {
       await apiRequest(`/api/v1/obras/${obra.id}/risks/recalculate`, { method: 'POST' })
@@ -151,7 +187,7 @@ export function ObraDetailContent({
         entity_id: obra.id,
         outcome: 'success',
       }).catch(() => undefined)
-      loadExecutionSummary()
+      reloadOverview()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao recalcular risco'
       toast(message, 'error')
@@ -159,14 +195,14 @@ export function ObraDetailContent({
   }
 
   useEffect(() => {
-    loadExecutionSummary()
-  }, [loadExecutionSummary])
+    reloadOverview()
+  }, [reloadOverview])
 
   async function refreshEtapas() {
     try {
       const data = await apiRequest<ObraEtapa[]>(`/api/v1/obras/${obra.id}/etapas`)
       setEtapas(data || [])
-      loadExecutionSummary()
+      reloadOverview()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao atualizar etapas'
       toast(message, 'error')
@@ -448,6 +484,16 @@ export function ObraDetailContent({
             {obra.descricao && <div className="pt-3 border-t border-gray-200/50 dark:border-gray-800"><span className="text-xs text-gray-500">Descrição</span><p className="text-sm text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-line">{obra.descricao}</p></div>}
           </div>
 
+          {obraIntelligenceEnabled && (
+            <ObraIntelligencePanel
+              payload={obraIntelligence}
+              loading={loadingIntelligence}
+              error={intelligenceError}
+              onRetry={() => void loadObraIntelligence()}
+              onRunAction={(action) => void runRecommendedAction(action)}
+            />
+          )}
+
           <ObraWeatherLogisticsPanel
             obraId={obra.id}
             obraNome={obra.nome}
@@ -635,16 +681,16 @@ export function ObraDetailContent({
 
       {/* Diario */}
       {tab === 'diario' && (
-        <DiarioObraTab obraId={obra.id} initialEntries={initialDiario} onEntryCreated={loadExecutionSummary} />
+        <DiarioObraTab obraId={obra.id} initialEntries={initialDiario} onEntryCreated={reloadOverview} />
       )}
 
       {/* Checklists */}
       {tab === 'checklists' && (
-        <ObraChecklistsTab obraId={obra.id} initialChecklists={initialChecklists} onChecklistChanged={loadExecutionSummary} />
+        <ObraChecklistsTab obraId={obra.id} initialChecklists={initialChecklists} onChecklistChanged={reloadOverview} />
       )}
 
       {tab === 'portalAdmin' && portalAdminEnabled && (
-        <ObraPortalAdminTab obraId={obra.id} />
+        <ObraPortalAdminTab obraId={obra.id} v2Enabled={portalAdminV2Enabled} />
       )}
 
       {showEditForm && (
