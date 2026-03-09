@@ -29,7 +29,9 @@ export async function generateBudgetItems(
     return []
   }
 
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+  const model = genAI.getGenerativeModel({
+    model: process.env.GOOGLE_GEMINI_MODEL || 'gemini-2.5-flash',
+  })
 
   const kbContext = knowledgebase.length > 0
     ? `\nReferências de preços da empresa:\n${knowledgebase.map(

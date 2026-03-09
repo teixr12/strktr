@@ -124,7 +124,9 @@ export async function extractReceiptReviewPayload(input: {
     )
   }
 
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+  const model = genAI.getGenerativeModel({
+    model: process.env.GOOGLE_GEMINI_MODEL || 'gemini-2.5-flash',
+  })
   const prompt = `
 Você é um assistente contábil brasileiro. Analise o arquivo recebido e extraia dados úteis para cadastro de despesa.
 
