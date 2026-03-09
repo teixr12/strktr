@@ -44,7 +44,7 @@ E2E_AUTO_PREPARE=1 npm run test:e2e:strict:auth
 - `scripts/run-e2e-ci.mjs` agora aceita `E2E_AUTH_STRICT_REQUIRED=1`
 - quando esse modo está ligado:
   1. roda `run-auth-e2e-strict.mjs`
-  2. se passar, roda só `smoke.spec.ts` no runner geral para evitar duplicação do bloco autenticado
+  2. se passar, roda só `smoke-core.spec.ts` no runner geral para evitar duplicação e manter o budget do job de PR
 
 ## O que é validado
 1. `tests/e2e/auth-strict.spec.ts`
@@ -55,6 +55,7 @@ E2E_AUTO_PREPARE=1 npm run test:e2e:strict:auth
 ## O que não entra mais neste gate
 - fluxos pesados de negócio de `tests/e2e/business-flow.spec.ts`
 - `tests/e2e/performance-core.spec.ts`
+- `tests/e2e/smoke.spec.ts` completo
 - motivo:
   - essa suíte é mais lenta e não valida a correção do role matrix/auth strict
   - o fluxo pesado de negócio também estava consumindo a janela inteira do job `quality`

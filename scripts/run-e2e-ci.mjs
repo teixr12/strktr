@@ -22,7 +22,7 @@ if (AUTH_STRICT_REQUIRED) {
 }
 
 const playwrightArgs = AUTH_STRICT_REQUIRED
-  ? ['playwright', 'test', 'tests/e2e/smoke.spec.ts', '--reporter=json']
+  ? ['playwright', 'test', 'tests/e2e/smoke-core.spec.ts', '--reporter=json']
   : ['playwright', 'test', '--reporter=json']
 
 const run = spawnSync('npx', playwrightArgs, {
