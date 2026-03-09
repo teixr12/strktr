@@ -47,16 +47,17 @@ E2E_AUTO_PREPARE=1 npm run test:e2e:strict:auth
   2. se passar, roda só `smoke.spec.ts` no runner geral para evitar duplicação do bloco autenticado
 
 ## O que é validado
-1. `tests/e2e/business-flow.spec.ts`
+1. `tests/e2e/auth-strict.spec.ts`
 2. zero `skip`
 3. zero `unexpected`
 4. zero `failed`
 
 ## O que não entra mais neste gate
+- fluxos pesados de negócio de `tests/e2e/business-flow.spec.ts`
 - `tests/e2e/performance-core.spec.ts`
 - motivo:
   - essa suíte é mais lenta e não valida a correção do role matrix/auth strict
-  - no CI do PR ela estava consumindo a janela inteira do job `quality`
+  - o fluxo pesado de negócio também estava consumindo a janela inteira do job `quality`
   - o gate estrito agora prova só o que ele precisa provar: auth, tenant isolation e fluxos autenticados sem `skip`
 
 ## Comportamento
