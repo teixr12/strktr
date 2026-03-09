@@ -10,6 +10,7 @@ import {
   getFinanceReceiptsCanarySnapshot,
   getWave2CanarySnapshot,
 } from '@/server/feature-flags/wave2-canary'
+import { getReleaseMetadata } from '@/server/ops/release-metadata'
 import { getProgramHealthSummary } from '@/server/program/program-status'
 
 function normalizeEnv(value: string | undefined | null): string | null {
@@ -19,6 +20,7 @@ function normalizeEnv(value: string | undefined | null): string | null {
 
 export async function GET(request: Request) {
   try {
+    const release = await getReleaseMetadata()
     const checks: Array<{ name: string; ok: boolean; message?: string }> = []
     checks.push({ name: 'runtime', ok: true })
     const analyticsExternalEnabled =
@@ -68,7 +70,10 @@ export async function GET(request: Request) {
       status: degraded ? 'degraded' : 'ok',
       ts: new Date().toISOString(),
       checks,
-      version: process.env.VERCEL_GIT_COMMIT_SHA || 'local',
+      version: release.version,
+      branch: release.branch,
+      deploymentUrl: release.deploymentUrl,
+      releaseSource: release.source,
       rollout: {
         wave2Canary,
         addressHqCanary,
