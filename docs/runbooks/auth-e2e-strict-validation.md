@@ -44,7 +44,8 @@ E2E_AUTO_PREPARE=1 npm run test:e2e:strict:auth
 - `scripts/run-e2e-ci.mjs` agora aceita `E2E_AUTH_STRICT_REQUIRED=1`
 - quando esse modo está ligado:
   1. roda `run-auth-e2e-strict.mjs`
-  2. se passar, roda só `smoke-core.spec.ts` no runner geral para evitar duplicação e manter o budget do job de PR
+  2. se passar, roda `run-smoke-core-http.mjs`
+  3. encerra o gate estrito sem chamar Playwright no trecho de smoke
 
 ## O que é validado
 1. `tests/e2e/auth-strict.spec.ts`
@@ -56,10 +57,12 @@ E2E_AUTO_PREPARE=1 npm run test:e2e:strict:auth
 - fluxos pesados de negócio de `tests/e2e/business-flow.spec.ts`
 - `tests/e2e/performance-core.spec.ts`
 - `tests/e2e/smoke.spec.ts` completo
+- `tests/e2e/smoke-core.spec.ts`
 - motivo:
   - essa suíte é mais lenta e não valida a correção do role matrix/auth strict
   - o fluxo pesado de negócio também estava consumindo a janela inteira do job `quality`
-  - o gate estrito agora prova só o que ele precisa provar: auth, tenant isolation e fluxos autenticados sem `skip`
+  - o `smoke-core` em Playwright continuava queimando budget sem adicionar cobertura relevante de auth/tenant
+  - o gate estrito agora prova só o que ele precisa provar: auth, tenant isolation e smoke mínimo por HTTP
 
 ## Comportamento
 - `pass`: suíte autenticada rodou por completo e sem skip
@@ -68,3 +71,4 @@ E2E_AUTO_PREPARE=1 npm run test:e2e:strict:auth
 ## Saída
 - readiness: `docs/reports/auth-e2e-readiness-<timestamp>.md`
 - execução estrita: `docs/reports/auth-e2e-strict-<timestamp>.md`
+- smoke mínimo HTTP: `docs/reports/smoke-core-http-<timestamp>.md`

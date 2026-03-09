@@ -19,6 +19,20 @@ if (AUTH_STRICT_REQUIRED) {
   if (authRun.status && authRun.status !== 0) {
     process.exit(authRun.status)
   }
+
+  const smokeRun = spawnSync('node', ['scripts/run-smoke-core-http.mjs'], {
+    encoding: 'utf8',
+    stdio: 'inherit',
+    env: process.env,
+    maxBuffer: 25 * 1024 * 1024,
+  })
+
+  if (smokeRun.status && smokeRun.status !== 0) {
+    process.exit(smokeRun.status)
+  }
+
+  console.log('E2E strict mode passed via auth + smoke HTTP validators.')
+  process.exit(0)
 }
 
 const playwrightArgs = AUTH_STRICT_REQUIRED
