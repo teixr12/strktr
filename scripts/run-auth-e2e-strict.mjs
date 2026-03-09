@@ -293,7 +293,15 @@ if (!workingEnv.PLAYWRIGHT_BASE_URL) {
 
 const run = spawnSync(
   'npx',
-  ['playwright', 'test', 'tests/e2e/business-flow.spec.ts', 'tests/e2e/performance-core.spec.ts', '--reporter=json'],
+  [
+    'playwright',
+    'test',
+    'tests/e2e/business-flow.spec.ts',
+    'tests/e2e/performance-core.spec.ts',
+    '--reporter=json',
+    '--workers=1',
+    '--retries=0',
+  ],
   {
     cwd: process.cwd(),
     encoding: 'utf8',
