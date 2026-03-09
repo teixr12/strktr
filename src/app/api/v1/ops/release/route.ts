@@ -1,19 +1,19 @@
 import { ok } from '@/lib/api/response'
 import { featureFlags } from '@/lib/feature-flags'
+import { getReleaseMetadata } from '@/server/ops/release-metadata'
 
 export async function GET(request: Request) {
-  const deploymentUrl = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : null
+  const release = await getReleaseMetadata()
 
   return ok(
     request,
     {
       app: 'strktr',
       environment: process.env.VERCEL_ENV || process.env.NODE_ENV || 'local',
-      version: process.env.VERCEL_GIT_COMMIT_SHA || 'local',
-      branch: process.env.VERCEL_GIT_COMMIT_REF || null,
-      deploymentUrl,
+      version: release.version,
+      branch: release.branch,
+      deploymentUrl: release.deploymentUrl,
+      releaseSource: release.source,
       generatedAt: new Date().toISOString(),
       flags: featureFlags,
     },

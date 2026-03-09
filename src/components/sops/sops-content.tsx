@@ -73,6 +73,28 @@ function isSafeImageSrc(value: string): boolean {
   )
 }
 
+function buildPrintDocument(title: string, htmlBlocks: string): string {
+  return `<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${escapeHtml(title)}</title>
+    <style>
+      body { font-family: Arial, sans-serif; padding: 24px; color: #111827; }
+      h1, h2 { margin: 0 0 12px; }
+      p { margin: 0 0 10px; line-height: 1.6; }
+      .meta { color: #6b7280; font-size: 12px; margin-bottom: 16px; }
+    </style>
+  </head>
+  <body>
+    <h1>${escapeHtml(title)}</h1>
+    <p class="meta">Gerado em ${new Date().toLocaleString('pt-BR')}</p>
+    ${htmlBlocks}
+  </body>
+</html>`
+}
+
 export function SopsContent() {
   const moduleEnabled = featureFlags.sopBuilderV1
   const imageInputRef = useRef<HTMLInputElement | null>(null)
@@ -264,32 +286,23 @@ export function SopsContent() {
       })
       .join('\n')
 
-    const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=900,height=700')
+    const htmlDocument = buildPrintDocument(selected.title, htmlBlocks)
+    const htmlBlob = new Blob([htmlDocument], { type: 'text/html;charset=utf-8' })
+    const printUrl = URL.createObjectURL(htmlBlob)
+    const printWindow = window.open(printUrl, '_blank', 'noopener,noreferrer,width=900,height=700')
     if (!printWindow) {
+      URL.revokeObjectURL(printUrl)
       toast('Não foi possível abrir a pré-visualização de impressão', 'error')
       return
     }
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>${escapeHtml(selected.title)}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 24px; color: #111827; }
-            h1, h2 { margin: 0 0 12px; }
-            p { margin: 0 0 10px; line-height: 1.6; }
-            .meta { color: #6b7280; font-size: 12px; margin-bottom: 16px; }
-          </style>
-        </head>
-        <body>
-          <h1>${escapeHtml(selected.title)}</h1>
-          <p class="meta">Gerado em ${new Date().toLocaleString('pt-BR')}</p>
-          ${htmlBlocks}
-        </body>
-      </html>
-    `)
-    printWindow.document.close()
-    printWindow.focus()
-    printWindow.print()
+    const cleanup = () => URL.revokeObjectURL(printUrl)
+    printWindow.onload = () => {
+      printWindow.focus()
+      printWindow.print()
+    }
+    printWindow.onafterprint = cleanup
+    printWindow.onbeforeunload = cleanup
+    window.setTimeout(cleanup, 60_000)
   }
 
   async function exportPdf() {
