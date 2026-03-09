@@ -108,6 +108,41 @@ async function fetchToken(email, password, maxAttempts = 6) {
   throw lastError || new Error(`Unable to fetch token for ${email}`)
 }
 
+async function verifyToken(accessToken, email, maxAttempts = 8) {
+  let lastError = null
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
+        method: 'GET',
+        headers: {
+          apikey: anonKey,
+          Authorization: `Bearer ${accessToken}`,
+        },
+      })
+
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(`Verify failed for ${email}: ${response.status} ${JSON.stringify(payload)}`)
+      }
+
+      const userEmail = String(payload?.email || '').toLowerCase()
+      if (userEmail !== email.toLowerCase()) {
+        throw new Error(`Verify returned unexpected email for ${email}: ${userEmail || 'missing'}`)
+      }
+
+      return accessToken
+    } catch (error) {
+      lastError = error
+      if (attempt < maxAttempts) {
+        await wait(500 * attempt)
+      }
+    }
+  }
+
+  throw lastError || new Error(`Unable to verify token for ${email}`)
+}
+
 async function findAuthUserByEmail(email) {
   let page = 1
   const perPage = 200
@@ -353,9 +388,18 @@ async function main() {
     nome: qa.obraForeign,
   })
 
-  const adminToken = await fetchToken(credentials.admin.email, credentials.admin.password)
-  const managerToken = await fetchToken(credentials.manager.email, credentials.manager.password)
-  const memberToken = await fetchToken(credentials.member.email, credentials.member.password)
+  const adminToken = await verifyToken(
+    await fetchToken(credentials.admin.email, credentials.admin.password),
+    credentials.admin.email
+  )
+  const managerToken = await verifyToken(
+    await fetchToken(credentials.manager.email, credentials.manager.password),
+    credentials.manager.email
+  )
+  const memberToken = await verifyToken(
+    await fetchToken(credentials.member.email, credentials.member.password),
+    credentials.member.email
+  )
 
   setOutput('E2E_BEARER_TOKEN', adminToken)
   setOutput('E2E_MANAGER_BEARER_TOKEN', managerToken)
