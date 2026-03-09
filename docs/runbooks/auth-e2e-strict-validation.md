@@ -1,7 +1,7 @@
 # Auth E2E Strict Validation
 
 ## Objetivo
-Eliminar a ambiguidade operacional do bloco autenticado de E2E e transformar a suíte de negócio/performance em um gate executável fora do CI.
+Eliminar a ambiguidade operacional do bloco autenticado de E2E e transformar a suíte autenticada de negócio em um gate executável fora do CI.
 
 ## Pré-requisitos
 - caminho 1: os envs estritos já existem
@@ -48,10 +48,16 @@ E2E_AUTO_PREPARE=1 npm run test:e2e:strict:auth
 
 ## O que é validado
 1. `tests/e2e/business-flow.spec.ts`
-2. `tests/e2e/performance-core.spec.ts`
-3. zero `skip`
-4. zero `unexpected`
-5. zero `failed`
+2. zero `skip`
+3. zero `unexpected`
+4. zero `failed`
+
+## O que não entra mais neste gate
+- `tests/e2e/performance-core.spec.ts`
+- motivo:
+  - essa suíte é mais lenta e não valida a correção do role matrix/auth strict
+  - no CI do PR ela estava consumindo a janela inteira do job `quality`
+  - o gate estrito agora prova só o que ele precisa provar: auth, tenant isolation e fluxos autenticados sem `skip`
 
 ## Comportamento
 - `pass`: suíte autenticada rodou por completo e sem skip

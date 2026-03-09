@@ -297,7 +297,6 @@ const run = spawnSync(
     'playwright',
     'test',
     'tests/e2e/business-flow.spec.ts',
-    'tests/e2e/performance-core.spec.ts',
     '--reporter=json',
     '--workers=1',
     '--retries=0',
