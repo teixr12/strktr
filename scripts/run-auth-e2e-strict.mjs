@@ -59,32 +59,12 @@ function parsePreparedEnv(raw) {
   return nextEnv
 }
 
-function asJsonBlock(value) {
-  return ['```json', JSON.stringify(value, null, 2), '```']
-}
-
 function asTextBlock(value) {
   return ['```text', String(value || '').trim() || '(empty)', '```']
 }
 
-function collectFailures(suites = [], failures = []) {
-  for (const suite of suites || []) {
-    collectFailures(suite.suites || [], failures)
-    for (const spec of suite.specs || []) {
-      for (const test of spec.tests || []) {
-        const unexpectedResults = (test.results || []).filter((result) => result.status === 'failed')
-        if (unexpectedResults.length === 0) continue
-        failures.push({
-          file: spec.file,
-          title: `${spec.titlePath?.join(' > ') || spec.title}`.trim(),
-          errors: unexpectedResults.flatMap((result) =>
-            (result.errors || []).map((error) => error?.message || error?.value || 'Unknown Playwright error')
-          ),
-        })
-      }
-    }
-  }
-  return failures
+function asJsonBlock(value) {
+  return ['```json', JSON.stringify(value, null, 2), '```']
 }
 
 async function stopServer(serverProcess, serverState, timeoutMs = 5_000) {
@@ -143,6 +123,156 @@ async function waitForBaseUrl({ baseURL, timeoutMs, serverState }) {
     ok: false,
     error: lastError instanceof Error ? lastError.message : String(lastError || 'Unknown startup error'),
   }
+}
+
+async function requestJson({ baseURL, pathname, method = 'GET', headers = {}, body }) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 15_000)
+  try {
+    const response = await fetch(`${baseURL}${pathname}`, {
+      method,
+      headers: {
+        Accept: 'application/json',
+        ...headers,
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    })
+    const text = await response.text()
+    let json = null
+    try {
+      json = text ? JSON.parse(text) : null
+    } catch {
+      json = null
+    }
+    return {
+      status: response.status,
+      ok: response.ok,
+      json,
+      text,
+    }
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+function ensure(condition, message) {
+  if (!condition) {
+    throw new Error(message)
+  }
+}
+
+async function runStrictChecks({ baseURL, env }) {
+  const results = []
+
+  async function record(name, fn) {
+    try {
+      await fn()
+      results.push({ name, status: 'pass' })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      results.push({ name, status: 'fail', error: message })
+      throw error
+    }
+  }
+
+  const primaryHeaders = { Authorization: `Bearer ${env.E2E_BEARER_TOKEN}` }
+  const managerHeaders = { Authorization: `Bearer ${env.E2E_MANAGER_BEARER_TOKEN}` }
+  const userHeaders = { Authorization: `Bearer ${env.E2E_USER_BEARER_TOKEN}` }
+
+  await record('pagination meta stability', async () => {
+    const routes = [
+      '/api/v1/leads?page=1&pageSize=5',
+      '/api/v1/compras?page=1&pageSize=5',
+      '/api/v1/transacoes?page=1&pageSize=5',
+      '/api/v1/projetos?page=1&pageSize=5',
+      '/api/v1/orcamentos?page=1&pageSize=5',
+    ]
+
+    for (const route of routes) {
+      const response = await requestJson({ baseURL, pathname: route, headers: primaryHeaders })
+      ensure(response.status === 200, `${route} expected 200, received ${response.status}`)
+      ensure(Array.isArray(response.json?.data), `${route} expected data array`)
+      ensure(response.json?.meta?.page === 1, `${route} expected meta.page=1`)
+      ensure(response.json?.meta?.pageSize === 5, `${route} expected meta.pageSize=5`)
+      ensure(typeof response.json?.meta?.total === 'number', `${route} expected numeric meta.total`)
+      ensure(typeof response.json?.meta?.hasMore === 'boolean', `${route} expected boolean meta.hasMore`)
+      ensure(typeof response.json?.meta?.count === 'number', `${route} expected numeric meta.count`)
+    }
+  })
+
+  await record('role matrix enforcement', async () => {
+    const managerFinance = await requestJson({
+      baseURL,
+      pathname: '/api/v1/transacoes?page=1&pageSize=5',
+      headers: managerHeaders,
+    })
+    ensure(managerFinance.status === 200, `manager finance expected 200, received ${managerFinance.status}`)
+
+    const managerProjects = await requestJson({
+      baseURL,
+      pathname: '/api/v1/projetos?page=1&pageSize=5',
+      headers: managerHeaders,
+    })
+    ensure(managerProjects.status === 200, `manager projects expected 200, received ${managerProjects.status}`)
+
+    const managerTeam = await requestJson({
+      baseURL,
+      pathname: '/api/v1/equipe',
+      headers: managerHeaders,
+    })
+    ensure(managerTeam.status === 200, `manager team expected 200, received ${managerTeam.status}`)
+
+    const userLeads = await requestJson({
+      baseURL,
+      pathname: '/api/v1/leads?page=1&pageSize=5',
+      headers: userHeaders,
+    })
+    ensure(userLeads.status === 200, `user leads expected 200, received ${userLeads.status}`)
+
+    const userFinance = await requestJson({
+      baseURL,
+      pathname: '/api/v1/transacoes?page=1&pageSize=5',
+      headers: userHeaders,
+    })
+    ensure(userFinance.status === 403, `user finance expected 403, received ${userFinance.status}`)
+
+    const userProjects = await requestJson({
+      baseURL,
+      pathname: '/api/v1/projetos?page=1&pageSize=5',
+      headers: userHeaders,
+    })
+    ensure(userProjects.status === 403, `user projects expected 403, received ${userProjects.status}`)
+
+    const userTeam = await requestJson({
+      baseURL,
+      pathname: '/api/v1/equipe',
+      headers: userHeaders,
+    })
+    ensure(userTeam.status === 403, `user team expected 403, received ${userTeam.status}`)
+  })
+
+  await record('tenant isolation', async () => {
+    const obraResponse = await requestJson({
+      baseURL,
+      pathname: `/api/v1/obras/${env.E2E_FOREIGN_OBRA_ID}`,
+      headers: primaryHeaders,
+    })
+    ensure([403, 404].includes(obraResponse.status), `foreign obra expected 403/404, received ${obraResponse.status}`)
+
+    const summaryResponse = await requestJson({
+      baseURL,
+      pathname: `/api/v1/obras/${env.E2E_FOREIGN_OBRA_ID}/execution-summary`,
+      headers: primaryHeaders,
+    })
+    ensure(
+      [403, 404].includes(summaryResponse.status),
+      `foreign execution summary expected 403/404, received ${summaryResponse.status}`
+    )
+  })
+
+  return results
 }
 
 let workingEnv = { ...process.env }
@@ -291,36 +421,21 @@ if (!workingEnv.PLAYWRIGHT_BASE_URL) {
   reportLines.push(`- BaseURL: ${baseURL}`)
 }
 
-const run = spawnSync(
-  'npx',
-  [
-    'playwright',
-    'test',
-    'tests/e2e/auth-strict.spec.ts',
-    '--reporter=json',
-    '--workers=1',
-    '--retries=0',
-  ],
-  {
-    cwd: process.cwd(),
-    encoding: 'utf8',
-    env: { ...workingEnv, CI: '1', PLAYWRIGHT_BASE_URL: baseURL },
-    maxBuffer: 50 * 1024 * 1024,
-    stdio: ['inherit', 'pipe', 'pipe'],
+let strictResults = []
+
+try {
+  strictResults = await runStrictChecks({ baseURL, env: workingEnv })
+} catch (error) {
+  if (serverProcess) {
+    await stopServer(serverProcess, serverState)
   }
-)
 
-if (serverProcess) {
-  await stopServer(serverProcess, serverState)
-}
-
-const rawJson = String(run.stdout || '').trim()
-if (!rawJson) {
   reportLines.push('- Status: fail')
-  reportLines.push('- Reason: no Playwright JSON output captured')
+  reportLines.push(`- Reason: ${error instanceof Error ? error.message : String(error)}`)
   reportLines.push('')
-  reportLines.push('## Playwright stderr')
-  reportLines.push(...asTextBlock(run.stderr))
+  reportLines.push('## Strict checks')
+  reportLines.push(...asJsonBlock(strictResults))
+
   if (serverStdout.length || serverStderr.length) {
     reportLines.push('')
     reportLines.push('## Server stdout tail')
@@ -329,53 +444,20 @@ if (!rawJson) {
     reportLines.push('## Server stderr tail')
     reportLines.push(...asTextBlock(serverStderr.join('')))
   }
+
   writeReport(reportLines)
   console.error(`Auth E2E strict failed: ${reportPath}`)
-  process.exit(run.status || 1)
+  process.exit(1)
 }
 
-let report = null
-try {
-  report = JSON.parse(rawJson)
-} catch (error) {
-  reportLines.push('- Status: fail')
-  reportLines.push(`- Reason: invalid Playwright JSON output: ${error instanceof Error ? error.message : String(error)}`)
-  writeReport(reportLines)
-  console.error(`Auth E2E strict failed: ${reportPath}`)
-  process.exit(run.status || 1)
+if (serverProcess) {
+  await stopServer(serverProcess, serverState)
 }
 
-const skipped = Number(report?.stats?.skipped || 0)
-const unexpected = Number(report?.stats?.unexpected || 0)
-const failures = Number(report?.stats?.failed || 0)
-
-reportLines.push(`- PlaywrightExitCode: ${run.status ?? 0}`)
-reportLines.push(`- Skipped: ${skipped}`)
-reportLines.push(`- Failed: ${failures}`)
-reportLines.push(`- Unexpected: ${unexpected}`)
+reportLines.unshift('- Status: pass')
 reportLines.push('')
-reportLines.push('## Playwright Stats')
-reportLines.push(...asJsonBlock(report?.stats || {}))
-const reportErrors = report?.errors || []
-const failureSummaries = collectFailures(report?.suites || [])
-
-if (reportErrors.length > 0) {
-  reportLines.push('')
-  reportLines.push('## Playwright Errors')
-  reportLines.push(...asJsonBlock(reportErrors))
-}
-
-if (failureSummaries.length > 0) {
-  reportLines.push('')
-  reportLines.push('## Failing Tests')
-  reportLines.push(...asJsonBlock(failureSummaries))
-}
-
-if (String(run.stderr || '').trim()) {
-  reportLines.push('')
-  reportLines.push('## Playwright stderr')
-  reportLines.push(...asTextBlock(run.stderr))
-}
+reportLines.push('## Strict checks')
+reportLines.push(...asJsonBlock(strictResults))
 
 if (serverStdout.length || serverStderr.length) {
   reportLines.push('')
@@ -386,22 +468,5 @@ if (serverStdout.length || serverStderr.length) {
   reportLines.push(...asTextBlock(serverStderr.join('')))
 }
 
-if ((run.status && run.status !== 0) || skipped > 0 || failures > 0 || unexpected > 0) {
-  reportLines.unshift('- Status: fail')
-  writeReport(reportLines)
-  if (reportErrors.length > 0) {
-    console.error(`Auth E2E strict errors: ${JSON.stringify(reportErrors, null, 2)}`)
-  }
-  if (failureSummaries.length > 0) {
-    console.error(`Auth E2E strict failing tests: ${JSON.stringify(failureSummaries, null, 2)}`)
-  }
-  if (String(run.stderr || '').trim()) {
-    console.error(`Auth E2E strict stderr:\n${String(run.stderr).trim()}`)
-  }
-  console.error(`Auth E2E strict failed: ${reportPath}`)
-  process.exit(run.status || 1)
-}
-
-reportLines.unshift('- Status: pass')
 writeReport(reportLines)
 console.log(`Auth E2E strict passed: ${reportPath}`)
