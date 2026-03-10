@@ -23,6 +23,17 @@
     "audit:analytics-capture-probe": "./scripts/audit-analytics-capture-probe.sh",
     "ops:reconcile-analytics-portal": "./scripts/reconcile-analytics-portal.sh",
     "ops:auth-e2e:readiness": "node scripts/validate-auth-e2e-readiness.mjs",
+    "ops:finance-receipts:validate": "node scripts/validate-finance-receipts-rollout.mjs",
+    "ops:finance-receipt-ai:validate": "node scripts/validate-finance-receipt-ai-rollout.mjs",
+    "ops:finance-receipt-ai:rollback-drill": "./scripts/finance-receipt-ai-rollback-drill.sh",
+    "ops:portal-admin-v2:validate": "node scripts/validate-portal-admin-v2-rollout.mjs",
+    "ops:portal-admin-v2:rollback-drill": "./scripts/portal-admin-v2-rollback-drill.sh",
+    "ops:cronograma-ux-v2:validate": "node scripts/validate-cronograma-ux-v2-rollout.mjs",
+    "ops:cronograma-ux-v2:rollback-drill": "./scripts/cronograma-ux-v2-rollback-drill.sh",
+    "ops:docs-workspace:validate": "node scripts/validate-docs-workspace-rollout.mjs",
+    "ops:docs-workspace:rollback-drill": "./scripts/docs-workspace-rollback-drill.sh",
+    "ops:obra-intelligence-v1:validate": "node scripts/validate-obra-intelligence-v1-rollout.mjs",
+    "ops:obra-intelligence-v1:rollback-drill": "./scripts/obra-intelligence-v1-rollback-drill.sh",
     "audit:ux-quality": "node scripts/audit-ux-quality.mjs",
     "governance:release-trains": "node scripts/report-release-train-scope.mjs",
     "governance:boundaries": "node scripts/check-dependency-boundaries.mjs",
@@ -33,7 +44,8 @@
     "baseline:tag": "./scripts/create-baseline-tag.sh",
     "ops:post-wave2": "./scripts/post-wave2-closure.sh",
     "ops:post-wave2:full": "./scripts/post-wave2-closure.sh --with-readiness",
-    "ops:wave2:rollback-drill": "./scripts/wave2-rollback-drill.sh"
+    "ops:wave2:rollback-drill": "./scripts/wave2-rollback-drill.sh",
+    "ops:core-closeout": "node scripts/generate-core-operational-closeout.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
