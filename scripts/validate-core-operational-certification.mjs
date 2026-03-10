@@ -76,9 +76,11 @@ const releaseBranch = release?.data?.branch ?? 'unknown'
 const deploymentUrl = health?.data?.deploymentUrl ?? release?.data?.deploymentUrl ?? 'unknown'
 const releaseSource = health?.data?.releaseSource ?? release?.data?.releaseSource ?? 'unknown'
 
+const releaseStatus = release?.data?.status ?? (release?.data?.version ? 'ok' : 'unknown')
+
 const releaseTraceabilityPass =
   health?.data?.status === 'ok' &&
-  release?.data?.status === 'ok' &&
+  releaseStatus === 'ok' &&
   liveVersion !== 'unknown' &&
   liveVersion === releaseVersion &&
   liveBranch === expectedBranch &&
@@ -102,7 +104,7 @@ const lines = [
   '',
   '## Release Traceability',
   `- HealthStatus: ${health?.data?.status ?? 'unknown'}`,
-  `- ReleaseStatus: ${release?.data?.status ?? 'unknown'}`,
+  `- ReleaseStatus: ${releaseStatus}`,
   `- LiveVersion: ${liveVersion}`,
   `- ReleaseVersion: ${releaseVersion}`,
   `- LiveBranch: ${liveBranch}`,

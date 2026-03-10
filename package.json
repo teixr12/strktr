@@ -48,7 +48,7 @@
     "ops:obra-intelligence-v1:rollback-drill": "./scripts/obra-intelligence-v1-rollback-drill.sh",
     "ops:architecture-execution-control": "node scripts/validate-architecture-execution-order.mjs",
     "ops:master-architecture:validate": "node scripts/validate-master-architecture.mjs",
-    "ops:core-certification": "node scripts/validate-core-operational-certification.mjs",
+    "ops:core-certification": "./scripts/run-core-operational-certification.sh",
     "ops:core-closeout": "node scripts/generate-core-operational-closeout.mjs"
   },
   "dependencies": {
