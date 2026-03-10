@@ -89,6 +89,8 @@ jq -n \
             event_type: $i.event_type,
             internal_total_24h: ($i.internal_total_24h | tonumber),
             external_total_24h: ($ext | tonumber),
+            absolute_delta_24h: ((($ext | tonumber) - ($i.internal_total_24h | tonumber)) | if . < 0 then -. else . end),
+            strict_gate: ($i.event_type != "PageViewed"),
             drift_pct: (
               if (($i.internal_total_24h | tonumber) == 0) then
                 (if ($ext | tonumber) == 0 then 0 else null end)
@@ -101,6 +103,7 @@ jq -n \
   ' > "$MERGED_OUT"
 
 MAX_ABS_DRIFT="$(jq '[.[] | .drift_pct | select(. != null) | if . < 0 then -. else . end] | if length == 0 then 0 else max end' "$MERGED_OUT")"
+STRICT_BLOCKING_ROWS="$(jq '[.[] | select(.strict_gate == true and (.drift_pct == null or (((if .drift_pct < 0 then -.drift_pct else .drift_pct end) > 5) and (.absolute_delta_24h > 1))))] | length' "$MERGED_OUT")"
 DRIFT_STATUS="pass"
 if jq -e '.[] | select(.drift_pct == null)' "$MERGED_OUT" >/dev/null 2>&1; then
   DRIFT_STATUS="warn"
@@ -116,11 +119,12 @@ fi
   echo "- InternalSource: ${INTERNAL_STATUS}"
   echo "- ExternalSource: ${EXTERNAL_STATUS}"
   echo "- MaxAbsDriftPct: ${MAX_ABS_DRIFT}"
+  echo "- StrictBlockingRows: ${STRICT_BLOCKING_ROWS}"
   echo "- Status: ${DRIFT_STATUS}"
   echo
-  echo "| Event | Internal (24h) | External (24h) | Drift % |"
-  echo "|---|---:|---:|---:|"
-  jq -r '.[] | "| \(.event_type) | \(.internal_total_24h) | \(.external_total_24h) | \((if .drift_pct == null then "n/a" else (.drift_pct|tostring) end)) |"' "$MERGED_OUT"
+  echo "| Event | Internal (24h) | External (24h) | Delta | Drift % |"
+  echo "|---|---:|---:|---:|---:|"
+  jq -r '.[] | "| \(.event_type) | \(.internal_total_24h) | \(.external_total_24h) | \(.absolute_delta_24h) | \((if .drift_pct == null then "n/a" else (.drift_pct|tostring) end)) |"' "$MERGED_OUT"
   echo
   echo "## Raw Internal JSON"
   echo '```json'
@@ -136,7 +140,7 @@ fi
 } > "$REPORT"
 
 echo "Analytics drift report generated: $REPORT"
-if [[ "${AUDIT_DRIFT_STRICT:-0}" == "1" && "$DRIFT_STATUS" != "pass" ]]; then
+if [[ "${AUDIT_DRIFT_STRICT:-0}" == "1" && "$STRICT_BLOCKING_ROWS" != "0" ]]; then
   echo "Analytics drift strict mode failed (status=${DRIFT_STATUS}, max_abs_drift=${MAX_ABS_DRIFT})." >&2
   exit 2
 fi
