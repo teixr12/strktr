@@ -215,7 +215,7 @@ redeploy_live() {
     deployment_url="$CORE_CERT_BASE_URL"
   fi
 
-  vercel redeploy "$deployment_url" --token "$VERCEL_TOKEN" --scope "$TEAM_ID" --yes >/dev/null
+  vercel redeploy "$deployment_url" --token "$VERCEL_TOKEN" --scope "$TEAM_ID" --non-interactive >/dev/null
 }
 
 wait_for_health_target() {
