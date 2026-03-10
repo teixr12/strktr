@@ -9,9 +9,10 @@ fs.mkdirSync(reportsDir, { recursive: true })
 const baseUrl = process.env.CORE_CERT_BASE_URL ?? 'https://strktr.vercel.app'
 const expectedBranch = process.env.CORE_CERT_EXPECT_BRANCH ?? 'main'
 const expectedVersion = process.env.CORE_CERT_EXPECT_VERSION ?? ''
-const authStrictStatus = (process.env.CORE_CERT_AUTH_STRICT_STATUS ?? 'unknown').toLowerCase()
+const authStrictStatusOverride = (process.env.CORE_CERT_AUTH_STRICT_STATUS ?? '').trim().toLowerCase()
 const healthSnapshotPath = process.env.CORE_CERT_HEALTH_JSON ?? ''
 const releaseSnapshotPath = process.env.CORE_CERT_RELEASE_JSON ?? ''
+const githubRepo = process.env.CORE_CERT_GITHUB_REPO ?? 'teixr12/strktr'
 
 function readJsonSnapshot(snapshotPath) {
   if (!snapshotPath) return null
@@ -36,6 +37,25 @@ async function fetchJson(endpoint) {
   return response.text()
 }
 
+async function fetchGithubJson(url) {
+  const headers = {
+    accept: 'application/vnd.github+json',
+    'user-agent': 'strktr-core-certification',
+  }
+
+  if (process.env.GITHUB_TOKEN) {
+    headers.authorization = `Bearer ${process.env.GITHUB_TOKEN}`
+  }
+
+  const response = await fetch(url, { headers })
+
+  if (!response.ok) {
+    throw new Error(`Unable to fetch GitHub API ${url}: ${response.status}`)
+  }
+
+  return response.json()
+}
+
 function parseJson(text) {
   try {
     return JSON.parse(text)
@@ -50,6 +70,84 @@ function findLatest(prefix) {
     .filter((file) => file.startsWith(prefix) && file.endsWith('.md'))
     .sort()
   return files.length ? files[files.length - 1] : null
+}
+
+async function inferAuthStrictStatus(sha) {
+  if (!sha || sha === 'unknown') {
+    return {
+      status: 'unknown',
+      source: 'missing_sha',
+      details: 'Live SHA is unavailable.',
+    }
+  }
+
+  try {
+    const data = await fetchGithubJson(`https://api.github.com/repos/${githubRepo}/commits/${sha}/check-runs?per_page=100`)
+    const checkRuns = Array.isArray(data.check_runs) ? data.check_runs : []
+
+    const ciRun = checkRuns.find((checkRun) => checkRun.name === 'CI')
+    if (ciRun?.conclusion === 'success') {
+      return {
+        status: 'pass',
+        source: 'github_check_run_ci',
+        details: 'CI check run succeeded for the live SHA.',
+      }
+    }
+
+    if (ciRun) {
+      return {
+        status: ciRun.conclusion === 'failure' ? 'fail' : 'unknown',
+        source: 'github_check_run_ci',
+        details: `CI conclusion: ${ciRun.conclusion ?? 'unknown'}`,
+      }
+    }
+
+    const qualityRun = checkRuns.find((checkRun) => checkRun.name === 'quality')
+    if (qualityRun?.conclusion === 'success') {
+      return {
+        status: 'pass',
+        source: 'github_check_run_quality',
+        details: 'Quality check run succeeded for the live SHA.',
+      }
+    }
+
+    if (qualityRun) {
+      return {
+        status: qualityRun.conclusion === 'failure' ? 'fail' : 'unknown',
+        source: 'github_check_run_quality',
+        details: `Quality conclusion: ${qualityRun.conclusion ?? 'unknown'}`,
+      }
+    }
+
+    const strictRun = checkRuns.find((checkRun) => checkRun.name.toLowerCase().includes('auth strict'))
+    if (strictRun?.conclusion === 'success') {
+      return {
+        status: 'pass',
+        source: 'github_check_run_auth_strict',
+        details: 'Auth strict check run succeeded for the live SHA.',
+      }
+    }
+
+    if (strictRun) {
+      return {
+        status: strictRun.conclusion === 'failure' ? 'fail' : 'unknown',
+        source: 'github_check_run_auth_strict',
+        details: `Auth strict conclusion: ${strictRun.conclusion ?? 'unknown'}`,
+      }
+    }
+
+    return {
+      status: 'unknown',
+      source: 'github_check_run_missing',
+      details: 'No CI or auth strict check run found for the live SHA.',
+    }
+  } catch (error) {
+    return {
+      status: 'unknown',
+      source: 'github_check_run_error',
+      details: error instanceof Error ? error.message : 'Unknown GitHub API error.',
+    }
+  }
 }
 
 const rollbackPrefixes = [
@@ -91,6 +189,16 @@ const releaseTraceabilityPass =
 
 const rollbackReports = rollbackPrefixes.map((prefix) => findLatest(prefix))
 const rollbackDrillsPass = rollbackReports.every(Boolean)
+const inferredAuthStrict = authStrictStatusOverride
+  ? {
+      status: authStrictStatusOverride,
+      source: 'env_override',
+      details: 'Auth strict status was provided explicitly.',
+    }
+  : await inferAuthStrictStatus(liveVersion)
+const authStrictStatus = inferredAuthStrict.status
+const authStrictSource = inferredAuthStrict.source
+const authStrictDetails = inferredAuthStrict.details
 const authStrictPass = authStrictStatus === 'pass' || authStrictStatus === 'success'
 
 const status = releaseTraceabilityPass && rollbackDrillsPass && authStrictPass ? 'pass' : 'fail'
@@ -117,6 +225,8 @@ const lines = [
   '',
   '## Auth Strict Gate',
   `- AuthStrictStatus: ${authStrictStatus}`,
+  `- AuthStrictSource: ${authStrictSource}`,
+  `- AuthStrictDetails: ${authStrictDetails}`,
   `- AuthStrictPass: ${String(authStrictPass)}`,
   '',
   '## Rollback Drill Evidence',
