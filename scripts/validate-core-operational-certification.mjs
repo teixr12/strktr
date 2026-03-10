@@ -91,7 +91,7 @@ const releaseTraceabilityPass =
 
 const rollbackReports = rollbackPrefixes.map((prefix) => findLatest(prefix))
 const rollbackDrillsPass = rollbackReports.every(Boolean)
-const authStrictPass = authStrictStatus === 'pass'
+const authStrictPass = authStrictStatus === 'pass' || authStrictStatus === 'success'
 
 const status = releaseTraceabilityPass && rollbackDrillsPass && authStrictPass ? 'pass' : 'fail'
 
