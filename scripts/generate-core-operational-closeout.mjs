@@ -69,6 +69,7 @@ const release = parseJson(releaseRaw)
 const latestProductionAudit = findLatest('production-audit-')
 const latestDrift = findLatest('analytics-drift-')
 const latestProbe = findLatest('analytics-capture-probe-')
+const latestCoreCertification = findLatest('core-operational-certification-')
 
 const rollbackReports = [
   findLatest('finance-receipt-ai-rollback-drill-'),
@@ -77,6 +78,13 @@ const rollbackReports = [
   findLatest('portal-admin-v2-rollback-drill-'),
   findLatest('obra-intelligence-v1-rollback-drill-'),
 ].filter(Boolean)
+
+const certificationText = latestCoreCertification
+  ? fs.readFileSync(path.join(reportsDir, latestCoreCertification), 'utf8')
+  : ''
+const authStrictPass = /- AuthStrictPass: true/.test(certificationText)
+const rollbackDrillsPass = /- RollbackDrillsPass: true/.test(certificationText)
+const coreOperationalPass = /- Status: pass/.test(certificationText)
 
 const lines = [
   '# Core Operational Closeout',
@@ -112,6 +120,7 @@ const lines = [
   `- ProductionAudit: ${latestProductionAudit ? `docs/reports/${latestProductionAudit}` : '[missing]'}`,
   `- AnalyticsDrift: ${latestDrift ? `docs/reports/${latestDrift}` : '[missing]'}`,
   `- CaptureProbe: ${latestProbe ? `docs/reports/${latestProbe}` : '[missing]'}`,
+  `- CoreCertification: ${latestCoreCertification ? `docs/reports/${latestCoreCertification}` : '[missing]'}`,
   '',
   '## Rollback Drill Reports',
 ]
@@ -124,7 +133,15 @@ if (rollbackReports.length === 0) {
   }
 }
 
-lines.push('', '## Conclusion', '- [ ] Auth strict E2E stable', '- [ ] Rollback drills completed', '- [ ] Core live modules certified', '')
+lines.push(
+  '',
+  '## Conclusion',
+  `- [${authStrictPass ? 'x' : ' '}] Auth strict E2E stable`,
+  `- [${rollbackDrillsPass ? 'x' : ' '}] Rollback drills completed`,
+  `- [${coreOperationalPass ? 'x' : ' '}] Core live modules certified`,
+  `- CoreOperationalPass: ${coreOperationalPass}`,
+  ''
+)
 
 fs.writeFileSync(reportPath, `${lines.join('\n')}\n`)
 console.log(reportPath)
