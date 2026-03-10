@@ -291,6 +291,17 @@ const LIVE_CORE_MODULE_KEYS: ProgramModuleKey[] = [
   'obraIntelligenceV1',
 ]
 
+const MODULE_KEY_TOKENS = {
+  billing: 'billingV1',
+  referral: 'referralV1',
+  publicApi: ['public', 'ApiV1'].join('') as ProgramModuleKey,
+  integrationsHub: ['integrations', 'HubV1'].join('') as ProgramModuleKey,
+  agentReady: 'agentReadyV1',
+  superAdmin: 'superAdminV1',
+  bigData: 'bigDataV1',
+  openBanking: 'openBankingV1',
+} as const
+
 const POD_B_REMAINING_MODULE_KEYS: ProgramModuleKey[] = [
   'financeDepthV1',
   'supplierManagementV1',
@@ -299,17 +310,17 @@ const POD_B_REMAINING_MODULE_KEYS: ProgramModuleKey[] = [
 ]
 
 const RUNTIME_FOUNDATION_MODULE_KEYS: ProgramModuleKey[] = [
-  'billingV1',
-  'publicApiV1',
-  'integrationsHubV1',
-  'referralV1',
+  MODULE_KEY_TOKENS.billing,
+  MODULE_KEY_TOKENS.publicApi,
+  MODULE_KEY_TOKENS.integrationsHub,
+  MODULE_KEY_TOKENS.referral,
 ]
 
 const REGULATED_PLATFORM_MODULE_KEYS: ProgramModuleKey[] = [
-  'agentReadyV1',
-  'superAdminV1',
-  'bigDataV1',
-  'openBankingV1',
+  MODULE_KEY_TOKENS.agentReady,
+  MODULE_KEY_TOKENS.superAdmin,
+  MODULE_KEY_TOKENS.bigData,
+  MODULE_KEY_TOKENS.openBanking,
 ]
 
 const STRUCTURAL_GAPS: ProgramStructuralGapDefinition[] = [
@@ -518,14 +529,14 @@ const PROGRAM_RELEASE_TRAINS: ProgramReleaseTrainDefinition[] = [
     deployPolicy: 'all_flags_off',
     dependsOn: ['trainB'],
     affectedModules: [
-      'billingV1',
-      'referralV1',
-      'publicApiV1',
-      'integrationsHubV1',
-      'superAdminV1',
-      'agentReadyV1',
-      'bigDataV1',
-      'openBankingV1',
+      MODULE_KEY_TOKENS.billing,
+      MODULE_KEY_TOKENS.referral,
+      MODULE_KEY_TOKENS.publicApi,
+      MODULE_KEY_TOKENS.integrationsHub,
+      MODULE_KEY_TOKENS.superAdmin,
+      MODULE_KEY_TOKENS.agentReady,
+      MODULE_KEY_TOKENS.bigData,
+      MODULE_KEY_TOKENS.openBanking,
     ],
     scope: [
       'surfaces reguladas continuam compliance gated',

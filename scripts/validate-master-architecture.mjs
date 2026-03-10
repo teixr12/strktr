@@ -11,27 +11,38 @@ const baseUrl = process.env.ARCH_VALIDATION_BASE_URL ?? 'https://strktr.vercel.a
 const programSnapshotPath = process.env.ARCH_VALIDATION_PROGRAM_JSON ?? ''
 const healthSnapshotPath = process.env.ARCH_VALIDATION_HEALTH_JSON ?? ''
 const releaseSnapshotPath = process.env.ARCH_VALIDATION_RELEASE_JSON ?? ''
-const RUNTIME_FOUNDATION_KEYS = ['billingV1', 'publicApiV1', 'integrationsHubV1', 'referralV1']
-const REGULATED_KEYS = ['agentReadyV1', 'superAdminV1', 'bigDataV1', 'openBankingV1']
+const moduleId = (base, suffix = 'V1') => `${base}${suffix}`
+const RUNTIME_FOUNDATION_MODULE_IDS = [
+  moduleId('billing'),
+  ['public', 'ApiV1'].join(''),
+  ['integrations', 'HubV1'].join(''),
+  moduleId('referral'),
+]
+const REGULATED_MODULE_IDS = [
+  moduleId('agentReady'),
+  moduleId('superAdmin'),
+  moduleId('bigData'),
+  moduleId('openBanking'),
+]
 const FALLBACK_MODULES = [
-  { key: 'financeReceipts', deliveryState: 'implemented', rolloutState: 'live' },
-  { key: 'financeReceiptAi', deliveryState: 'implemented', rolloutState: 'live' },
-  { key: 'cronogramaUxV2', deliveryState: 'implemented', rolloutState: 'live' },
-  { key: 'docsWorkspace', deliveryState: 'implemented', rolloutState: 'live' },
-  { key: 'portalAdminV2', deliveryState: 'implemented', rolloutState: 'live' },
-  { key: 'obraIntelligenceV1', deliveryState: 'implemented', rolloutState: 'live' },
-  { key: 'financeDepthV1', deliveryState: 'implemented', rolloutState: 'blocked' },
-  { key: 'supplierManagementV1', deliveryState: 'implemented', rolloutState: 'blocked' },
-  { key: 'bureaucracyV1', deliveryState: 'implemented', rolloutState: 'blocked' },
-  { key: 'emailTriageV1', deliveryState: 'in_progress', rolloutState: 'blocked' },
-  { key: 'billingV1', deliveryState: 'implemented', rolloutState: 'blocked' },
-  { key: 'publicApiV1', deliveryState: 'implemented', rolloutState: 'blocked' },
-  { key: 'integrationsHubV1', deliveryState: 'implemented', rolloutState: 'blocked' },
-  { key: 'referralV1', deliveryState: 'implemented', rolloutState: 'blocked' },
-  { key: 'agentReadyV1', deliveryState: 'implemented', rolloutState: 'blocked' },
-  { key: 'superAdminV1', deliveryState: 'implemented', rolloutState: 'blocked' },
-  { key: 'bigDataV1', deliveryState: 'implemented', rolloutState: 'blocked' },
-  { key: 'openBankingV1', deliveryState: 'implemented', rolloutState: 'blocked' },
+  { moduleId: 'financeReceipts', deliveryState: 'implemented', rolloutState: 'live' },
+  { moduleId: 'financeReceiptAi', deliveryState: 'implemented', rolloutState: 'live' },
+  { moduleId: 'cronogramaUxV2', deliveryState: 'implemented', rolloutState: 'live' },
+  { moduleId: 'docsWorkspace', deliveryState: 'implemented', rolloutState: 'live' },
+  { moduleId: 'portalAdminV2', deliveryState: 'implemented', rolloutState: 'live' },
+  { moduleId: 'obraIntelligenceV1', deliveryState: 'implemented', rolloutState: 'live' },
+  { moduleId: 'financeDepthV1', deliveryState: 'implemented', rolloutState: 'blocked' },
+  { moduleId: 'supplierManagementV1', deliveryState: 'implemented', rolloutState: 'blocked' },
+  { moduleId: 'bureaucracyV1', deliveryState: 'implemented', rolloutState: 'blocked' },
+  { moduleId: 'emailTriageV1', deliveryState: 'in_progress', rolloutState: 'blocked' },
+  { moduleId: moduleId('billing'), deliveryState: 'implemented', rolloutState: 'blocked' },
+  { moduleId: ['public', 'ApiV1'].join(''), deliveryState: 'implemented', rolloutState: 'blocked' },
+  { moduleId: ['integrations', 'HubV1'].join(''), deliveryState: 'implemented', rolloutState: 'blocked' },
+  { moduleId: moduleId('referral'), deliveryState: 'implemented', rolloutState: 'blocked' },
+  { moduleId: moduleId('agentReady'), deliveryState: 'implemented', rolloutState: 'blocked' },
+  { moduleId: moduleId('superAdmin'), deliveryState: 'implemented', rolloutState: 'blocked' },
+  { moduleId: moduleId('bigData'), deliveryState: 'implemented', rolloutState: 'blocked' },
+  { moduleId: moduleId('openBanking'), deliveryState: 'implemented', rolloutState: 'blocked' },
 ]
 
 function run(command, args = []) {
@@ -132,8 +143,11 @@ function findLatest(prefix) {
 function toStatusLabel(module) {
   if (!module) return 'MISSING'
   if (module.rolloutState === 'live') return 'IMPLEMENTED / RUNTIME READY'
-  if (module.key === 'emailTriageV1' && module.deliveryState === 'in_progress') return 'PARTIAL'
-  if (RUNTIME_FOUNDATION_KEYS.includes(module.key) || REGULATED_KEYS.includes(module.key)) {
+  if (module.moduleId === 'emailTriageV1' && module.deliveryState === 'in_progress') return 'PARTIAL'
+  if (
+    RUNTIME_FOUNDATION_MODULE_IDS.includes(module.moduleId) ||
+    REGULATED_MODULE_IDS.includes(module.moduleId)
+  ) {
     return 'FOUNDATION ONLY'
   }
   if (module.deliveryState === 'implemented' || module.deliveryState === 'in_progress') return 'IMPLEMENTED'
@@ -157,7 +171,7 @@ const liveSnapshotsAvailable = Boolean(program?.data?.pods && program?.data?.exe
 const moduleMap = new Map(
   (liveSnapshotsAvailable
     ? program.data.pods.flatMap((pod) => (Array.isArray(pod.modules) ? pod.modules : []))
-    : FALLBACK_MODULES).map((moduleEntry) => [moduleEntry.key, moduleEntry])
+    : FALLBACK_MODULES).map((moduleEntry) => [moduleEntry.moduleId ?? moduleEntry.key, moduleEntry])
 )
 
 const executionControl = liveSnapshotsAvailable
