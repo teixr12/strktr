@@ -14,6 +14,7 @@ export type OrgRolloutFeatureKey =
   | 'financeReceiptAi'
   | 'cronogramaUxV2'
   | 'docsWorkspace'
+  | 'supplierManagementV1'
 
 type RolloutSource =
   | 'wave2'
@@ -22,6 +23,7 @@ type RolloutSource =
   | 'financeReceiptAi'
   | 'cronogramaUxV2'
   | 'docsWorkspace'
+  | 'supplierManagementV1'
 
 export type OrgCanarySnapshot = {
   configured: boolean
@@ -47,6 +49,7 @@ const FEATURE_FLAG_ENV: Record<OrgRolloutFeatureKey, string | undefined> = {
   financeReceiptAi: process.env.NEXT_PUBLIC_FF_FINANCE_RECEIPT_AI_V1,
   cronogramaUxV2: process.env.NEXT_PUBLIC_FF_CRONOGRAMA_UX_V2,
   docsWorkspace: process.env.NEXT_PUBLIC_FF_DOCS_WORKSPACE_V1,
+  supplierManagementV1: process.env.NEXT_PUBLIC_FF_SUPPLIER_MANAGEMENT_V1,
 }
 
 const DEFAULT_WAVE2_CANARY_ENV: CanaryEnvConfig = {
@@ -85,6 +88,12 @@ const DOCS_WORKSPACE_CANARY_ENV: CanaryEnvConfig = {
   source: 'docsWorkspace',
 }
 
+const SUPPLIER_MANAGEMENT_V1_CANARY_ENV: CanaryEnvConfig = {
+  allowlistEnv: 'FF_SUPPLIER_MANAGEMENT_V1_CANARY_ORGS',
+  percentEnv: 'FF_SUPPLIER_MANAGEMENT_V1_CANARY_PERCENT',
+  source: 'supplierManagementV1',
+}
+
 const FEATURE_CANARY_ENV: Record<OrgRolloutFeatureKey, CanaryEnvConfig> = {
   weather: DEFAULT_WAVE2_CANARY_ENV,
   map: DEFAULT_WAVE2_CANARY_ENV,
@@ -96,6 +105,7 @@ const FEATURE_CANARY_ENV: Record<OrgRolloutFeatureKey, CanaryEnvConfig> = {
   financeReceiptAi: FINANCE_RECEIPT_AI_CANARY_ENV,
   cronogramaUxV2: CRONOGRAMA_UX_V2_CANARY_ENV,
   docsWorkspace: DOCS_WORKSPACE_CANARY_ENV,
+  supplierManagementV1: SUPPLIER_MANAGEMENT_V1_CANARY_ENV,
 }
 
 function normalizeEnv(value: string | undefined): string {
@@ -200,6 +210,10 @@ export function getDocsWorkspaceCanarySnapshot(): OrgCanarySnapshot {
   return getFeatureCanarySnapshot('docsWorkspace')
 }
 
+export function getSupplierManagementV1CanarySnapshot(): OrgCanarySnapshot {
+  return getFeatureCanarySnapshot('supplierManagementV1')
+}
+
 export function isWave2FeatureEnabledForOrg(
   feature: Wave2FeatureKey,
   orgId: string | null | undefined
@@ -232,4 +246,8 @@ export function isCronogramaUxV2EnabledForOrg(orgId: string | null | undefined):
 
 export function isDocsWorkspaceEnabledForOrg(orgId: string | null | undefined): boolean {
   return isFeatureEnabledForOrg('docsWorkspace', orgId)
+}
+
+export function isSupplierManagementV1EnabledForOrg(orgId: string | null | undefined): boolean {
+  return isFeatureEnabledForOrg('supplierManagementV1', orgId)
 }
