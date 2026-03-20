@@ -15,6 +15,7 @@ const BUREAUCRACY_COLUMNS = [
   'prioridade',
   'obra_id',
   'projeto_id',
+  'supplier_id',
   'processo_codigo',
   'orgao_nome',
   'responsavel_nome',
@@ -59,7 +60,7 @@ async function hydrateContext(
 async function ensureLinkedContext(
   supabase: SupabaseClient,
   orgId: string,
-  payload: { obra_id?: string | null; projeto_id?: string | null }
+  payload: { obra_id?: string | null; projeto_id?: string | null; supplier_id?: string | null }
 ) {
   if (payload.obra_id) {
     const { data, error } = await supabase
@@ -87,6 +88,25 @@ async function ensureLinkedContext(
     if (error) throw new Error(error.message)
     if (!data) {
       const err = new Error('Projeto vinculado não encontrado') as Error & { code?: string; status?: number }
+      err.code = API_ERROR_CODES.NOT_FOUND
+      err.status = 404
+      throw err
+    }
+  }
+
+  if (payload.supplier_id) {
+    const { data, error } = await supabase
+      .from('fornecedores')
+      .select('id')
+      .eq('id', payload.supplier_id)
+      .eq('org_id', orgId)
+      .maybeSingle()
+    if (error) throw new Error(error.message)
+    if (!data) {
+      const err = new Error('Fornecedor vinculado não encontrado') as Error & {
+        code?: string
+        status?: number
+      }
       err.code = API_ERROR_CODES.NOT_FOUND
       err.status = 404
       throw err
@@ -149,7 +169,7 @@ export const PUT = withBureaucracyAuth('can_manage_projects', async (request, { 
 
   const { data: existing, error: existingError } = await supabase
     .from('burocracia_itens')
-    .select('id, obra_id, projeto_id')
+    .select('id, obra_id, projeto_id, supplier_id')
     .eq('id', id)
     .eq('org_id', orgId)
     .maybeSingle()
@@ -173,6 +193,8 @@ export const PUT = withBureaucracyAuth('can_manage_projects', async (request, { 
   const candidate = {
     obra_id: parsed.data.obra_id !== undefined ? parsed.data.obra_id || null : existing.obra_id,
     projeto_id: parsed.data.projeto_id !== undefined ? parsed.data.projeto_id || null : existing.projeto_id,
+    supplier_id:
+      parsed.data.supplier_id !== undefined ? parsed.data.supplier_id || null : existing.supplier_id,
   }
 
   try {
@@ -197,6 +219,7 @@ export const PUT = withBureaucracyAuth('can_manage_projects', async (request, { 
     'prioridade',
     'obra_id',
     'projeto_id',
+    'supplier_id',
     'processo_codigo',
     'orgao_nome',
     'responsavel_nome',

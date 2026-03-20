@@ -16,6 +16,7 @@ const BUREAUCRACY_COLUMNS = [
   'prioridade',
   'obra_id',
   'projeto_id',
+  'supplier_id',
   'processo_codigo',
   'orgao_nome',
   'responsavel_nome',
@@ -95,7 +96,7 @@ async function hydrateContext(
 async function ensureLinkedContext(
   supabase: SupabaseClient,
   orgId: string,
-  payload: { obra_id?: string | null; projeto_id?: string | null }
+  payload: { obra_id?: string | null; projeto_id?: string | null; supplier_id?: string | null }
 ) {
   if (payload.obra_id) {
     const { data, error } = await supabase
@@ -128,6 +129,25 @@ async function ensureLinkedContext(
       throw err
     }
   }
+
+  if (payload.supplier_id) {
+    const { data, error } = await supabase
+      .from('fornecedores')
+      .select('id')
+      .eq('id', payload.supplier_id)
+      .eq('org_id', orgId)
+      .maybeSingle()
+    if (error) throw new Error(error.message)
+    if (!data) {
+      const err = new Error('Fornecedor vinculado não encontrado') as Error & {
+        code?: string
+        status?: number
+      }
+      err.code = API_ERROR_CODES.NOT_FOUND
+      err.status = 404
+      throw err
+    }
+  }
 }
 
 export const GET = withBureaucracyAuth('can_manage_projects', async (request, { supabase, requestId, orgId, user }) => {
@@ -135,6 +155,7 @@ export const GET = withBureaucracyAuth('can_manage_projects', async (request, { 
   const status = (searchParams.get('status') || '').trim()
   const categoria = (searchParams.get('categoria') || '').trim()
   const prioridade = (searchParams.get('prioridade') || '').trim()
+  const supplierId = (searchParams.get('supplier_id') || '').trim()
   const search = normalizeSearchTerm(searchParams.get('q'))
   const { page, pageSize, offset } = getPaginationFromSearchParams(searchParams, {
     defaultPageSize: 50,
@@ -149,6 +170,7 @@ export const GET = withBureaucracyAuth('can_manage_projects', async (request, { 
   if (status) query = query.eq('status', status)
   if (categoria) query = query.eq('categoria', categoria)
   if (prioridade) query = query.eq('prioridade', prioridade)
+  if (supplierId) query = query.eq('supplier_id', supplierId)
   if (search) {
     query = query.or(
       `titulo.ilike.%${search}%,processo_codigo.ilike.%${search}%,orgao_nome.ilike.%${search}%,responsavel_nome.ilike.%${search}%`
@@ -234,6 +256,7 @@ export const POST = withBureaucracyAuth('can_manage_projects', async (request, {
       prioridade: parsed.data.prioridade,
       obra_id: parsed.data.obra_id || null,
       projeto_id: parsed.data.projeto_id || null,
+      supplier_id: parsed.data.supplier_id || null,
       processo_codigo: parsed.data.processo_codigo || null,
       orgao_nome: parsed.data.orgao_nome || null,
       responsavel_nome: parsed.data.responsavel_nome || null,
