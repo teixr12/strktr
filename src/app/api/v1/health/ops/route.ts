@@ -4,6 +4,7 @@ import { fail, ok } from '@/lib/api/response'
 import { isFlagDisabledByDefault, isFlagEnabledByDefault } from '@/lib/feature-flags'
 import {
   getAddressHqCanarySnapshot,
+  getBureaucracyV1CanarySnapshot,
   getCronogramaUxV2CanarySnapshot,
   getDocsWorkspaceCanarySnapshot,
   getFinanceReceiptAiCanarySnapshot,
@@ -60,6 +61,7 @@ export async function GET(request: Request) {
     const addressHqCanary = getAddressHqCanarySnapshot()
     const financeReceiptsCanary = getFinanceReceiptsCanarySnapshot()
     const financeReceiptAiCanary = getFinanceReceiptAiCanarySnapshot()
+    const bureaucracyV1Canary = getBureaucracyV1CanarySnapshot()
     const cronogramaUxV2Canary = getCronogramaUxV2CanarySnapshot()
     const docsWorkspaceCanary = getDocsWorkspaceCanarySnapshot()
     return ok(request, {
@@ -72,6 +74,7 @@ export async function GET(request: Request) {
         addressHqCanary,
         financeReceiptsCanary,
         financeReceiptAiCanary,
+        bureaucracyV1Canary,
         cronogramaUxV2Canary,
         docsWorkspaceCanary,
       },
@@ -127,6 +130,7 @@ export async function GET(request: Request) {
         docsWorkspaceV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_DOCS_WORKSPACE_V1),
         financeReceiptsV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_FINANCE_RECEIPTS_V1),
         financeReceiptAiV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_FINANCE_RECEIPT_AI_V1),
+        bureaucracyV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_BUREAUCRACY_V1),
         clientPortal: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_CLIENT_PORTAL),
         approvalGate: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_APPROVAL_GATE),
         architectAgenda: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_ARCHITECT_AGENDA),
