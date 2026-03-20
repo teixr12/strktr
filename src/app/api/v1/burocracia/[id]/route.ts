@@ -3,6 +3,8 @@ import { API_ERROR_CODES } from '@/lib/api/errors'
 import { log } from '@/lib/api/logger'
 import { fail, ok } from '@/lib/api/response'
 import { withBureaucracyAuth } from '@/lib/bureaucracy/api'
+import { buildBureaucracyItemChangedEvent } from '@/server/events/bureaucracy-events'
+import { publishAfterResponse } from '@/server/events/publish'
 import { updateBureaucracyItemSchema } from '@/shared/schemas/bureaucracy'
 import type { BureaucracyRecord } from '@/shared/types/bureaucracy'
 
@@ -31,6 +33,10 @@ const BUREAUCRACY_COLUMNS = [
 ].join(', ')
 
 type BureaucracyRow = Omit<BureaucracyRecord, 'obra_nome' | 'projeto_nome'>
+type BureaucracyEventRow = Pick<
+  BureaucracyRecord,
+  'id' | 'org_id' | 'supplier_id' | 'status' | 'proxima_checagem_em' | 'updated_at'
+>
 type ContextRow = { id: string; nome: string | null }
 
 async function hydrateContext(
@@ -259,6 +265,17 @@ export const PUT = withBureaucracyAuth('can_manage_projects', async (request, { 
 
   try {
     const hydrated = await hydrateContext(supabase, (data as unknown) as BureaucracyRow)
+    publishAfterResponse(
+      buildBureaucracyItemChangedEvent(hydrated, {
+        previous_supplier_id: existing.supplier_id,
+      }),
+      {
+        requestId,
+        orgId,
+        route: '/api/v1/burocracia/[id]',
+        userId: user.id,
+      }
+    )
     return ok(request, hydrated)
   } catch (err) {
     return fail(
@@ -271,6 +288,24 @@ export const PUT = withBureaucracyAuth('can_manage_projects', async (request, { 
 
 export const DELETE = withBureaucracyAuth('can_manage_projects', async (request, { supabase, requestId, orgId, user }) => {
   const id = new URL(request.url).pathname.split('/').pop() || ''
+  const { data: existing, error: existingError } = await supabase
+    .from('burocracia_itens')
+    .select('id, org_id, supplier_id, status, proxima_checagem_em, updated_at')
+    .eq('id', id)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (existingError) {
+    log('error', 'burocracia.lookup.failed', {
+      requestId,
+      orgId,
+      userId: user.id,
+      route: '/api/v1/burocracia/[id]',
+      itemId: id,
+      error: existingError.message,
+    })
+    return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: existingError.message }, 500)
+  }
 
   const { error } = await supabase
     .from('burocracia_itens')
@@ -288,6 +323,21 @@ export const DELETE = withBureaucracyAuth('can_manage_projects', async (request,
       error: error.message,
     })
     return fail(request, { code: API_ERROR_CODES.DB_ERROR, message: error.message }, 500)
+  }
+
+  if (existing) {
+    publishAfterResponse(
+      buildBureaucracyItemChangedEvent((existing as unknown) as BureaucracyEventRow, {
+        supplier_id: null,
+        previous_supplier_id: existing.supplier_id,
+      }),
+      {
+        requestId,
+        orgId,
+        route: '/api/v1/burocracia/[id]',
+        userId: user.id,
+      }
+    )
   }
 
   return ok(request, { success: true })
