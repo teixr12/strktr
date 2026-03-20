@@ -28,6 +28,7 @@ const iconMap: Record<ToastType, typeof CheckCircle2> = {
 let nextId = 0
 
 export function ToastProvider() {
+  const [mounted, setMounted] = useState(false)
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const timersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map())
 
@@ -88,8 +89,11 @@ export function ToastProvider() {
     }
   }, [])
 
-  // Don't render during SSR
-  if (typeof window === 'undefined') return null
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted || typeof document === 'undefined') return null
 
   return createPortal(
     <ToastContext.Provider value={addToast}>

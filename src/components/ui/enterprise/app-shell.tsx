@@ -16,13 +16,9 @@ export function AppShell({ sidebar, header, footer, children }: AppShellProps) {
       >
         Pular para conteúdo
       </a>
-      <nav aria-label="Menu principal">
-        {sidebar}
-      </nav>
+      {sidebar}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header role="banner">
-          {header}
-        </header>
+        {header}
         <main id="main-content" className="flex-1 overflow-y-auto px-0 pb-0">
           {children}
           {footer}
