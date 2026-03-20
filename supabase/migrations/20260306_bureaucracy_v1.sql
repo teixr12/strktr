@@ -38,9 +38,9 @@ alter table public.burocracia_itens enable row level security;
 
 drop policy if exists burocracia_itens_org_read on public.burocracia_itens;
 create policy burocracia_itens_org_read on public.burocracia_itens
-  for select using (org_id = public.current_org_id());
+  for select using (org_id in (select public.get_user_org_ids(auth.uid())));
 
 drop policy if exists burocracia_itens_org_write on public.burocracia_itens;
 create policy burocracia_itens_org_write on public.burocracia_itens
-  for all using (org_id = public.current_org_id())
-  with check (org_id = public.current_org_id());
+  for all using (org_id in (select public.get_user_org_ids(auth.uid())))
+  with check (org_id in (select public.get_user_org_ids(auth.uid())));
