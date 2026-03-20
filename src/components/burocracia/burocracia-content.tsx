@@ -99,7 +99,8 @@ function statusTone(value: BureaucracyStatus) {
 
 function formatDate(value: string | null) {
   if (!value) return 'Sem data'
-  return new Date(value).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+  const normalizedValue = /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T12:00:00` : value
+  return new Date(normalizedValue).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 function toDatetimeLocalValue(value: string | null) {
