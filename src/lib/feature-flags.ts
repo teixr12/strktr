@@ -61,6 +61,7 @@ export const featureFlags = {
   docsWorkspaceV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_DOCS_WORKSPACE_V1),
   financeReceiptsV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_FINANCE_RECEIPTS_V1),
   financeReceiptAiV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_FINANCE_RECEIPT_AI_V1),
+  bureaucracyV1: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_BUREAUCRACY_V1),
   clientPortal: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_CLIENT_PORTAL),
   approvalGate: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_APPROVAL_GATE),
   architectAgenda: isFlagDisabledByDefault(process.env.NEXT_PUBLIC_FF_ARCHITECT_AGENDA),
