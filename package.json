@@ -20,6 +20,7 @@
     "audit:analytics-drift:7d": "./scripts/audit-analytics-drift-7d.sh",
     "audit:analytics-capture-probe": "./scripts/audit-analytics-capture-probe.sh",
     "ops:reconcile-analytics-portal": "./scripts/reconcile-analytics-portal.sh",
+    "ops:bureaucracy-v1:validate": "node scripts/validate-bureaucracy-v1-rollout.mjs",
     "audit:ux-quality": "node scripts/audit-ux-quality.mjs",
     "governance:boundaries": "node scripts/check-dependency-boundaries.mjs",
     "governance:analytics": "node scripts/check-analytics-taxonomy.mjs",
