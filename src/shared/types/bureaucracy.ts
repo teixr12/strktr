@@ -30,6 +30,7 @@ export interface BureaucracyRecord {
   obra_nome: string | null
   projeto_id: string | null
   projeto_nome: string | null
+  supplier_id: string | null
   processo_codigo: string | null
   orgao_nome: string | null
   responsavel_nome: string | null

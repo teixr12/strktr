@@ -16,6 +16,7 @@ const BUREAUCRACY_COLUMNS = [
   'prioridade',
   'obra_id',
   'projeto_id',
+  'supplier_id',
   'processo_codigo',
   'orgao_nome',
   'responsavel_nome',

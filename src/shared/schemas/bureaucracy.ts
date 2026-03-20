@@ -39,6 +39,7 @@ export const createBureaucracyItemSchema = z.object({
   prioridade: bureaucracyPrioritySchema.default('medium'),
   obra_id: optionalStringSchema,
   projeto_id: optionalStringSchema,
+  supplier_id: optionalStringSchema,
   processo_codigo: optionalStringSchema,
   orgao_nome: optionalStringSchema,
   responsavel_nome: optionalStringSchema,
